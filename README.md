@@ -40,7 +40,8 @@ Proofs are about the code the compiler produces, not about a transcription by ha
   as calls. It changes no code.
 - `ir2lean` exports one function and rejects anything outside the supported fragment. Its output
   is a Lean file in the `llvm_func` notation of `LibcMath/IR/DSL.lean`, which follows LLVM's
-  assembly language and defines a `LibcMath.IR.Func`.
+  assembly language and defines a `LibcMath.IR.Func`. The fragment has no `switch`; `ir2lean`
+  first replaces each one by conditional branches with LLVM's `lower-switch` pass.
 
 ```bash
 extract/extract.sh <llvm-project>/libc expf math::double_eval::expf expf

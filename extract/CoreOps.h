@@ -27,9 +27,12 @@ struct CoreOp {
   llvm::StringRef LeanName;
 };
 
-/// The name of a function relative to the libc namespace, without parameter
-/// list or template arguments: `__llvm_libc::fputil::f<float>(int)` becomes
-/// `fputil::f`.
+/// The name of a function relative to the libc namespace, without its
+/// parameter list and template arguments: `__llvm_libc::fputil::f<float>(int)`
+/// becomes `fputil::f`. An enclosing class or function is printed in full, so
+/// a member of a class template or a lambda has a name different from that of
+/// any function at namespace scope. A name that is not mangled is returned
+/// unchanged.
 std::string relativeName(const llvm::Function &F);
 
 /// The core operation a function implements, if any.
