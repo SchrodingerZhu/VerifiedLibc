@@ -5,6 +5,7 @@ import LibcMath.Functions.RoundingRanges
 import LibcMath.Functions.ExpRanges
 import LibcMath.SpecExamples
 import LibcMath.IR.Semantics
+import LibcMath.IR.SemanticsExamples
 import LibcMath.SpecLemmas
 import LibcMath.IR.Interp
 import LibcMath.Exhaustive.Interface
