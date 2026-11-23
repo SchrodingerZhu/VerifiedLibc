@@ -22,7 +22,8 @@ Registers are numbered: parameters first, then instructions in program order. Bl
 written as bare bit patterns, including floating-point ones. Types are `iN`, `half`, `float` and
 `double`. The instructions are those of `Instr`, under their LLVM names; `call` names a `CoreOp`.
 The flags of `Flags` and `FastMathFlags` follow the opcode, as in LLVM, on the instructions that
-carry them there.
+carry them there. An intrinsic is written like an instruction, under its name without the
+`llvm.` prefix and the type suffix: `%2 = sqrt %1 : double`, `%2 = is.fpclass %1, 0x204 : float`.
 -/
 
 namespace LibcMath.IR.DSL
@@ -108,6 +109,11 @@ def expandOperand (ty : Ident) : TSyntax `llvm_operand → MacroM Term
   | `(llvm_operand| $bits:num) => do `(Operand.const $(quote (← typeWidth ty)) $bits)
   | stx => Macro.throwErrorAt stx "unsupported operand"
 
+/-- An operand that an instruction requires to be a constant, such as the mask of `is.fpclass`. -/
+def constantOperand : TSyntax `llvm_operand → MacroM (TSyntax `num)
+  | `(llvm_operand| $bits:num) => pure bits
+  | stx => Macro.throwErrorAt stx "expected a constant"
+
 def expandArg : TSyntax `llvm_arg → MacroM Term
   | `(llvm_arg| $ty:ident $a:llvm_operand) => expandOperand ty a
   | stx => Macro.throwErrorAt stx "unsupported operand"
@@ -130,9 +136,9 @@ def allowedFlags : String → List String
   | "lshr" | "ashr" => ["exact"]
   | "or" => ["disjoint"]
   | "icmp" => ["samesign"]
-  | "zext" => ["nneg"]
-  | "fadd" | "fsub" | "fmul" | "fneg" | "fabs" | "fmuladd" | "fcmp" | "fpext" | "fptrunc" =>
-    ["nnan", "ninf"]
+  | "zext" | "uitofp" => ["nneg"]
+  | "fadd" | "fsub" | "fmul" | "fdiv" | "fneg" | "fabs" | "sqrt" | "copysign" | "fmuladd" | "fcmp"
+  | "fpext" | "fptrunc" => ["nnan", "ninf"]
   | _ => []
 
 /-- The `Flags` and the `FastMathFlags` written after the opcode `op`. -/
@@ -157,8 +163,12 @@ def expandInstr (tables : Array Name) :
     let instr ← match op.getId.toString, ← args.mapM (expandOperand ty) with
       | "fneg", #[a] => do `(Instr.fneg $(← typeFormat ty) $a $fmf)
       | "fabs", #[a] => do `(Instr.fabs $(← typeFormat ty) $a $fmf)
+      | "sqrt", #[a] => do `(Instr.sqrt $(← typeFormat ty) $a $fmf)
+      | "copysign", #[a, b] => do `(Instr.copysign $(← typeFormat ty) $a $b $fmf)
+      | "is.fpclass", #[a, _] => do
+        `(Instr.isFpClass $(← typeFormat ty) $a $(← constantOperand args[1]!))
       | "fmuladd", #[a, b, c] => do `(Instr.fmuladd $(← typeFormat ty) $a $b $c $fmf)
-      | "fadd", #[a, b] | "fsub", #[a, b] | "fmul", #[a, b] => do
+      | "fadd", #[a, b] | "fsub", #[a, b] | "fmul", #[a, b] | "fdiv", #[a, b] => do
         `(Instr.fBin $(← typeFormat ty) $(enumCtor ``FBinOp op) $a $b $fmf)
       | "select", #[_, a, b] => do `(Instr.select $(← expandOperand (mkIdent `i1) args[0]!) $a $b)
       | _, #[a, b] => `(Instr.intBin $(enumCtor ``IntBinOp op) $a $b $flags)
@@ -184,6 +194,9 @@ def expandInstr (tables : Array Name) :
       | "bitcast" => `(Instr.bitcast $a)
       | "fpext" | "fptrunc" => do `(Instr.fpConvert $(← typeFormat src) $(← typeFormat dst) $a $fmf)
       | "fptosi" => do `(Instr.fptosi $(← typeFormat src) $(quote (← typeWidth dst)) $a)
+      | "fptoui" => do `(Instr.fptoui $(← typeFormat src) $(quote (← typeWidth dst)) $a)
+      | "sitofp" => do `(Instr.sitofp $(← typeFormat dst) $a)
+      | "uitofp" => do `(Instr.uitofp $(← typeFormat dst) $a $flags)
       | _ => Macro.throwErrorAt op "unsupported cast"
     return (r, .inr instr)
   | `(llvm_instr| %$r:num = phi $incoming:llvm_incoming,* : $ty) => do

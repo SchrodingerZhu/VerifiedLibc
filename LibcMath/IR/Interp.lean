@@ -347,6 +347,31 @@ def Instr.exec (mode : IEEERoundingMode) (f : Func) (s : Store) : Instr → Opti
     match ExecDType.convertToInteger (width := width) x .towardZero with
     | .success n _ => some (.exact ⟨width, n.bits⟩)
     | .failure _ => none
+  | fptoui src width a => do
+    let x ← a.execFloat src s
+    match ExecDType.convertToInteger (width := width + 1) x .towardZero with
+    | .success n _ =>
+      if n.bits.msb = false then some (.exact ⟨width, n.bits.setWidth width⟩) else none
+    | .failure _ => none
+  | sitofp dst a => do
+    let v ← a.execExact s
+    some (.ofFloat (ExecDType.convertFromInt dst ⟨v.bits⟩ mode : Model dst))
+  | uitofp dst a flags => do
+    let v ← a.execExact s
+    if flags.zextDefined v.bits then
+      some (.ofFloat (ExecDType.convertFromInt dst ⟨v.bits.setWidth (v.width + 1)⟩ mode : Model dst))
+    else none
+  | sqrt fmt a fmf => do
+    let x ← a.execFloat fmt s
+    if fmf.admits x && fmf.admits (Model.sqrt x mode) then some (.ofFloat (Model.sqrt x mode))
+    else none
+  | copysign fmt a b fmf => do
+    let x ← a.execFloat fmt s
+    let y ← b.execFloat fmt s
+    if fmf.admits x && fmf.admits y then some (.exact (.ofModel (Model.copySign x y))) else none
+  | isFpClass fmt a mask => do
+    let x ← a.execFloat fmt s
+    some (.exact (.ofBool (mask.testBit (fpClassBit (Model.classify x)))))
   | bitcast a => a.exec s
   | load table index => do
     let t ← f.tables[table]?
@@ -535,6 +560,80 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     cases ha₂
     rw [hn] at hn₂
     cases hn₂
+    rfl
+  | fptoui src width a =>
+    simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
+    obtain ⟨u, hu, hx⟩ := hx
+    have ha := Operand.eval_of_execFloat h hu
+    split at hx <;> [skip; cases hx]
+    rename_i n status hn
+    split at hx <;> cases hx
+    rename_i hmsb
+    refine ⟨⟨_, ⟨u, n, status, ha, hn, hmsb, rfl⟩, fun _ => rfl⟩, ?_⟩
+    rintro r ⟨u₂, n₂, status₂, ha₂, hn₂, -, rfl⟩
+    rw [ha] at ha₂
+    cases ha₂
+    rw [hn] at hn₂
+    cases hn₂
+    rfl
+  | sitofp dst a =>
+    simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
+    obtain ⟨v, hv, hx⟩ := hx
+    cases hx
+    have ha := Operand.eval_of_execExact h hv
+    refine ⟨⟨_, ⟨v, ha, (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩,
+      fun _ => rfl⟩, ?_⟩
+    rintro r ⟨v₂, ha₂, hr⟩
+    rw [ha] at ha₂
+    cases ha₂
+    exact (AbsVal.ofFloat_admits_iff _ _).2 hr
+  | uitofp dst a flags =>
+    simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
+    obtain ⟨v, hv, hx⟩ := hx
+    split at hx <;> cases hx
+    rename_i hdef
+    have ha := Operand.eval_of_execExact h hv
+    refine ⟨⟨_, ⟨v, ha, hdef, (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩,
+      fun _ => rfl⟩, ?_⟩
+    rintro r ⟨v₂, ha₂, -, hr⟩
+    rw [ha] at ha₂
+    cases ha₂
+    exact (AbsVal.ofFloat_admits_iff _ _).2 hr
+  | sqrt fmt a fmf =>
+    simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
+    obtain ⟨u, hu, hx⟩ := hx
+    split at hx <;> cases hx
+    rename_i hdef
+    have ha := Operand.eval_of_execFloat h hu
+    refine ⟨⟨_, ⟨u, ha, hdef,
+      (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩, fun _ => rfl⟩, ?_⟩
+    rintro r ⟨u₂, ha₂, -, hr⟩
+    rw [ha] at ha₂
+    cases ha₂
+    exact (AbsVal.ofFloat_admits_iff _ _).2 hr
+  | copysign fmt a b fmf =>
+    simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
+    obtain ⟨u, hu, v, hv, hx⟩ := hx
+    split at hx <;> cases hx
+    rename_i hdef
+    have ha := Operand.eval_of_execFloat h hu
+    have hb := Operand.eval_of_execFloat h hv
+    refine ⟨⟨_, ⟨u, v, ha, hb, hdef, rfl⟩, fun _ => rfl⟩, ?_⟩
+    rintro r ⟨u₂, v₂, ha₂, hb₂, -, rfl⟩
+    rw [ha] at ha₂
+    cases ha₂
+    rw [hb] at hb₂
+    cases hb₂
+    rfl
+  | isFpClass fmt a mask =>
+    simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
+    obtain ⟨u, hu, hx⟩ := hx
+    cases hx
+    have ha := Operand.eval_of_execFloat h hu
+    refine ⟨⟨_, ⟨u, ha, rfl⟩, fun _ => rfl⟩, ?_⟩
+    rintro r ⟨u₂, ha₂, rfl⟩
+    rw [ha] at ha₂
+    cases ha₂
     rfl
   | bitcast a =>
     obtain ⟨v, hv, hadm⟩ := Operand.exec_sound h hx

@@ -172,7 +172,8 @@ SmallVector<StringRef, 2> Translator::poisonFlags(const Instruction &I) const {
     if (FMF.any())
       unsupported("fast-math flags", I);
     Rest->copyFastMathFlags(FMF);
-  } else if (isa<OverflowingBinaryOperator>(I) || isa<TruncInst>(I)) {
+  }
+  if (isa<OverflowingBinaryOperator>(I) || isa<TruncInst>(I)) {
     if (I.hasNoUnsignedWrap())
       Flags.push_back("nuw");
     if (I.hasNoSignedWrap())
@@ -219,6 +220,7 @@ void Translator::translateBinary(const BinaryOperator &I,
   case Instruction::FAdd:
   case Instruction::FSub:
   case Instruction::FMul:
+  case Instruction::FDiv:
     Opcode = I.getOpcodeName();
     break;
   default:
@@ -238,6 +240,13 @@ void Translator::translateCast(const CastInst &I, ArrayRef<StringRef> Flags) {
   case Instruction::FPExt:
   case Instruction::FPTrunc:
   case Instruction::FPToSI:
+  case Instruction::FPToUI:
+    break;
+  case Instruction::SIToFP:
+  case Instruction::UIToFP:
+    // The Lean side has no fast-math flags on conversions from integers.
+    if (I.getFastMathFlags().any())
+      unsupported("fast-math flags", I);
     break;
   default:
     unsupported("cast", I);
@@ -254,6 +263,8 @@ void Translator::translateLoad(const LoadInst &I) {
 void Translator::translateCall(const CallInst &I,
                                ArrayRef<StringRef> Flags) {
   if (const auto *II = dyn_cast<IntrinsicInst>(&I)) {
+    // Printed under the name of the intrinsic without `llvm.`, with the type
+    // of its first argument.
     StringRef Opcode;
     switch (II->getIntrinsicID()) {
     case Intrinsic::fabs:
@@ -262,13 +273,23 @@ void Translator::translateCall(const CallInst &I,
     case Intrinsic::fmuladd:
       Opcode = "fmuladd";
       break;
+    case Intrinsic::sqrt:
+      Opcode = "sqrt";
+      break;
+    case Intrinsic::copysign:
+      Opcode = "copysign";
+      break;
+    case Intrinsic::is_fpclass:
+      Opcode = "is.fpclass";
+      break;
     default:
       unsupported("intrinsic", I);
     }
     SmallVector<Operand> Args;
     for (const Use &Arg : II->args())
       Args.push_back(operand(Arg));
-    Emitter.operation(reg(I), Opcode, Flags, Args, type(I.getType(), I));
+    Emitter.operation(reg(I), Opcode, Flags, Args,
+                      type(II->getArgOperand(0)->getType(), I));
     return;
   }
   if (!Flags.empty())

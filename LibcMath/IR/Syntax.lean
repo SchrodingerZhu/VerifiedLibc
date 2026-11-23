@@ -43,7 +43,7 @@ structure Flags where
   disjoint : Bool := false
   /-- The operands have the same sign: `icmp`. -/
   samesign : Bool := false
-  /-- The operand is non-negative: `zext`. -/
+  /-- The operand is non-negative: `zext`, `uitofp`. -/
   nneg : Bool := false
   deriving DecidableEq
 
@@ -67,7 +67,7 @@ inductive ICmp where
   deriving DecidableEq
 
 inductive FBinOp where
-  | fadd | fsub | fmul
+  | fadd | fsub | fmul | fdiv
   deriving DecidableEq
 
 /-- Ordered comparisons are false, and unordered ones true, when an operand is NaN. -/
@@ -106,6 +106,16 @@ inductive Instr where
   /-- `fpext` and `fptrunc`. -/
   | fpConvert (src dst : FloatFormat) (a : Operand) (fmf : FastMathFlags := {})
   | fptosi (src : FloatFormat) (width : ℕ) (a : Operand)
+  | fptoui (src : FloatFormat) (width : ℕ) (a : Operand)
+  | sitofp (dst : FloatFormat) (a : Operand)
+  | uitofp (dst : FloatFormat) (a : Operand) (flags : Flags := {})
+  /-- `llvm.sqrt`. -/
+  | sqrt (fmt : FloatFormat) (a : Operand) (fmf : FastMathFlags := {})
+  /-- `llvm.copysign`: `a` with the sign of `b`. -/
+  | copysign (fmt : FloatFormat) (a b : Operand) (fmf : FastMathFlags := {})
+  /-- `llvm.is.fpclass`: whether `a` belongs to one of the classes that the bits of `mask`
+  select. -/
+  | isFpClass (fmt : FloatFormat) (a : Operand) (mask : ℕ)
   /-- A bit cast between an integer and a floating-point type; the bits are unchanged. -/
   | bitcast (a : Operand)
   /-- Read element `index` of constant table `table`. -/

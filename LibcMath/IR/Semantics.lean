@@ -18,13 +18,17 @@ Execution of a `Func` under a rounding direction, as a relation between argument
   file states that behavior.
 * The result of an arithmetic instruction or conversion is any bit pattern with the same value as
   FloatLib's result (`SameValue`), so nothing can be concluded about the sign or payload of a NaN
-  it produces. `fneg` and `fabs` only change the sign bit, and their results are exact.
+  it produces. `fneg`, `fabs` and `llvm.copysign` only change the sign bit, and their results are
+  exact.
+* `uitofp` and `fptoui` are FloatLib's conversions from and to a signed integer one bit wider,
+  which holds every unsigned integer of the instruction's width.
 * `llvm.fmuladd` is a multiplication followed by an addition, and `quickGetRound` returns the
   `FE_*` constants of x86-64. Both describe x86-64 without FMA instructions.
 * Core operations are given their intended behavior. Reporting through `errno` and the status
   flags has no effect on the values computed.
 * An instruction that LLVM leaves undefined, or whose result would be poison, has no result:
-  an out-of-range `fptosi` or table index, a shift by the width or more, and an instruction with
+  an out-of-range `fptosi`, `fptoui` or table index, a shift by the width or more, and an
+  instruction with
   a flag (`Flags`, `FastMathFlags`) whose condition fails. The conditions are those of the LLVM
   Language Reference.
   There are therefore no poison or undefined values: an execution that returns a result has
@@ -167,6 +171,20 @@ def FBinOp.eval {fmt : FloatFormat} (mode : IEEERoundingMode) (x y : Model fmt) 
   | .fadd => Model.add x y mode
   | .fsub => Model.sub x y mode
   | .fmul => Model.mul x y mode
+  | .fdiv => Model.div x y mode
+
+/-- The bit of the mask of `llvm.is.fpclass` that selects a class. -/
+def fpClassBit : FloatLib.Numerics.IEEEClass → ℕ
+  | .signalingNaN => 0
+  | .quietNaN => 1
+  | .negativeInfinity => 2
+  | .negativeNormal => 3
+  | .negativeSubnormal => 4
+  | .negativeZero => 5
+  | .positiveZero => 6
+  | .positiveSubnormal => 7
+  | .positiveNormal => 8
+  | .positiveInfinity => 9
 
 /-- The value of `fegetround()` on x86-64, for the rounding directions C can select. -/
 def roundingConstant : IEEERoundingMode → Option ℕ
@@ -231,6 +249,25 @@ def Instr.Eval (mode : IEEERoundingMode) (f : Func) (env : Env) : Instr → Val 
     ∃ x n status, (a.eval env).bind (·.toModel? src) = some x ∧
       ExecDType.convertToInteger (width := width) x .towardZero = .success n status ∧
       r = ⟨width, n.bits⟩
+  | .fptoui src width a, r =>
+    ∃ x n status, (a.eval env).bind (·.toModel? src) = some x ∧
+      ExecDType.convertToInteger (width := width + 1) x .towardZero = .success n status ∧
+      n.bits.msb = false ∧ r = ⟨width, n.bits.setWidth width⟩
+  | .sitofp dst a, r =>
+    ∃ v, a.eval env = some v ∧ r.Encodes (ExecDType.convertFromInt dst ⟨v.bits⟩ mode : Model dst)
+  | .uitofp dst a flags, r =>
+    ∃ v, a.eval env = some v ∧ flags.zextDefined v.bits = true ∧
+      r.Encodes (ExecDType.convertFromInt dst ⟨v.bits.setWidth (v.width + 1)⟩ mode : Model dst)
+  | .sqrt fmt a fmf, r =>
+    ∃ x, (a.eval env).bind (·.toModel? fmt) = some x ∧
+      (fmf.admits x && fmf.admits (Model.sqrt x mode)) = true ∧ r.Encodes (Model.sqrt x mode)
+  | .copysign fmt a b fmf, r =>
+    ∃ x y, (a.eval env).bind (·.toModel? fmt) = some x ∧
+      (b.eval env).bind (·.toModel? fmt) = some y ∧ (fmf.admits x && fmf.admits y) = true ∧
+      r = .ofModel (Model.copySign x y)
+  | .isFpClass fmt a mask, r =>
+    ∃ x, (a.eval env).bind (·.toModel? fmt) = some x ∧
+      r = .ofBool (mask.testBit (fpClassBit (Model.classify x)))
   | .bitcast a, r => a.eval env = some r
   | .load table index, r =>
     ∃ t i e, f.tables[table]? = some t ∧ index.eval env = some i ∧
