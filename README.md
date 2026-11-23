@@ -30,3 +30,20 @@ nix store prefetch-file https://github.com/leanprover/lean4/releases/download/v<
 ```
 
 Mathlib and FloatLib each target one Lean release, so move all three together.
+
+## Extracting functions from LLVM libc
+
+Proofs are about the code the compiler produces, not about a transcription by hand. The tools in
+`extract/` turn the optimized LLVM IR of a math function into a Lean value:
+
+- `MarkCoreOps` is a clang plugin that keeps a fixed list of libc operations (`extract/CoreOps.cpp`)
+  as calls. It changes no code.
+- `ir2lean` exports one function as a `LibcMath.IR.Func` and rejects anything outside the
+  supported fragment.
+
+```bash
+extract/extract.sh <llvm-project>/libc expf math::double_eval::expf expf
+```
+
+writes `LibcMath/Extracted/Expf.lean`. `LibcMath/IR/Semantics.lean` defines what extracted code
+means and lists the assumptions that meaning rests on.
