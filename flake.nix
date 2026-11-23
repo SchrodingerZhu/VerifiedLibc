@@ -29,6 +29,12 @@
           git
           curl
 
+          # Extraction of libc functions from LLVM IR (see ./extract).
+          llvmPackages_23.clang
+          llvmPackages_23.llvm
+          cmake
+          ninja
+
           # Polynomial and table generation, as used by the LLVM libc sources.
           sollya
           # Round-off error bounds for straight-line floating-point code.
