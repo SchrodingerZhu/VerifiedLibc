@@ -19,6 +19,9 @@ the input decide every branch on the way. This file collects what such an evalua
   where `omega` proves them.
 * `Func.runUnary_of_exec_exact` and `Func.runUnary_of_exec_ofFloat` read off the result of
   `Func.runUnary`.
+* `nonNaN`, `Operand.execFloat_eq` and `AbsVal.toModel?_ofFloat` read a floating-point register
+  that holds the result of an arithmetic instruction, `fptosi?` and `Instr.exec_fptosi` state
+  `fptosi`, and `execBody_cons` executes one instruction of a block.
 
 The tactic `exec_blocks [h₁, h₂, …]` evaluates `Func.exec` with the lemmas on stores and values
 above. The `hᵢ` are the block lemmas
@@ -191,6 +194,151 @@ theorem Func.runUnary_of_exec_ofFloat {fmt : FloatFormat} {f : Func} {mode : IEE
     f.runUnary mode x = some y := by
   unfold AbsVal.ofFloat at h
   split at h <;> simp only [runUnary, runFloat, h, Val.toModel?_ofModel, ↓reduceDIte]
+
+/-! ## Floating-point registers
+
+An arithmetic instruction stores `AbsVal.ofFloat z`, and the next instruction that needs the value
+of that register continues only if `z` is not a NaN. `nonNaN` states that condition, and
+`Operand.execFloat_eq` with `AbsVal.toModel?_ofFloat` reads a floating-point operand in terms of
+it. A structured form of a function mirrors an arithmetic result that is used later by
+`nonNaN z >>= …`; `nonNaN_bind_congr` then treats both sides at once. -/
+
+/-- `z`, unless it is a NaN. The interpreter gives up when a NaN produced by arithmetic is the
+operand of an instruction that needs its value. -/
+def nonNaN {fmt : FloatFormat} (z : Model fmt) : Option (Model fmt) :=
+  if z.isNaN then none else some z
+
+theorem nonNaN_of_isNaN_eq_false {fmt : FloatFormat} {z : Model fmt} (h : z.isNaN = false) :
+    nonNaN z = some z := by
+  simp [nonNaN, h]
+
+theorem nonNaN_of_isNaN {fmt : FloatFormat} {z : Model fmt} (h : z.isNaN = true) :
+    nonNaN z = none := by
+  simp [nonNaN, h]
+
+/-- Two computations that continue from the same arithmetic result agree if they agree when it
+is not a NaN. The second continuation is given as a variable `r`, so that a tactic applied to the
+goal `f z = r` works on the first one only. -/
+theorem nonNaN_bind_congr {fmt : FloatFormat} {β : Type} {z : Model fmt}
+    {f g : Model fmt → Option β} (h : z.isNaN = false → ∀ r, g z = r → f z = r) :
+    (nonNaN z).bind f = (nonNaN z).bind g := by
+  cases hz : z.isNaN
+  · rw [nonNaN_of_isNaN_eq_false hz, Option.bind_some, Option.bind_some, h hz _ rfl]
+  · rw [nonNaN_of_isNaN hz, Option.bind_none, Option.bind_none]
+
+/-- Two computations that continue from the same optional value agree if their continuations
+do; the second continuation is a variable as in `nonNaN_bind_congr`. -/
+theorem bind_congr_of_forall {α β : Type} {o : Option α} {f g : α → Option β}
+    (h : ∀ a r, g a = r → f a = r) : o.bind f = o.bind g :=
+  congrArg o.bind (funext fun a => h a _ rfl)
+
+/-- The floating-point value of a register, if it is known exactly. -/
+def AbsVal.toModel? (fmt : FloatFormat) : AbsVal → Option (Model fmt)
+  | .exact v => v.toModel? fmt
+  | _ => none
+
+theorem AbsVal.toModel?_exact (fmt : FloatFormat) (v : Val) :
+    (AbsVal.exact v).toModel? fmt = v.toModel? fmt :=
+  rfl
+
+theorem AbsVal.toModel?_ofFloat {fmt : FloatFormat} (z : Model fmt) :
+    (AbsVal.ofFloat z).toModel? fmt = nonNaN z := by
+  unfold AbsVal.ofFloat nonNaN
+  split
+  · rfl
+  · exact Val.toModel?_ofModel z
+
+theorem Operand.execFloat_eq (fmt : FloatFormat) (s : Store) (a : Operand) :
+    a.execFloat fmt s = (a.exec s).bind (AbsVal.toModel? fmt) := by
+  unfold Operand.execFloat Operand.execExact
+  rcases a.exec s with _ | v
+  · rfl
+  · cases v <;> rfl
+
+theorem Val.toModel?_binary64 (bits : BitVec 64) :
+    Val.toModel? .binary64 ⟨64, bits⟩ = some (.ofBits bits) :=
+  rfl
+
+/-- The outcome of an ordered comparison in terms of the IEEE ordering. -/
+theorem FCmp.eval_olt (o : Option Ordering) : FCmp.olt.eval o = (o == some .lt) :=
+  rfl
+
+theorem FCmp.eval_ogt (o : Option Ordering) : FCmp.ogt.eval o = (o == some .gt) :=
+  rfl
+
+/-- `fptosi`: the integer part of `x` as a signed integer of the given width, if it is one. -/
+def fptosi? {fmt : FloatFormat} (width : ℕ) (x : Model fmt) : Option (BitVec width) :=
+  match ExecDType.convertToInteger (width := width) x .towardZero with
+  | .success n _ => some n.bits
+  | .failure _ => none
+
+theorem Instr.exec_fptosi (mode : IEEERoundingMode) (f : Func) (s : Store) (src : FloatFormat)
+    (width : ℕ) (a : Operand) :
+    Instr.exec mode f s (.fptosi src width a) =
+      (a.execFloat src s).bind fun x => (fptosi? width x).bind fun n =>
+        some (.exact ⟨width, n⟩) := by
+  simp only [Instr.exec, fptosi?, Option.bind_eq_bind]
+  congr 1
+  funext x
+  split <;> simp_all
+
+/-- `add` without flags always has a result. -/
+theorem IntBinOp.defined_add {w : ℕ} (a b : BitVec w) : IntBinOp.add.defined { } a b = true := by
+  simp [defined, Flags.noWrap]
+
+/-- A shift without flags has a result when the amount is less than the width. -/
+theorem IntBinOp.defined_ashr {w : ℕ} (a b : BitVec w) (h : b.toNat < w) :
+    IntBinOp.ashr.defined { } a b = true := by
+  simp [defined, h]
+
+/-- `zext nneg` has a result on an operand whose sign bit is clear. -/
+theorem Flags.zextDefined_nneg {w : ℕ} (a : BitVec w) (h : a.msb = false) :
+    Flags.zextDefined { nneg := true } a = true := by
+  simp [Flags.zextDefined, h]
+
+/-! ## One instruction at a time
+
+Simplifying `execBody` on a whole block unfolds every instruction under the binders of those
+before it, and takes time exponential in the length of the block when their results are not
+known to exist. `execBody_cons` exposes one instruction instead. -/
+
+theorem execBody_cons (mode : IEEERoundingMode) (f : Func) (s : Store) (r : Reg) (i : Instr)
+    (rest : List (Reg × Instr)) :
+    execBody mode f s ((r, i) :: rest) =
+      (i.exec mode f s).bind fun a => execBody mode f (s.set r a) rest :=
+  rfl
+
+/-- `Option.bind_eq_bind` as a rewrite rule with a proof term. The core lemma holds by `rfl`, so
+`simp` applies it without recording a step, and the kernel is then left to compare the monadic
+and the plain form of a whole block by unfolding both. -/
+theorem bind_eq_optionBind {α β : Type} (o : Option α) (f : α → Option β) :
+    o >>= f = o.bind f := by
+  cases o <;> rfl
+
+theorem execBody_nil (mode : IEEERoundingMode) (f : Func) (s : Store) :
+    execBody mode f s [] = some s :=
+  rfl
+
+/-- The floating-point value the interpreter reports for a returned register. -/
+def AbsVal.result? (fmt : FloatFormat) : AbsVal → Option (Model fmt)
+  | .exact v => v.toModel? fmt
+  | .nan fmt' x _ => if h : fmt' = fmt then some (h ▸ x) else none
+  | .any _ => none
+
+theorem AbsVal.result?_ofFloat {fmt : FloatFormat} (z : Model fmt) :
+    (AbsVal.ofFloat z).result? fmt = some z := by
+  unfold AbsVal.ofFloat
+  split
+  · simp only [result?, ↓reduceDIte]
+  · exact Val.toModel?_ofModel z
+
+theorem Func.runUnary_eq_bind {fmt : FloatFormat} (f : Func) (mode : IEEERoundingMode)
+    (x : Model fmt) :
+    f.runUnary mode x = (f.exec mode [.ofModel x]).bind (AbsVal.result? fmt) := by
+  unfold runUnary runFloat
+  rcases f.exec mode [.ofModel x] with _ | v
+  · rfl
+  · cases v <;> rfl
 
 /-- Evaluate `Func.exec` block by block. The arguments are the block lemmas of the function
 (`Func.execFrom_of_block hblock`), the number of its blocks, and the facts that decide its branch
