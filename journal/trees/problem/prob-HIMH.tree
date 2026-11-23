@@ -1,0 +1,18 @@
+\title{The interpreter gives up when a NaN from arithmetic is used again}
+\taxon{Problem}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{ir}
+\tag{floatlib}
+\meta{status}{open}
+\meta{created}{2026-11-23}
+\import{base-macros}
+
+\p{\strong{Status:} open.}
+\p{A register that holds a NaN produced by arithmetic or a conversion is recorded as "some NaN", and any instruction other than \code{\verb~|phi~}, \code{\verb~|select~}, \code{\verb~|bitcast~} and \code{\verb~|ret~} that reads it makes the interpreter answer \code{\verb~|none~}. \code{\verb~|nanConsumed~} in \code{\verb~|LibcMath/IR/InterpExamples.lean~} shows it. The description of \pr{2} says that this does not happen on any input of \code{\verb~|expf~}; another function may need it.}
+\ul{
+\li{To continue, the interpreter has to know that \code{\verb~|Model.add~}, \code{\verb~|Model.sub~} and \code{\verb~|Model.mul~} return a NaN when an operand is a NaN, whichever NaN it is. The author of \pr{2} did not find such lemmas in FloatLib 4.1.0, where \code{\verb~|isNaN_neg~}, \code{\verb~|isNaN_abs~} and \code{\verb~|cast_of_isNaN~} exist. The review did not search again.}
+\li{A comparison with a NaN operand has a result that does not depend on which NaN it is, so \code{\verb~|fcmp~} could accept "some NaN" once the corresponding fact about \code{\verb~|Model.compare~} is available.}
+\li{When it happens, \code{\verb~|Func.explain~} names the instruction and the register: [log-BRI0](log-BRI0).}
+}
