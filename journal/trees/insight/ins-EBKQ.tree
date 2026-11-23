@@ -1,0 +1,11 @@
+\title{A strict inequality with a closed power as hypothesis may be slow to elaborate}
+\taxon{Hypothesis}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{spec}
+\tag{elaboration}
+\import{base-macros}
+
+\p{Source: the description of \pr{4} and a comment in \code{\verb~|LibcMath/Functions/ExpRanges.lean~}. Not verified by the review in [ses-0YU4](ses-0YU4).}
+\p{The author reports that a hypothesis of the form \code{\verb~|Real.exp x.toReal < 1 / 2 ^ 150~} makes elaboration, and the linter \code{\verb~|constructorNameAsVariable~}, unfold the power until the recursion limit, and therefore stated the conditions for underflow with \code{\verb~|≤~} and the range before underflow on \code{\verb~|x.toReal~}. If a statement with \code{\verb~|<~} is wanted, reproduce this first; if it holds, try stating the bound through a rational cast or a \code{\verb~|zpow~}.}

@@ -1,0 +1,22 @@
+\title{Review of the closed forms of binary32 \code{\verb~|exp~}}
+\taxon{Session}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{spec}
+\tag{exp}
+\tag{review}
+\meta{harness}{Claude Code}
+\meta{model-id}{claude-fable-5-2}
+\meta{pr}{4}
+\import{base-macros}
+
+\p{Third review of the series described in [ses-9U0D](ses-9U0D), on \pr{4}, branch \code{\verb~|swarm/ranges~}, after \pr{2} was merged. The main branch merged into the branch without conflict.}
+\ul{
+\li{\strong{Verified.} The branch builds with the main branch merged. \code{\verb~|eval_eq_of_closedForm?~} depends on \code{\verb~|propext~}, \code{\verb~|Classical.choice~} and \code{\verb~|Quot.sound~} only. The counts of covered patterns in the description are right; they are now checked by the build.}
+\li{\strong{Changed.} [log-NB5R](log-NB5R), on top of [log-VSAO](log-VSAO).}
+\li{\strong{Lessons.} [ins-TJ7G](ins-TJ7G); a report of the author kept as a hypothesis, [ins-EBKQ](ins-EBKQ).}
+\li{\strong{Left open.} [prob-TZIY](prob-TZIY); [prob-E4RT](prob-E4RT) was extended.}
+}
+\p{\strong{Reuse.} The proofs lean on FloatLib and Mathlib throughout: the enclosure lemma, the executable rounding of rationals, the adjacency rank and the bounds on the exponential are all theirs. The one repetition was with the main branch, the first step of rounding a positive real, and it is removed. The branch of \pr{13} does not change the three files, so the review changed them freely.}
+\p{\strong{Not done.} The four theorems on blocks of tiny arguments and their four companions on real values share a skeleton of about eight lines each. They were left as they are: each differs in its bounds and its lemma on the exponential, and a common lemma would take those as six hypotheses.}

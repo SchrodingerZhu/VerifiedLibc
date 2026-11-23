@@ -38,6 +38,12 @@ exponential of `0x42B17217` is below the largest finite value, and the exponenti
 `closedForm?` collects the blocks into one function of the bit pattern, and
 `eval_eq_of_closedForm?` states that it returns the correctly rounded result.
 
+`blocks mode` lists the same blocks as data, each with the name of its theorem
+(`closedForm?_isSome_iff` ties the two together). From it, `blockOf? mode bits` answers which
+theorem covers a bit pattern, `covered mode` counts the patterns that have a closed form, and
+`uncovered mode` lists the ranges that are left for another method. Evaluate them with `#eval`;
+`LibcMath/Functions/ExpRangesExamples.lean` checks the counts.
+
 The results are equalities of bit patterns, which give `SameValue` in either order.
 
 The closed forms are found by evaluation: a real between two rationals that round alike rounds
@@ -69,26 +75,22 @@ theorem eval_of_nan_bits
 /-- `exp (±0) = 1`. -/
 theorem eval_of_zero_bits (hbits : x.toNatBits = 0 ∨ x.toNatBits = 0x80000000) :
     (Spec.exp .binary32).eval mode x = posOne .binary32 := by
-  have hnan : x.isNaN = false := Bool.eq_false_iff.mpr (by rw [ne_eq, Binary32.isNaN_iff]; omega)
-  have hinf : x.isInfinite = false :=
-    Bool.eq_false_iff.mpr (by rw [ne_eq, Binary32.isInfinite_iff]; omega)
-  have hzero : x.isZero = true := Binary32.isZero_iff.mpr hbits
+  obtain ⟨hnan, hinf, hzero⟩ : x.isNaN = false ∧ x.isInfinite = false ∧ x.isZero = true := by
+    grind [Binary32.isNaN_iff, Binary32.isInfinite_iff, Binary32.isZero_iff]
   simp [Spec.eval, Spec.exp, hnan, hinf, hzero]
 
 /-- `exp (+∞) = +∞`. -/
 theorem eval_of_posInf_bits (hbits : x.toNatBits = 0x7F800000) :
     (Spec.exp .binary32).eval mode x = posInf .binary32 := by
-  have hnan : x.isNaN = false := Bool.eq_false_iff.mpr (by rw [ne_eq, Binary32.isNaN_iff]; omega)
-  have hinf : x.isInfinite = true := Binary32.isInfinite_iff.mpr (.inl hbits)
-  have hsign : x.signBit = false := (Binary32.signBit_eq_false_iff x).mpr (by omega)
+  obtain ⟨hnan, hinf, hsign⟩ : x.isNaN = false ∧ x.isInfinite = true ∧ x.signBit = false := by
+    grind [Binary32.isNaN_iff, Binary32.isInfinite_iff, Binary32.signBit_eq_false_iff]
   simp [Spec.eval, Spec.exp, hnan, hinf, hsign]
 
 /-- `exp (-∞) = +0`. -/
 theorem eval_of_negInf_bits (hbits : x.toNatBits = 0xFF800000) :
     (Spec.exp .binary32).eval mode x = posZero .binary32 := by
-  have hnan : x.isNaN = false := Bool.eq_false_iff.mpr (by rw [ne_eq, Binary32.isNaN_iff]; omega)
-  have hinf : x.isInfinite = true := Binary32.isInfinite_iff.mpr (.inr hbits)
-  have hsign : x.signBit = true := (Binary32.signBit_eq_true_iff x).mpr (by omega)
+  obtain ⟨hnan, hinf, hsign⟩ : x.isNaN = false ∧ x.isInfinite = true ∧ x.signBit = true := by
+    grind [Binary32.isNaN_iff, Binary32.isInfinite_iff, Binary32.signBit_eq_true_iff]
   simp [Spec.eval, Spec.exp, hnan, hinf, hsign]
 
 /-! ## Finite nonzero arguments -/
@@ -581,5 +583,54 @@ theorem eval_eq_of_closedForm? (hmode : mode ∈ cModes) {result : Model FloatFo
     exact (eval_of_negInf_bits hnegInf).trans (Option.some.inj h)
   rw [ite_eq_right hnegInf] at h
   exact absurd h (by simp)
+
+/-! ## The blocks as data -/
+
+/-- The blocks of `closedForm?` in increasing order: the first and the last bit pattern of each,
+and the theorem of this file that gives the result on it. -/
+def blocks (mode : IEEERoundingMode) : List (ℕ × ℕ × String) :=
+  [(0x00000000, 0x00000000, "eval_of_zero_bits"),
+   if mode = .nearest then (0x00000001, 0x337FFFFF, "eval_of_tiny_pos_bits")
+   else (0x00000001, 0x33FFFFFF, "eval_of_tiny_pos_bits_of_ne_nearest"),
+   (0x42B17218, 0x7F7FFFFF, "eval_of_overflow_bits"),
+   (0x7F800000, 0x7F800000, "eval_of_posInf_bits"),
+   (0x7F800001, 0x7FFFFFFF, "eval_of_nan_bits"),
+   (0x80000000, 0x80000000, "eval_of_zero_bits"),
+   if mode = .nearest then (0x80000001, 0xB3000000, "eval_of_tiny_neg_bits")
+   else (0x80000001, 0xB3800000, "eval_of_tiny_neg_bits_of_ne_nearest"),
+   (0xC2CE8ED0, 0xC2CFF1B4, "eval_of_near_underflow_bits"),
+   (0xC2CFF1B5, 0xFF7FFFFF, "eval_of_underflow_bits"),
+   (0xFF800000, 0xFF800000, "eval_of_negInf_bits"),
+   (0xFF800001, 0xFFFFFFFF, "eval_of_nan_bits")]
+
+/-- The block that contains the bit pattern `bits`, if any: which theorem to use for it. -/
+def blockOf? (mode : IEEERoundingMode) (bits : ℕ) : Option (ℕ × ℕ × String) :=
+  (blocks mode).find? fun block => block.1 ≤ bits ∧ bits ≤ block.2.1
+
+/-- `closedForm?` answers exactly on the bit patterns of `blocks`. -/
+theorem closedForm?_isSome_iff (mode : IEEERoundingMode) (bits : ℕ) :
+    (closedForm? mode bits).isSome ↔ (blockOf? mode bits).isSome := by
+  have hblocks : (blockOf? mode bits).isSome ↔
+      bits ≤ (if mode = .nearest then 0x337FFFFF else 0x33FFFFFF) ∨
+        (0x42B17218 ≤ bits ∧ bits ≤ (if mode = .nearest then 0xB3000000 else 0xB3800000)) ∨
+        (0xC2CE8ED0 ≤ bits ∧ bits ≤ 0xFFFFFFFF) := by
+    by_cases hn : mode = .nearest <;>
+      simp [blockOf?, blocks, hn, List.find?_isSome] <;> omega
+  rw [hblocks]
+  unfold closedForm?
+  by_cases hn : mode = .nearest <;> simp only [hn, ↓reduceIte] <;>
+    split_ifs <;> simp <;> omega
+
+/-- The number of bit patterns with a closed form. -/
+def covered (mode : IEEERoundingMode) : ℕ :=
+  ((blocks mode).map fun block => block.2.1 - block.1 + 1).sum
+
+/-- The ranges of bit patterns below `2 ^ 32` that lie in no block, as first and last pattern:
+what is left for another method. -/
+def uncovered (mode : IEEERoundingMode) : List (ℕ × ℕ) :=
+  let rec go (next : ℕ) : List (ℕ × ℕ × String) → List (ℕ × ℕ)
+    | [] => if next < 2 ^ 32 then [(next, 2 ^ 32 - 1)] else []
+    | (lo, hi, _) :: rest => (if next < lo then [(next, lo - 1)] else []) ++ go (hi + 1) rest
+  go 0 (blocks mode)
 
 end LibcMath.ExpRanges
