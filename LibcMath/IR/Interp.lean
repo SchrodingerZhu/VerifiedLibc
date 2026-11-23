@@ -11,11 +11,12 @@ any NaN where FloatLib returns one, and `raiseExcept` returns an unspecified int
 interpreter therefore computes with an `AbsVal` per register, which is either the exact value of
 the register or a description of the values it may hold. Instructions that copy a value (`phi`,
 `select`, `bitcast`, `ret`) accept any `AbsVal`; every other instruction needs exact operands, and
-the interpreter gives up (`none`) otherwise.
+the interpreter gives up (`none`) otherwise. In particular it gives up when a NaN produced by
+arithmetic is the operand of further arithmetic.
 
 The soundness theorems are `Func.exec_sound`, `Func.run_sound`, `Func.runFloat_sound` and
-`Func.runUnary_sound`: when the interpreter answers, the function has a result, and every result
-it can have is described by the answer.
+`Func.runUnary_sound`: when the interpreter answers, the function can return the answer, and
+every result it can return is described by the answer.
 -/
 
 namespace LibcMath.IR
@@ -52,7 +53,8 @@ theorem ofBool_injective : Function.Injective ofBool := fun a b h => by
   simpa using congrArg toBool? h
 
 @[simp]
-private theorem toModel?_ofModel {fmt : FloatFormat} (x : Model fmt) : (ofModel x).toModel? fmt = some x := by
+private theorem toModel?_ofModel {fmt : FloatFormat} (x : Model fmt) :
+    (ofModel x).toModel? fmt = some x := by
   cases x
   simp only [toModel?, ofModel, Model.ofBits, Model.toBits, ↓reduceDIte]
   rfl
@@ -174,7 +176,25 @@ theorem Sim.set {s : Store} {env : Env} (h : s.Sim env) (r : Reg) {a : AbsVal} {
   · simp only [hr, ↓reduceIte] at ha' ⊢
     exact h r' a' ha'
 
-theorem sim_ofArgs (args : List Val) : (ofArgs args).Sim (Env.ofArgs args) := by
+/-- Every register assigned in `s` is assigned in `env`, to the value `AbsVal.toVal` selects. -/
+def Tight (s : Store) (env : Env) : Prop :=
+  ∀ r a, s.get r = some a → env r = some a.toVal
+
+theorem Tight.sim {s : Store} {env : Env} (h : s.Tight env) : s.Sim env :=
+  fun r a ha => ⟨a.toVal, h r a ha, a.admits_toVal⟩
+
+theorem Tight.set {s : Store} {env : Env} (h : s.Tight env) (r : Reg) (a : AbsVal) :
+    (s.set r a).Tight (env.set r a.toVal) := by
+  intro r' a' ha'
+  rw [get_set] at ha'
+  unfold Env.set
+  by_cases hr : r' = r
+  · simp only [hr, ↓reduceIte, Option.some.injEq] at ha' ⊢
+    rw [ha']
+  · simp only [hr, ↓reduceIte] at ha' ⊢
+    exact h r' a' ha'
+
+theorem tight_ofArgs (args : List Val) : (ofArgs args).Tight (Env.ofArgs args) := by
   intro r a ha
   simp only [get, ofArgs, Array.getElem?_map, List.getElem?_toArray] at ha
   unfold Env.ofArgs
@@ -182,7 +202,11 @@ theorem sim_ofArgs (args : List Val) : (ofArgs args).Sim (Env.ofArgs args) := by
   | none => simp [hr] at ha
   | some v =>
     simp only [hr, Option.map_some, Option.join_some, Option.some.injEq] at ha
-    exact ⟨v, rfl, ha ▸ rfl⟩
+    rw [← ha]
+    rfl
+
+theorem sim_ofArgs (args : List Val) : (ofArgs args).Sim (Env.ofArgs args) :=
+  (tight_ofArgs args).sim
 
 end Store
 
@@ -213,6 +237,14 @@ theorem exec_sound (h : s.Sim env) {a : Operand} {x : AbsVal} (ha : a.exec s = s
   | const width bits =>
     cases ha
     exact ⟨_, rfl, rfl⟩
+
+theorem exec_tight (h : s.Tight env) {a : Operand} {x : AbsVal} (ha : a.exec s = some x) :
+    a.eval env = some x.toVal := by
+  cases a with
+  | reg r => exact h r x ha
+  | const width bits =>
+    cases ha
+    rfl
 
 theorem eval_of_execExact (h : s.Sim env) {a : Operand} {v : Val} (ha : a.execExact s = some v) :
     a.eval env = some v := by
@@ -304,27 +336,27 @@ def Instr.exec (mode : IEEERoundingMode) (f : Func) (s : Store) : Instr → Opti
   | call op _ => op.exec mode
 
 theorem CoreOp.exec_sound {mode : IEEERoundingMode} {op : CoreOp} {x : AbsVal}
-    (hx : op.exec mode = some x) : (∃ r, op.Eval mode r) ∧ ∀ r, op.Eval mode r → x.Admits r := by
+    (hx : op.exec mode = some x) : op.Eval mode x.toVal ∧ ∀ r, op.Eval mode r → x.Admits r := by
   cases op with
   | quickGetRound =>
     obtain ⟨c, hc, rfl⟩ := Option.map_eq_some_iff.1 hx
-    refine ⟨⟨_, c, hc, rfl⟩, ?_⟩
+    refine ⟨⟨c, hc, rfl⟩, ?_⟩
     rintro r ⟨c', hc', rfl⟩
     rw [hc] at hc'
     cases hc'
     rfl
   | isRoundUp | isRoundDown | isRoundToNearest | isRoundToZero =>
     cases hx
-    exact ⟨⟨_, rfl⟩, fun r hr => hr⟩
+    exact ⟨rfl, fun r hr => hr⟩
   | setErrno | raiseExcept =>
     cases hx
-    exact ⟨⟨.ofNat _ 0, rfl⟩, fun r hr => hr⟩
+    exact ⟨rfl, fun r hr => hr⟩
 
 /-- The interpreter's result for an instruction describes every result of the instruction, and
-there is one. -/
+the value `AbsVal.toVal` selects is one when the operands are the selected values. -/
 theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env : Env}
     (h : s.Sim env) {i : Instr} {x : AbsVal} (hx : i.exec mode f s = some x) :
-    (∃ r, i.Eval mode f env r) ∧ ∀ r, i.Eval mode f env r → x.Admits r := by
+    (s.Tight env → i.Eval mode f env x.toVal) ∧ ∀ r, i.Eval mode f env r → x.Admits r := by
   cases i with
   | intBin op a b =>
     simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
@@ -335,7 +367,7 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     subst hw
     have ha := Operand.eval_of_execExact h hu
     have hb := Operand.eval_of_execExact h hv
-    refine ⟨⟨_, _, u, v, ha, hb, rfl⟩, ?_⟩
+    refine ⟨fun _ => ⟨_, u, v, ha, hb, rfl⟩, ?_⟩
     rintro r ⟨w₂, u₂, v₂, ha₂, hb₂, rfl⟩
     rw [ha] at ha₂
     cases ha₂
@@ -351,7 +383,7 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     subst hw
     have ha := Operand.eval_of_execExact h hu
     have hb := Operand.eval_of_execExact h hv
-    refine ⟨⟨_, _, u, v, ha, hb, rfl⟩, ?_⟩
+    refine ⟨fun _ => ⟨_, u, v, ha, hb, rfl⟩, ?_⟩
     rintro r ⟨w₂, u₂, v₂, ha₂, hb₂, rfl⟩
     rw [ha] at ha₂
     cases ha₂
@@ -363,7 +395,7 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     obtain ⟨v, hv, hx⟩ := hx
     cases hx
     have ha := Operand.eval_of_execExact h hv
-    refine ⟨⟨_, v, ha, rfl⟩, ?_⟩
+    refine ⟨fun _ => ⟨v, ha, rfl⟩, ?_⟩
     rintro r ⟨v₂, ha₂, rfl⟩
     rw [ha] at ha₂
     cases ha₂
@@ -376,7 +408,7 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     obtain ⟨v, hv, hadm⟩ := Operand.exec_sound h hx'
     have hsel (c' : Bool) : (if c' = true then a.eval env else b.eval env) =
         (if c' then a else b).eval env := by cases c' <;> rfl
-    refine ⟨⟨v, c, hcond, (hsel c).trans hv⟩, ?_⟩
+    refine ⟨fun ht => ⟨c, hcond, (hsel c).trans (Operand.exec_tight ht hx')⟩, ?_⟩
     rintro r ⟨c', hc', hr⟩
     rw [hcond] at hc'
     cases Val.ofBool_injective (Option.some.inj hc')
@@ -389,7 +421,7 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     cases hx
     have ha := Operand.eval_of_execFloat h hu
     have hb := Operand.eval_of_execFloat h hv
-    refine ⟨⟨_, u, v, ha, hb, (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩, ?_⟩
+    refine ⟨fun _ => ⟨u, v, ha, hb, (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩, ?_⟩
     rintro r ⟨u₂, v₂, ha₂, hb₂, hr⟩
     rw [ha] at ha₂
     cases ha₂
@@ -401,7 +433,7 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     obtain ⟨u, hu, hx⟩ := hx
     cases hx
     have ha := Operand.eval_of_execFloat h hu
-    refine ⟨⟨_, u, ha, rfl⟩, ?_⟩
+    refine ⟨fun _ => ⟨u, ha, rfl⟩, ?_⟩
     rintro r ⟨u₂, ha₂, rfl⟩
     rw [ha] at ha₂
     cases ha₂
@@ -413,7 +445,7 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     have ha := Operand.eval_of_execFloat h hu
     have hb := Operand.eval_of_execFloat h hv
     have hc := Operand.eval_of_execFloat h hw
-    refine ⟨⟨_, u, v, w, ha, hb, hc,
+    refine ⟨fun _ => ⟨u, v, w, ha, hb, hc,
       (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩, ?_⟩
     rintro r ⟨u₂, v₂, w₂, ha₂, hb₂, hc₂, hr⟩
     rw [ha] at ha₂
@@ -429,7 +461,7 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     cases hx
     have ha := Operand.eval_of_execFloat h hu
     have hb := Operand.eval_of_execFloat h hv
-    refine ⟨⟨_, u, v, ha, hb, rfl⟩, ?_⟩
+    refine ⟨fun _ => ⟨u, v, ha, hb, rfl⟩, ?_⟩
     rintro r ⟨u₂, v₂, ha₂, hb₂, rfl⟩
     rw [ha] at ha₂
     cases ha₂
@@ -441,7 +473,7 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     obtain ⟨u, hu, hx⟩ := hx
     cases hx
     have ha := Operand.eval_of_execFloat h hu
-    refine ⟨⟨_, u, ha, (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩, ?_⟩
+    refine ⟨fun _ => ⟨u, ha, (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩, ?_⟩
     rintro r ⟨u₂, ha₂, hr⟩
     rw [ha] at ha₂
     cases ha₂
@@ -452,7 +484,7 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     have ha := Operand.eval_of_execFloat h hu
     split at hx <;> cases hx
     rename_i n status hn
-    refine ⟨⟨_, u, n, status, ha, hn, rfl⟩, ?_⟩
+    refine ⟨fun _ => ⟨u, n, status, ha, hn, rfl⟩, ?_⟩
     rintro r ⟨u₂, n₂, status₂, ha₂, hn₂, rfl⟩
     rw [ha] at ha₂
     cases ha₂
@@ -461,7 +493,7 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     rfl
   | bitcast a =>
     obtain ⟨v, hv, hadm⟩ := Operand.exec_sound h hx
-    refine ⟨⟨v, hv⟩, fun r hr => ?_⟩
+    refine ⟨fun ht => Operand.exec_tight ht hx, fun r hr => ?_⟩
     rw [show a.eval env = some r from hr] at hv
     cases hv
     exact hadm
@@ -470,7 +502,7 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     obtain ⟨t, ht, i, hi, e, he, hx⟩ := hx
     cases hx
     have hindex := Operand.eval_of_execExact h hi
-    refine ⟨⟨_, t, i, e, ht, hindex, he, rfl⟩, ?_⟩
+    refine ⟨fun _ => ⟨t, i, e, ht, hindex, he, rfl⟩, ?_⟩
     rintro r ⟨t₂, i₂, e₂, ht₂, hindex₂, he₂, rfl⟩
     rw [ht] at ht₂
     cases ht₂
@@ -479,7 +511,7 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     rw [he] at he₂
     cases he₂
     rfl
-  | call op args => exact CoreOp.exec_sound hx
+  | call op args => exact ⟨fun _ => (CoreOp.exec_sound hx).1, (CoreOp.exec_sound hx).2⟩
 
 /-- Execute the instructions of a block in order. -/
 def execBody (mode : IEEERoundingMode) (f : Func) : Store → List (Reg × Instr) → Option Store
@@ -518,34 +550,36 @@ def Func.exec (mode : IEEERoundingMode) (f : Func) (args : List Val) : Option Ab
 
 theorem execBody_sound {mode : IEEERoundingMode} {f : Func} {body : List (Reg × Instr)}
     {s s' : Store} {env : Env} (h : s.Sim env) (hs' : execBody mode f s body = some s') :
-    (∃ env', ExecBody mode f env body env') ∧
+    (s.Tight env → ∃ env', ExecBody mode f env body env' ∧ s'.Tight env') ∧
       ∀ env', ExecBody mode f env body env' → s'.Sim env' := by
   induction body generalizing s env with
   | nil =>
     cases hs'
-    refine ⟨⟨env, .nil env⟩, ?_⟩
+    refine ⟨fun ht => ⟨env, .nil env, ht⟩, ?_⟩
     rintro env' ⟨⟩
     exact h
   | cons head rest ih =>
     obtain ⟨r, i⟩ := head
     simp only [execBody, Option.bind_eq_bind, Option.bind_eq_some_iff] at hs'
     obtain ⟨a, ha, hs'⟩ := hs'
-    obtain ⟨⟨v, hv⟩, hadm⟩ := Instr.exec_sound (env := env) h ha
-    obtain ⟨⟨env', henv'⟩, -⟩ := ih (h.set r (hadm v hv)) hs'
-    refine ⟨⟨env', .cons hv henv'⟩, ?_⟩
-    intro env' henv'
-    cases henv' with
-    | cons hv' henv' => exact (ih (h.set r (hadm _ hv')) hs').2 _ henv'
+    obtain ⟨hstep, hadm⟩ := Instr.exec_sound (env := env) h ha
+    constructor
+    · intro ht
+      obtain ⟨env', henv', ht'⟩ := (ih (ht.set r a).sim hs').1 (ht.set r a)
+      exact ⟨env', .cons (hstep ht) henv', ht'⟩
+    · intro env' henv'
+      cases henv' with
+      | cons hv henv' => exact (ih (h.set r (hadm _ hv)) hs').2 _ henv'
 
 theorem enterPhis_sound {pred : ℕ} {phis : List (Reg × List (ℕ × Operand))} {old s s' : Store}
     {oldEnv env : Env} (hold : old.Sim oldEnv) (h : s.Sim env)
     (hs' : enterPhis pred old s phis = some s') :
-    (∃ env', EnterPhis pred oldEnv env phis env') ∧
+    (old.Tight oldEnv → s.Tight env → ∃ env', EnterPhis pred oldEnv env phis env' ∧ s'.Tight env') ∧
       ∀ env', EnterPhis pred oldEnv env phis env' → s'.Sim env' := by
   induction phis generalizing s env with
   | nil =>
     cases hs'
-    refine ⟨⟨env, .nil env⟩, ?_⟩
+    refine ⟨fun _ ht => ⟨env, .nil env, ht⟩, ?_⟩
     rintro env' ⟨⟩
     exact h
   | cons head rest ih =>
@@ -553,94 +587,108 @@ theorem enterPhis_sound {pred : ℕ} {phis : List (Reg × List (ℕ × Operand))
     simp only [enterPhis, Option.bind_eq_bind, Option.bind_eq_some_iff] at hs'
     obtain ⟨a, ha, x, hx, hs'⟩ := hs'
     obtain ⟨v, hv, hadm⟩ := Operand.exec_sound hold hx
-    obtain ⟨⟨env', henv'⟩, -⟩ := ih (h.set r hadm) hs'
-    refine ⟨⟨env', .cons ha hv henv'⟩, ?_⟩
-    intro env' henv'
-    cases henv' with
-    | cons ha' hv' henv' =>
-      rw [ha] at ha'
-      cases ha'
-      rw [hv] at hv'
-      cases hv'
-      exact (ih (h.set r hadm) hs').2 _ henv'
+    constructor
+    · intro htold ht
+      obtain ⟨env', henv', ht'⟩ := (ih (ht.set r x).sim hs').1 htold (ht.set r x)
+      exact ⟨env', .cons ha (Operand.exec_tight htold hx) henv', ht'⟩
+    · intro env' henv'
+      cases henv' with
+      | cons ha' hv' henv' =>
+        rw [ha] at ha'
+        cases ha'
+        rw [hv] at hv'
+        cases hv'
+        exact (ih (h.set r hadm) hs').2 _ henv'
 
 theorem Func.execFrom_sound {mode : IEEERoundingMode} {f : Func} {fuel pred cur : ℕ} {s : Store}
     {env : Env} {a : AbsVal} (h : s.Sim env) (ha : f.execFrom mode fuel pred cur s = some a) :
-    (∃ r, Run mode f pred cur env r) ∧ ∀ r, Run mode f pred cur env r → a.Admits r := by
+    (s.Tight env → Run mode f pred cur env a.toVal) ∧
+      ∀ r, Run mode f pred cur env r → a.Admits r := by
   induction fuel generalizing pred cur s env with
   | zero => cases ha
   | succ fuel ih =>
     simp only [execFrom, Option.bind_eq_bind, Option.bind_eq_some_iff] at ha
     obtain ⟨b, hb, s₁, hs₁, s₂, hs₂, ha⟩ := ha
-    obtain ⟨⟨env₁, henv₁⟩, hsim₁⟩ := enterPhis_sound h h hs₁
-    obtain ⟨⟨env₂, henv₂⟩, hsim₂⟩ := execBody_sound (hsim₁ _ henv₁) hs₂
     -- Any execution of the block ends with registers described by `s₂`.
-    have hsim {env₁' env₂' : Env} (h₁ : EnterPhis pred env env b.phis env₁')
-        (h₂ : ExecBody mode f env₁' b.body env₂') : s₂.Sim env₂' :=
-      (execBody_sound (hsim₁ _ h₁) hs₂).2 _ h₂
+    have hsim {env₁ env₂ : Env} (h₁ : EnterPhis pred env env b.phis env₁)
+        (h₂ : ExecBody mode f env₁ b.body env₂) : s₂.Sim env₂ :=
+      (execBody_sound ((enterPhis_sound h h hs₁).2 _ h₁) hs₂).2 _ h₂
+    -- One execution ends with the values `AbsVal.toVal` selects.
+    have htight (ht : s.Tight env) : ∃ env₁ env₂, EnterPhis pred env env b.phis env₁ ∧
+        ExecBody mode f env₁ b.body env₂ ∧ s₂.Tight env₂ := by
+      obtain ⟨env₁, h₁, ht₁⟩ := (enterPhis_sound h h hs₁).1 ht ht
+      obtain ⟨env₂, h₂, ht₂⟩ := (execBody_sound ht₁.sim hs₂).1 ht₁
+      exact ⟨env₁, env₂, h₁, h₂, ht₂⟩
     split at ha
     · rename_i operand hterm
-      obtain ⟨v, hv, hadm⟩ := Operand.exec_sound (hsim₂ _ henv₂) ha
-      refine ⟨⟨v, .ret hb henv₁ henv₂ hterm hv⟩, ?_⟩
-      intro r hr
-      cases hr with
-      | ret hb' h₁ h₂ hterm' hv' =>
-        rw [hb] at hb'
-        cases hb'
-        rw [hterm] at hterm'
-        cases hterm'
-        obtain ⟨v', hv'', hadm'⟩ := Operand.exec_sound (hsim h₁ h₂) ha
-        rw [hv'] at hv''
-        cases hv''
-        exact hadm'
-      | br hb' _ _ hterm' | condBr hb' _ _ hterm' =>
-        rw [hb] at hb'
-        cases hb'
-        rw [hterm] at hterm'
-        cases hterm'
+      constructor
+      · intro ht
+        obtain ⟨env₁, env₂, h₁, h₂, ht₂⟩ := htight ht
+        exact .ret hb h₁ h₂ hterm (Operand.exec_tight ht₂ ha)
+      · intro r hr
+        cases hr with
+        | ret hb' h₁ h₂ hterm' hv' =>
+          rw [hb] at hb'
+          cases hb'
+          rw [hterm] at hterm'
+          cases hterm'
+          obtain ⟨v', hv'', hadm'⟩ := Operand.exec_sound (hsim h₁ h₂) ha
+          rw [hv'] at hv''
+          cases hv''
+          exact hadm'
+        | br hb' _ _ hterm' | condBr hb' _ _ hterm' =>
+          rw [hb] at hb'
+          cases hb'
+          rw [hterm] at hterm'
+          cases hterm'
     · rename_i target hterm
-      obtain ⟨⟨v, hv⟩, -⟩ := ih (hsim₂ _ henv₂) ha
-      refine ⟨⟨v, .br hb henv₁ henv₂ hterm hv⟩, ?_⟩
-      intro r hr
-      cases hr with
-      | br hb' h₁ h₂ hterm' hrun =>
-        rw [hb] at hb'
-        cases hb'
-        rw [hterm] at hterm'
-        cases hterm'
-        exact (ih (hsim h₁ h₂) ha).2 _ hrun
-      | ret hb' _ _ hterm' | condBr hb' _ _ hterm' =>
-        rw [hb] at hb'
-        cases hb'
-        rw [hterm] at hterm'
-        cases hterm'
+      constructor
+      · intro ht
+        obtain ⟨env₁, env₂, h₁, h₂, ht₂⟩ := htight ht
+        exact .br hb h₁ h₂ hterm ((ih ht₂.sim ha).1 ht₂)
+      · intro r hr
+        cases hr with
+        | br hb' h₁ h₂ hterm' hrun =>
+          rw [hb] at hb'
+          cases hb'
+          rw [hterm] at hterm'
+          cases hterm'
+          exact (ih (hsim h₁ h₂) ha).2 _ hrun
+        | ret hb' _ _ hterm' | condBr hb' _ _ hterm' =>
+          rw [hb] at hb'
+          cases hb'
+          rw [hterm] at hterm'
+          cases hterm'
     · rename_i cond ifTrue ifFalse hterm
       simp only [Option.bind_eq_some_iff] at ha
       obtain ⟨c, hc, ha⟩ := ha
-      have hcond := Operand.eval_of_execBool (hsim₂ _ henv₂) hc
-      obtain ⟨⟨v, hv⟩, -⟩ := ih (hsim₂ _ henv₂) ha
-      refine ⟨⟨v, .condBr hb henv₁ henv₂ hterm hcond hv⟩, ?_⟩
-      intro r hr
-      cases hr with
-      | condBr hb' h₁ h₂ hterm' hcond' hrun =>
-        rw [hb] at hb'
-        cases hb'
-        rw [hterm] at hterm'
-        cases hterm'
-        rw [Operand.eval_of_execBool (hsim h₁ h₂) hc] at hcond'
-        cases Val.ofBool_injective (Option.some.inj hcond')
-        exact (ih (hsim h₁ h₂) ha).2 _ hrun
-      | ret hb' _ _ hterm' | br hb' _ _ hterm' =>
-        rw [hb] at hb'
-        cases hb'
-        rw [hterm] at hterm'
-        cases hterm'
+      constructor
+      · intro ht
+        obtain ⟨env₁, env₂, h₁, h₂, ht₂⟩ := htight ht
+        exact .condBr hb h₁ h₂ hterm (Operand.eval_of_execBool ht₂.sim hc) ((ih ht₂.sim ha).1 ht₂)
+      · intro r hr
+        cases hr with
+        | condBr hb' h₁ h₂ hterm' hcond' hrun =>
+          rw [hb] at hb'
+          cases hb'
+          rw [hterm] at hterm'
+          cases hterm'
+          rw [Operand.eval_of_execBool (hsim h₁ h₂) hc] at hcond'
+          cases Val.ofBool_injective (Option.some.inj hcond')
+          exact (ih (hsim h₁ h₂) ha).2 _ hrun
+        | ret hb' _ _ hterm' | br hb' _ _ hterm' =>
+          rw [hb] at hb'
+          cases hb'
+          rw [hterm] at hterm'
+          cases hterm'
 
-/-- When the interpreter answers, `f` has a result, and its answer describes every result. -/
+/-- When the interpreter answers `a`, the function can return `a.toVal`, and `a` describes every
+result it can return. -/
 theorem Func.exec_sound {mode : IEEERoundingMode} {f : Func} {args : List Val} {a : AbsVal}
     (ha : f.exec mode args = some a) :
-    (∃ r, f.Returns mode args r) ∧ ∀ r, f.Returns mode args r → a.Admits r :=
-  f.execFrom_sound (Store.sim_ofArgs args) ha
+    f.Returns mode args a.toVal ∧ ∀ r, f.Returns mode args r → a.Admits r :=
+  have h := f.execFrom_sound (Store.sim_ofArgs args) ha
+  ⟨h.1 (Store.tight_ofArgs args), h.2⟩
 
 /-- The result of `f` on `args`, if the interpreter determines it up to the choice of a NaN, in
 which case this is the NaN FloatLib computes. -/
@@ -650,11 +698,11 @@ def Func.run (mode : IEEERoundingMode) (f : Func) (args : List Val) : Option Val
   | some (.nan _ x _) => some (.ofModel x)
   | _ => none
 
-/-- When `f.run` answers `v`, the function has a result, and every result it can have is `v` or,
-like `v`, a NaN of some format. -/
+/-- When `f.run` answers `v`, the function can return `v`, and every result it can return is `v`
+or, like `v`, a NaN of some format. -/
 theorem Func.run_sound {mode : IEEERoundingMode} {f : Func} {args : List Val} {v : Val}
     (hv : f.run mode args = some v) :
-    (∃ r, f.Returns mode args r) ∧ ∀ r, f.Returns mode args r →
+    f.Returns mode args v ∧ ∀ r, f.Returns mode args r →
       r = v ∨ ∃ (fmt : FloatFormat) (x y : Model fmt),
         r = .ofModel x ∧ v = .ofModel y ∧ x.isNaN = true ∧ y.isNaN = true := by
   unfold run at hv
@@ -668,15 +716,6 @@ theorem Func.run_sound {mode : IEEERoundingMode} {f : Func} {args : List Val} {v
     obtain ⟨x, rfl, hx⟩ := (exec_sound ha).2 r hr
     exact .inr ⟨fmt, x, y, rfl, rfl, hx, hy⟩
   · cases hv
-
-/-- When the interpreter determines the result exactly, the function returns that value and no
-other. -/
-theorem Func.returns_of_exec_eq_exact {mode : IEEERoundingMode} {f : Func} {args : List Val}
-    {v : Val} (hv : f.exec mode args = some (.exact v)) :
-    f.Returns mode args v ∧ ∀ r, f.Returns mode args r → r = v := by
-  obtain ⟨⟨r, hr⟩, hadm⟩ := exec_sound hv
-  cases hadm r hr
-  exact ⟨hr, hadm⟩
 
 /-- The result of `f` on `args` as a bit pattern of format `fmt`. -/
 def Func.runFloat (fmt : FloatFormat) (mode : IEEERoundingMode) (f : Func) (args : List Val) :
@@ -697,14 +736,14 @@ theorem Func.runFloat_sound {fmt : FloatFormat} {mode : IEEERoundingMode} {f : F
   unfold runFloat at hy
   split at hy
   · rename_i v ha
-    refine ⟨(exec_sound ha).1, fun r hr => ?_⟩
+    refine ⟨⟨_, (exec_sound ha).1⟩, fun r hr => ?_⟩
     cases (exec_sound ha).2 r hr
     exact ⟨y, hy, .inl rfl⟩
   · rename_i fmt' x hx ha
     split at hy <;> cases hy
     rename_i hfmt
     subst hfmt
-    refine ⟨(exec_sound ha).1, fun r hr => ?_⟩
+    refine ⟨⟨_, (exec_sound ha).1⟩, fun r hr => ?_⟩
     obtain ⟨x', rfl, hx'⟩ := (exec_sound ha).2 r hr
     exact ⟨x', Val.toModel?_ofModel x', .inr ⟨hx', hx⟩⟩
   · cases hy
