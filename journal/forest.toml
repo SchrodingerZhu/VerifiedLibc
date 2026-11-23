@@ -1,0 +1,5 @@
+[forest]
+trees = ["trees"]
+assets = ["assets"]
+home = "index"
+lang = "en"
