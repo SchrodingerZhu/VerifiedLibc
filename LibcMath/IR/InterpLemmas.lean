@@ -19,6 +19,9 @@ the input decide every branch on the way. This file collects what such an evalua
   where `omega` proves them.
 * `Func.runUnary_of_exec_exact` and `Func.runUnary_of_exec_ofFloat` read off the result of
   `Func.runUnary`.
+* `nonNaN`, `Operand.execFloat_eq` and `AbsVal.toModel?_ofFloat` read a floating-point register
+  that holds the result of an arithmetic instruction, `fptosi?` and `Instr.exec_fptosi` state
+  `fptosi`, and `execBody_cons` executes one instruction of a block.
 
 The tactic `exec_blocks [h₁, h₂, …]` evaluates `Func.exec` with the lemmas on stores and values
 above. The `hᵢ` are the block lemmas

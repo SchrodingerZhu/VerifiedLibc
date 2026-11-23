@@ -5,8 +5,8 @@ import LibcMath.Extracted.ExpfStructuredEntry
 
 One statement is not proved in the build yet: `execFrom_block15_eq_expfMain`, that from block 15
 on the interpreter computes `expfMain`, for every argument and rounding direction (blocks 15 to
-21). `ExpfStructuredExec.lean` has a proof of it whose tactic steps all elaborate; the kernel has
-not finished checking it.
+21). `ExpfStructuredExec.lean` has a proof of it whose tactic steps all elaborate; the kernel did
+not finish checking it within fourteen minutes.
 
 With `exec_reaches_block15` and `runUnary_special` from `ExpfStructuredEntry.lean` it gives the
 equality `runUnary_eq_expfStructured` on the two main ranges and the transfer
