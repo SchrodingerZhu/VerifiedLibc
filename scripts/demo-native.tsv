@@ -1,0 +1,9 @@
+check	first	count	status	millis
+nearest	1065353216	512	ok	31
+nearest	1065353728	512	ok	16
+down	1065353216	512	ok	70
+down	1065353728	512	ok	58
+towardZero=down	1065353216	512	ok	41
+towardZero=down	1065353728	512	ok	42
+up	1065353216	512	ok	113
+up	1065353728	512	ok	83

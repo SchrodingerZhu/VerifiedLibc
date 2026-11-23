@@ -15,3 +15,5 @@ import LibcMath.Exhaustive.Modes
 import LibcMath.Exhaustive.Expf
 import LibcMath.Extracted.Statements
 import LibcMath.Exhaustive.ExpfInterp
+import LibcMath.Exhaustive.Run.Kernel.Demo
+import LibcMath.Exhaustive.Run.Native.Demo
