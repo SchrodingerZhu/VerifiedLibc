@@ -19,10 +19,10 @@ llvm_func f(float %0) {
 
 Registers are numbered: parameters first, then instructions in program order. Blocks are labeled
 `^bb0, ^bb1, …` in order. Every instruction states the type of its operands, so constants are
-written as bare bit patterns, including floating-point ones. Types are `iN`, `float` and `double`.
-The instructions are those of `Instr`, under their LLVM names; `call` names a `CoreOp`. The flags
-of `Flags` and `FastMathFlags` follow the opcode, as in LLVM, on the instructions that carry them
-there.
+written as bare bit patterns, including floating-point ones. Types are `iN`, `half`, `float` and
+`double`. The instructions are those of `Instr`, under their LLVM names; `call` names a `CoreOp`.
+The flags of `Flags` and `FastMathFlags` follow the opcode, as in LLVM, on the instructions that
+carry them there.
 -/
 
 namespace LibcMath.IR.DSL
@@ -87,6 +87,7 @@ syntax "llvm_func " ident "(" llvm_arg,* ")" " {" llvm_table* llvm_block* "}" : 
 /-- The width of a type. -/
 def typeWidth (ty : Ident) : MacroM Nat :=
   match ty.getId.toString with
+  | "half" => pure 16
   | "float" => pure 32
   | "double" => pure 64
   | s =>
@@ -97,6 +98,7 @@ def typeWidth (ty : Ident) : MacroM Nat :=
 /-- The format of a floating-point type. -/
 def typeFormat (ty : Ident) : MacroM Term :=
   match ty.getId.toString with
+  | "half" => `(.binary16)
   | "float" => `(.binary32)
   | "double" => `(.binary64)
   | s => Macro.throwErrorAt ty s!"{s} is not a floating-point type"

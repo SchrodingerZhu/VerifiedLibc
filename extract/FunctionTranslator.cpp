@@ -78,6 +78,8 @@ private:
 std::string Translator::type(const Type *Ty, const Value &Context) const {
   if (Ty->isIntegerTy())
     return "i" + utostr(Ty->getIntegerBitWidth());
+  if (Ty->isHalfTy())
+    return "half";
   if (Ty->isFloatTy())
     return "float";
   if (Ty->isDoubleTy())
