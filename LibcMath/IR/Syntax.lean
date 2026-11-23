@@ -1,4 +1,5 @@
-import LibcMath.Spec
+import FloatLib.Floats.Formats.BinaryInterchange.Format.Catalog
+import Mathlib.Data.Nat.Notation
 
 /-!
 # Extracted code
@@ -11,6 +12,8 @@ Values of this type are produced by the `ir2lean` tool from the optimized IR of 
 -/
 
 namespace LibcMath.IR
+
+open FloatLib.Floats.Formats.BinaryInterchange (FloatFormat)
 
 /-- An SSA register. Parameters come first, then instructions in program order. -/
 abbrev Reg := ℕ
@@ -61,15 +64,15 @@ inductive Instr where
   | sext (width : ℕ) (a : Operand)
   | trunc (width : ℕ) (a : Operand)
   | select (cond a b : Operand)
-  | fBin (F : Format) (op : FBinOp) (a b : Operand)
-  | fneg (F : Format) (a : Operand)
-  | fabs (F : Format) (a : Operand)
+  | fBin (fmt : FloatFormat) (op : FBinOp) (a b : Operand)
+  | fneg (fmt : FloatFormat) (a : Operand)
+  | fabs (fmt : FloatFormat) (a : Operand)
   /-- `llvm.fmuladd`: `a * b + c`, fused or not at the discretion of the target. -/
-  | fmuladd (F : Format) (a b c : Operand)
-  | fcmp (F : Format) (pred : FCmp) (a b : Operand)
+  | fmuladd (fmt : FloatFormat) (a b c : Operand)
+  | fcmp (fmt : FloatFormat) (pred : FCmp) (a b : Operand)
   /-- `fpext` and `fptrunc`. -/
-  | fpConvert (src dst : Format) (a : Operand)
-  | fptosi (src : Format) (width : ℕ) (a : Operand)
+  | fpConvert (src dst : FloatFormat) (a : Operand)
+  | fptosi (src : FloatFormat) (width : ℕ) (a : Operand)
   /-- A bit cast between an integer and a floating-point type; the bits are unchanged. -/
   | bitcast (a : Operand)
   /-- Read element `index` of constant table `table`. -/
