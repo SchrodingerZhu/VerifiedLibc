@@ -11,6 +11,6 @@ namespace LibcMath.Extracted
 /-- The claim LLVM libc makes for `expf`: correct rounding under all four rounding directions.
 Not yet proved. -/
 def ExpfCorrectlyRounded : Prop :=
-  expf.CorrectlyRounded .binary32 Spec.exp Set.univ
+  expf.CorrectlyRounded (Spec.exp .binary32) cModes
 
 end LibcMath.Extracted

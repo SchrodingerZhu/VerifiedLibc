@@ -6,6 +6,7 @@ import LibcMath.IR.Syntax
 namespace LibcMath.Extracted
 
 open LibcMath.IR
+open FloatLib.Floats.Formats.BinaryInterchange (FloatFormat)
 
 set_option maxRecDepth 100000 in
 def expf : Func where
