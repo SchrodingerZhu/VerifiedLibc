@@ -1,0 +1,87 @@
+\title{How far extraction reaches across the math library of LLVM libc}
+\taxon{Note}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{extraction}
+\tag{survey}
+\meta{pr}{6}
+\import{base-macros}
+
+\p{This document records how much of LLVM libc's math library the tools in \code{\verb~|extract/~} can export to Lean today, and what is missing for the rest. It was measured on 2026-11-23 with}
+
+\ul{
+\li{llvm-project \code{\verb~|f0e7941beee3~},}
+\li{clang 23.1.3 targeting x86-64 with libc's default configuration, compiled exactly as \code{\verb~|extract/extract.sh~} compiles (\code{\verb~|-O3 -fno-vectorize -fno-slp-vectorize~}, no \code{\verb~|-march~}),}
+\li{the exporter and the Lean IR at commit \code{\verb~|23c1079~}.}
+}
+
+\p{The tables are the output of \code{\verb~|scripts/survey-extraction.py~}:}
+
+\pre{\verb~|
+nix develop -c scripts/survey-extraction.py <llvm-project>/libc
+~}
+
+\p{The run takes about ten seconds. Nothing it generates is committed; the compiled IR is left in \code{\verb~|extract/build/survey~}.}
+
+\p{To measure again, run the script, convert its output with \code{\verb~|python3 scripts/md2tree.py~}, and replace the bodies of [the results](note-extraction-results) and [the generated details](note-extraction-details); then revise the work list and the counts by hand, and set \code{\verb~|\meta{updated}{…}~} on the trees changed.}
+
+\subtree[note-extraction-coverage-what-was-surveyed]{
+\title{What was surveyed}
+
+\ul{
+\li{Every entrypoint \code{\verb~|src/math/generic/<name>.cpp~} whose name ends in \code{\verb~|f~} (96 files, all with \code{\verb~|float~} arguments, including the \code{\verb~|f16*f~} functions that return \code{\verb~|_Float16~}) or in \code{\verb~|f16~} (88 files). The bfloat16 entrypoints and \code{\verb~|modf~}, which is a double-precision function, are left out. clang 23 on x86-64 compiles all \code{\verb~|_Float16~} sources.}
+\li{Nine double-precision entrypoints: \code{\verb~|exp~}, \code{\verb~|log~}, \code{\verb~|sin~}, \code{\verb~|cos~}, \code{\verb~|pow~}, \code{\verb~|exp2~}, \code{\verb~|log2~}, \code{\verb~|sqrt~}, \code{\verb~|hypot~}.}
+}
+
+\p{The survey includes entrypoints that are not unary or binary functions of floating-point numbers (for example \code{\verb~|frexpf(float, int*)~} or \code{\verb~|nanf(const char*)~}); their signatures are in the tables.}
+}
+
+\subtree[note-extraction-coverage-how-to-read-the-tables]{
+\title{How to read the tables}
+
+\p{\strong{Body function.} Most entrypoints only forward to a function in \code{\verb~|src/__support/math~}. The script starts at the entrypoint and, as long as the function is a single block that does nothing but call one other function defined in the module, moves to that function. The result is the function that would be passed to \code{\verb~|ir2lean --function~}. Where libc chooses between implementations at compile time (\code{\verb~|expf~}, \code{\verb~|exp2f~}, \code{\verb~|exp10f~}, \code{\verb~|powf~}, \code{\verb~|sinf~}, \code{\verb~|cosf~}, \code{\verb~|tanf~}), the default configuration selects the \code{\verb~|double_eval~} implementation, and that is what the table shows. The alternatives are \code{\verb~|float_eval~} (selected with \code{\verb~|LIBC_MATH_HAS_SKIP_ACCURATE_PASS~} together with \code{\verb~|LIBC_MATH_HAS_SMALL_TABLES~} or \code{\verb~|LIBC_MATH_HAS_INTERMEDIATE_COMP_IN_FLOAT~}; for \code{\verb~|sinf~}, \code{\verb~|cosf~} and \code{\verb~|tanf~} also only on targets with FMA) and, for \code{\verb~|expf~}, \code{\verb~|integer_eval~} (targets without a double-precision FPU). They were not surveyed.}
+
+\p{\strong{Exports.} Whether \code{\verb~|ir2lean~} exports the body function. This column and the column \em{First construct \code{\verb~|ir2lean~} rejects} come from running the committed tool.}
+
+\p{\strong{Blocks / instructions.} Basic blocks and instructions of the body function in the optimized IR. A number in parentheses is the number of instructions in the functions the body calls, other than core operations, followed transitively.}
+
+\p{\strong{Loop.} Whether the control-flow graph of the body function has a cycle. \code{\verb~|ir2lean~} does not check this.}
+
+\p{\strong{Missing groups.} The script reads the IR of the body function and of every function it calls and lists each construct that \code{\verb~|FunctionTranslator.cpp~} rejects. Each construct belongs to one of the groups of the work list below. The column therefore says what would have to be done before the entrypoint, including the functions it calls, could be exported. The constructs themselves, with instruction counts and the names of the constant tables read, are listed per entrypoint at the end of the document.}
+
+\p{The script's reading of the IR and \code{\verb~|ir2lean~} agree on which functions export for all 193 entrypoints. The script reports a disagreement on standard error if there is one.}
+}
+
+\subtree[note-extraction-coverage-functions-that-export-today]{
+\title{Functions that export today}
+
+\p{27 of the 96 single-precision entrypoints export without any change. All 27 exported files were also elaborated with Lean against \code{\verb~|LibcMath/IR/DSL.lean~}, and the export of \code{\verb~|expf~} is identical to the committed \code{\verb~|LibcMath/Extracted/Expf.lean~}. No half-precision and no surveyed double-precision entrypoint exports.}
+
+\table{
+\tr{\th{Kind}\th{Entrypoints}}
+\tr{\td{Approximations of a real function, unary}\td{\code{\verb~|expf~} (done), \code{\verb~|cospif~}, \code{\verb~|sinpif~}}}
+\tr{\td{Rounding to an integral value, unary}\td{\code{\verb~|ceilf~}, \code{\verb~|floorf~}, \code{\verb~|truncf~}, \code{\verb~|roundevenf~}}}
+\tr{\td{Other unary}\td{\code{\verb~|fabsf~}, \code{\verb~|nextupf~}, \code{\verb~|nextdownf~}, \code{\verb~|isnanf~}, \code{\verb~|iscanonicalf~}, \code{\verb~|issignalingf~}}}
+\tr{\td{Binary}\td{\code{\verb~|copysignf~}, \code{\verb~|fdimf~}, \code{\verb~|nextafterf~}, \code{\verb~|fmaxf~}, \code{\verb~|fminf~}, \code{\verb~|fmaximumf~}, \code{\verb~|fminimumf~}, \code{\verb~|fmaximum_numf~}, \code{\verb~|fminimum_numf~}, \code{\verb~|fmaximum_magf~}, \code{\verb~|fminimum_magf~}, \code{\verb~|fmaximum_mag_numf~}, \code{\verb~|fminimum_mag_numf~}}}
+\tr{\td{Ternary}\td{\code{\verb~|fmaf~}}}
+}
+
+\p{Remarks for whoever takes these up:}
+
+\ul{
+\li{\code{\verb~|cospif~} and \code{\verb~|sinpif~} are the closest to \code{\verb~|expf~}: unary, 18 and 21 blocks, one table (\code{\verb~|SIN_K_PI_OVER_32~}), and a specification that is the correct rounding of a real function.}
+\li{The unary functions of the second and third row have 2^32 inputs and can be checked input by input, but their specifications are exact IEEE 754 operations, not roundings of a real function. Three of them return \code{\verb~|int~}.}
+\li{\code{\verb~|Func.CorrectlyRounded~} in \code{\verb~|LibcMath/IR/Semantics.lean~} is stated for unary functions. The binary functions have 2^64 inputs and \code{\verb~|fmaf~} has 2^96, so they cannot be checked by enumerating inputs.}
+\li{\code{\verb~|fmaf~} exports because x86-64 without \code{\verb~|-mfma~} uses libc's software implementation, which computes in \code{\verb~|double~}. \code{\verb~|floorf~}, \code{\verb~|ceilf~}, \code{\verb~|truncf~} and \code{\verb~|roundevenf~} likewise export because the baseline x86-64 target has no SSE4.2 and libc then uses integer code instead of the compiler builtins.}
+\li{The body of \code{\verb~|cospif~} contains \code{\verb~|fmul nnan double~}. See \em{Observations about the tools} below.}
+}
+}
+
+\scope{
+\put\transclude/expanded{false}
+\transclude{note-extraction-results}
+\transclude{note-extraction-worklist}
+\transclude{note-extraction-tools}
+\transclude{note-extraction-details}
+}

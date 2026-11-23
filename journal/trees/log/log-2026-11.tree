@@ -3,6 +3,7 @@
 
 \p{Changelog entries dated November 2026, newest first.}
 
+\transclude{log-VD3D}
 \transclude{log-NB5R}
 \transclude{log-VSAO}
 \transclude{log-BRI0}

@@ -1,0 +1,18 @@
+\title{Extraction: observations about the tools}
+\taxon{Note}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{extraction}
+\tag{survey}
+\meta{pr}{6}
+\import{base-macros}
+
+\p{Part of [the survey of extraction](note-extraction-coverage). The first three observations are defects to fix and have their own trees: [prob-ZWH4](prob-ZWH4), [prob-HVD8](prob-HVD8), [prob-JYU7](prob-JYU7).}
+
+\ul{
+\li{\code{\verb~|ir2lean~} drops fast-math flags without a diagnostic. 45 of the surveyed entrypoints contain \code{\verb~|nnan~} or \code{\verb~|ninf~} on some instruction, among them \code{\verb~|cospif~}, which exports today. The flags are not in the source; the optimizer adds them where it has proved that no NaN or infinity can occur, so they have the same standing as \code{\verb~|nsw~} and \code{\verb~|nuw~}, which \code{\verb~|Semantics.lean~} documents as not represented. No \code{\verb~|nsz~}, \code{\verb~|arcp~}, \code{\verb~|contract~}, \code{\verb~|reassoc~} or \code{\verb~|afn~} occurs anywhere.}
+\li{\code{\verb~|ir2lean~} does not check that the control-flow graph is free of cycles, although \code{\verb~|Syntax.lean~} describes the fragment as loop-free. No function that exports today has a loop.}
+\li{\code{\verb~|relativeName~} in \code{\verb~|extract/CoreOps.cpp~} strips template arguments by counting \code{\verb~|<~} and \code{\verb~|>~}. A name whose template arguments contain a comparison, such as the return type \code{\verb~|enable_if<... && sizeof(T) <= sizeof(U), T>::type~} of \code{\verb~|fputil::generic::add_or_sub~}, comes out as \code{\verb~|cpp::enable_if~}. \code{\verb~|--function~} therefore cannot name the body functions of \code{\verb~|f16addf~}, \code{\verb~|f16subf~}, \code{\verb~|f16mulf~}, \code{\verb~|f16divf~} and \code{\verb~|f16fmaf~} by their real names, and a lambda inside a function gets the same name as the function (\code{\verb~|math::double_eval::exp2f~} in the module of \code{\verb~|powf~}); the tool takes the first match in module order.}
+\li{Which functions export depends on the target. With \code{\verb~|-march~} values that provide SSE4.2 or FMA, libc uses compiler builtins for \code{\verb~|floor~}, \code{\verb~|rint~}, \code{\verb~|fma~} and similar operations in place of the integer code measured here. None of the corresponding intrinsics occurs in the default configuration, and other targets were not surveyed.}
+}

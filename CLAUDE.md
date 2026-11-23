@@ -116,11 +116,16 @@ Outside the flake shell: `nix run .#new -- <kind>`, `nix run .#build`, `nix run 
 | Problem | `prob-XXXX` | `journal/trees/problem/` | `Problem` | something is left out or unresolved |
 | Decision | `dec-XXXX` | `journal/trees/decision/` | `Decision` | a maintainer chooses between alternatives |
 | Session | `ses-XXXX` | `journal/trees/session/` | `Session` | once per working session |
+| Note | `note-<slug>` | `journal/trees/note/` | `Note` | a survey, a design or a description is longer than one idea |
 
 - Every tree starts with `\title`, `\taxon`, `\date` (creation), `\author` (the identity tree of
   your exact model version in `journal/trees/people/`; create one and add it to `agents.tree` if
   it is missing), `\contributor` (who directed the session), `\tag`s and `\import{base-macros}`.
   Copy an existing tree of the same kind.
+- A note is created by hand with a readable address, not with `journal-new`. Write documents
+  there, not under `docs/`. A Markdown draft, or the Markdown a script prints, is converted with
+  `python3 scripts/md2tree.py draft.md note-<slug>`; a long note is split into trees that the
+  first one transcludes (`journal/trees/note/note-extraction-coverage.tree` is the model).
 - Addresses are permanent; never rename one. Keep a tree to one idea and link the others.
 - A change is also added by hand, newest first, to its month tree
   `journal/trees/log/log-YYYY-MM.tree` (new months go at the top of `changelog.tree`). The other
