@@ -23,7 +23,8 @@ written as bare bit patterns, including floating-point ones. Types are `iN`, `ha
 `double`. The instructions are those of `Instr`, under their LLVM names; `call` names a `CoreOp`.
 The flags of `Flags` and `FastMathFlags` follow the opcode, as in LLVM, on the instructions that
 carry them there. An intrinsic is written like an instruction, under its name without the
-`llvm.` prefix and the type suffix: `%2 = sqrt %1 : double`, `%2 = is.fpclass %1, 0x204 : float`.
+`llvm.` prefix and the type suffix: `%2 = sqrt %1 : double`, `%2 = is.fpclass %1, 0x204 : float`,
+`%2 = ctlz %1, 0x1 : i32`.
 -/
 
 namespace LibcMath.IR.DSL
@@ -76,6 +77,7 @@ syntax &"ret" llvm_arg : llvm_term
 syntax &"br" llvm_label : llvm_term
 /-- `br %1, ^bb1, ^bb2`. -/
 syntax &"br" llvm_operand ", " llvm_label ", " llvm_label : llvm_term
+syntax &"unreachable" : llvm_term
 
 declare_syntax_cat llvm_block
 syntax llvm_label ":" llvm_instr* llvm_term : llvm_block
@@ -109,7 +111,8 @@ def expandOperand (ty : Ident) : TSyntax `llvm_operand → MacroM Term
   | `(llvm_operand| $bits:num) => do `(Operand.const $(quote (← typeWidth ty)) $bits)
   | stx => Macro.throwErrorAt stx "unsupported operand"
 
-/-- An operand that an instruction requires to be a constant, such as the mask of `is.fpclass`. -/
+/-- An operand that an instruction requires to be a constant: the mask of `is.fpclass`, and the
+second argument of `ctlz`, `cttz` and `abs`. -/
 def constantOperand : TSyntax `llvm_operand → MacroM (TSyntax `num)
   | `(llvm_operand| $bits:num) => pure bits
   | stx => Macro.throwErrorAt stx "expected a constant"
@@ -133,7 +136,7 @@ def enumCtor (type : Name) (name : Ident) : Term :=
 /-- The flags an instruction may carry. -/
 def allowedFlags : String → List String
   | "add" | "sub" | "mul" | "shl" | "trunc" => ["nuw", "nsw"]
-  | "lshr" | "ashr" => ["exact"]
+  | "lshr" | "ashr" | "udiv" => ["exact"]
   | "or" => ["disjoint"]
   | "icmp" => ["samesign"]
   | "zext" | "uitofp" => ["nneg"]
@@ -168,6 +171,14 @@ def expandInstr (tables : Array Name) :
       | "is.fpclass", #[a, _] => do
         `(Instr.isFpClass $(← typeFormat ty) $a $(← constantOperand args[1]!))
       | "fmuladd", #[a, b, c] => do `(Instr.fmuladd $(← typeFormat ty) $a $b $c $fmf)
+      | "ctlz", #[a, _] | "cttz", #[a, _] | "abs", #[a, _] => do
+        let poison := (← constantOperand args[1]!).getNat != 0
+        `(Instr.intUn $(enumCtor ``IntUnOp op) $a $(quote poison))
+      | "ctpop", #[a] => `(Instr.intUn .ctpop $a)
+      | "fshl", #[a, b, c] | "fshr", #[a, b, c] =>
+        `(Instr.funnelShift $(enumCtor ``FunnelShift op) $a $b $c)
+      | "freeze", #[a] => `(Instr.freeze $a)
+      | "assume", #[a] => `(Instr.assume $a)
       | "fadd", #[a, b] | "fsub", #[a, b] | "fmul", #[a, b] | "fdiv", #[a, b] => do
         `(Instr.fBin $(← typeFormat ty) $(enumCtor ``FBinOp op) $a $b $fmf)
       | "select", #[_, a, b] => do `(Instr.select $(← expandOperand (mkIdent `i1) args[0]!) $a $b)
@@ -219,6 +230,7 @@ def expandTerminator : TSyntax `llvm_term → MacroM Term
   | `(llvm_term| br $c:llvm_operand, $t:llvm_label, $e:llvm_label) => do
     `(Terminator.condBr $(← expandOperand (mkIdent `i1) c)
       $(quote (← expandLabel t)) $(quote (← expandLabel e)))
+  | `(llvm_term| unreachable) => `(Terminator.unreachable)
   | stx => Macro.throwErrorAt stx "unsupported terminator"
 
 def expandBlock (tables : Array Name) (index : Nat) : TSyntax `llvm_block → MacroM Term

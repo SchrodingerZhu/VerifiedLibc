@@ -10,7 +10,7 @@ floating-point function. Both are computable and are meant to be run on every in
 any NaN where FloatLib returns one, and `raiseExcept` returns an unspecified integer. The
 interpreter therefore computes with an `AbsVal` per register, which is either the exact value of
 the register or a description of the values it may hold. Instructions that copy a value (`phi`,
-`select`, `bitcast`, `ret`) accept any `AbsVal`; every other instruction needs exact operands, and
+`select`, `bitcast`, `freeze`, `ret`) accept any `AbsVal`; every other instruction needs exact operands, and
 the interpreter gives up (`none`) otherwise. In particular it gives up when a NaN produced by
 arithmetic is the operand of further arithmetic. It also answers `none` where an instruction has
 no result, such as one whose flag condition fails.
@@ -290,6 +290,16 @@ def Instr.exec (mode : IEEERoundingMode) (f : Func) (s : Store) : Instr → Opti
         some (.exact ⟨x.width, op.eval x.bits (y.bits.cast h)⟩)
       else none
     else none
+  | intUn op a poison => do
+    let v ← a.execExact s
+    if op.defined poison v.bits then some (.exact ⟨v.width, op.eval v.bits⟩) else none
+  | funnelShift op a b c => do
+    let x ← a.execExact s
+    let y ← b.execExact s
+    let z ← c.execExact s
+    if h : y.width = x.width ∧ z.width = x.width then
+      some (.exact ⟨x.width, op.eval x.bits (y.bits.cast h.1) (z.bits.cast h.2)⟩)
+    else none
   | icmp pred a b flags => do
     let x ← a.execExact s
     let y ← b.execExact s
@@ -373,6 +383,10 @@ def Instr.exec (mode : IEEERoundingMode) (f : Func) (s : Store) : Instr → Opti
     let x ← a.execFloat fmt s
     some (.exact (.ofBool (mask.testBit (fpClassBit (Model.classify x)))))
   | bitcast a => a.exec s
+  | freeze a => a.exec s
+  | assume cond => do
+    let c ← cond.execBool s
+    if c then some (.exact (.ofNat 0 0)) else none
   | load table index => do
     let t ← f.tables[table]?
     let i ← index.execExact s
@@ -422,6 +436,38 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     cases ha₂
     rw [hb] at hb₂
     cases hb₂
+    rfl
+  | intUn op a poison =>
+    simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
+    obtain ⟨v, hv, hx⟩ := hx
+    split at hx <;> cases hx
+    rename_i hdef
+    have ha := Operand.eval_of_execExact h hv
+    refine ⟨⟨_, ⟨v, ha, hdef, rfl⟩, fun _ => rfl⟩, ?_⟩
+    rintro r ⟨v₂, ha₂, -, rfl⟩
+    rw [ha] at ha₂
+    cases ha₂
+    rfl
+  | funnelShift op a b c =>
+    simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
+    obtain ⟨⟨w, u⟩, hu, ⟨w', v⟩, hv, ⟨w'', z⟩, hz, hx⟩ := hx
+    split at hx <;> cases hx
+    rename_i hw
+    obtain ⟨hw', hw''⟩ := hw
+    change w' = w at hw'
+    change w'' = w at hw''
+    subst hw' hw''
+    have ha := Operand.eval_of_execExact h hu
+    have hb := Operand.eval_of_execExact h hv
+    have hc := Operand.eval_of_execExact h hz
+    refine ⟨⟨_, ⟨_, u, v, z, ha, hb, hc, rfl⟩, fun _ => rfl⟩, ?_⟩
+    rintro r ⟨w₂, u₂, v₂, z₂, ha₂, hb₂, hc₂, rfl⟩
+    rw [ha] at ha₂
+    cases ha₂
+    rw [hb] at hb₂
+    cases hb₂
+    rw [hc] at hc₂
+    cases hc₂
     rfl
   | icmp pred a b flags =>
     simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
@@ -635,7 +681,14 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     rw [ha] at ha₂
     cases ha₂
     rfl
-  | bitcast a =>
+  | assume cond =>
+    simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
+    obtain ⟨c, hc, hx⟩ := hx
+    split at hx <;> cases hx
+    rename_i hc'
+    subst hc'
+    exact ⟨⟨_, ⟨Operand.eval_of_execBool h hc, rfl⟩, fun _ => rfl⟩, fun r hr => hr.2⟩
+  | bitcast a | freeze a =>
     obtain ⟨v, hv, hadm⟩ := Operand.exec_sound h hx
     refine ⟨⟨v, hv, fun ht => Option.some.inj (hv.symm.trans (Operand.exec_tight ht hx))⟩,
       fun r hr => ?_⟩
@@ -687,6 +740,7 @@ def Func.execFrom (mode : IEEERoundingMode) (f : Func) : (fuel pred cur : ℕ) �
     | .condBr cond ifTrue ifFalse => do
       let c ← cond.execBool s₂
       f.execFrom mode fuel cur (if c then ifTrue else ifFalse) s₂
+    | .unreachable => none
 
 /-- Execute `f` on `args`. Each block is entered at most once, which is enough for the loop-free
 code this development is about; `none` means that the interpreter gave up, not that `f` has no
@@ -859,6 +913,7 @@ theorem Func.execFrom_sound {mode : IEEERoundingMode} {f : Func} {fuel pred cur 
           cases hb'
           rw [hterm] at hterm'
           cases hterm'
+    · cases ha
 
 /-- Where the interpreter answers, no execution goes wrong: every execution follows the blocks
 the interpreter visits, and the interpreter has found each of their operations to have a result
@@ -896,6 +951,10 @@ theorem Func.not_goesWrong_of_execFrom {mode : IEEERoundingMode} {f : Func} {fue
       simp only [hterm, Option.bind_eq_some_iff] at ha
       obtain ⟨c, hc, -⟩ := ha
       exact hnone c (Operand.eval_of_execBool (hsim₂ h₁ h₂) hc)
+    | unreachable hb' h₁ h₂ hterm =>
+      cases hb.symm.trans hb'
+      simp only [hterm] at ha
+      cases ha
     | br hb' h₁ h₂ hterm hrest =>
       cases hb.symm.trans hb'
       simp only [hterm] at ha

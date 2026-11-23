@@ -5,6 +5,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/IR/ConstantRange.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Instructions.h"
@@ -152,14 +153,31 @@ void Translator::collectTables() {
     }
 }
 
-SmallVector<StringRef, 2> Translator::poisonFlags(const Instruction &I) const {
-  if (I.hasPoisonGeneratingMetadata() || I.hasPoisonGeneratingAttributes())
-    unsupported("metadata or attribute", I);
+/// Whether the instruction is a bit count with a `range` attribute that holds
+/// of every count, which is between zero and the width of the operand.
+static bool hasImpliedRange(const Instruction &I) {
+  const auto *II = dyn_cast<IntrinsicInst>(&I);
+  if (!II || !is_contained({Intrinsic::ctlz, Intrinsic::cttz, Intrinsic::ctpop},
+                           II->getIntrinsicID()))
+    return false;
+  std::optional<ConstantRange> Range = II->getRange();
+  unsigned Width = II->getType()->getIntegerBitWidth();
+  return Range &&
+         Range->contains(ConstantRange(APInt(Width, 0), APInt(Width, Width) + 1));
+}
 
+SmallVector<StringRef, 2> Translator::poisonFlags(const Instruction &I) const {
   // Clear every flag that is exported on a copy of the instruction, so that
   // whatever remains is known not to be.
   SmallVector<StringRef, 2> Flags;
   Instruction *Rest = I.clone();
+  if (hasImpliedRange(I))
+    cast<CallBase>(Rest)->removeRetAttr(Attribute::Range);
+  if (Rest->hasPoisonGeneratingMetadata() ||
+      Rest->hasPoisonGeneratingAttributes()) {
+    Rest->deleteValue();
+    unsupported("metadata or attribute", I);
+  }
   if (isa<FPMathOperator>(I)) {
     FastMathFlags FMF = I.getFastMathFlags();
     if (FMF.noNaNs())
@@ -197,6 +215,12 @@ SmallVector<StringRef, 2> Translator::poisonFlags(const Instruction &I) const {
       Flags.push_back("samesign");
     cast<ICmpInst>(Rest)->setSameSign(false);
   }
+  // LLVM counts the second argument of these intrinsics as a flag. It is
+  // exported as an argument.
+  if (const auto *II = dyn_cast<IntrinsicInst>(&I);
+      II && is_contained({Intrinsic::ctlz, Intrinsic::cttz, Intrinsic::abs},
+                         II->getIntrinsicID()))
+    Rest->setOperand(1, ConstantInt::getFalse(I.getContext()));
   bool HasOtherFlags = Rest->hasPoisonGeneratingFlags();
   Rest->deleteValue();
   if (HasOtherFlags)
@@ -221,6 +245,8 @@ void Translator::translateBinary(const BinaryOperator &I,
   case Instruction::FSub:
   case Instruction::FMul:
   case Instruction::FDiv:
+  case Instruction::UDiv:
+  case Instruction::URem:
     Opcode = I.getOpcodeName();
     break;
   default:
@@ -282,6 +308,42 @@ void Translator::translateCall(const CallInst &I,
     case Intrinsic::is_fpclass:
       Opcode = "is.fpclass";
       break;
+    case Intrinsic::ctlz:
+      Opcode = "ctlz";
+      break;
+    case Intrinsic::cttz:
+      Opcode = "cttz";
+      break;
+    case Intrinsic::ctpop:
+      Opcode = "ctpop";
+      break;
+    case Intrinsic::abs:
+      Opcode = "abs";
+      break;
+    case Intrinsic::umin:
+      Opcode = "umin";
+      break;
+    case Intrinsic::umax:
+      Opcode = "umax";
+      break;
+    case Intrinsic::smin:
+      Opcode = "smin";
+      break;
+    case Intrinsic::smax:
+      Opcode = "smax";
+      break;
+    case Intrinsic::fshl:
+      Opcode = "fshl";
+      break;
+    case Intrinsic::fshr:
+      Opcode = "fshr";
+      break;
+    case Intrinsic::assume:
+      // Operand bundles state assumptions that the condition does not.
+      if (II->hasOperandBundles())
+        unsupported("operand bundle", I);
+      Opcode = "assume";
+      break;
     default:
       unsupported("intrinsic", I);
     }
@@ -331,6 +393,9 @@ void Translator::translate(const Instruction &I) {
                       {operand(I.getOperand(0)), operand(I.getOperand(1)),
                        operand(I.getOperand(2))},
                       type(I.getType(), I));
+  } else if (isa<FreezeInst>(I)) {
+    Emitter.operation(reg(I), "freeze", {}, {operand(I.getOperand(0))},
+                      type(I.getType(), I));
   } else if (I.getOpcode() == Instruction::FNeg) {
     Emitter.operation(reg(I), "fneg", Flags, {operand(I.getOperand(0))},
                       type(I.getType(), I));
@@ -352,6 +417,8 @@ void Translator::translateTerminator(const Instruction &I) {
     Emitter.condBr(operand(Br->getCondition()),
                    Blocks.lookup(Br->getSuccessor(0)),
                    Blocks.lookup(Br->getSuccessor(1)));
+  else if (isa<UnreachableInst>(I))
+    Emitter.unreachable();
   else
     unsupported("terminator", I);
 }

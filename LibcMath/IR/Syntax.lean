@@ -37,7 +37,7 @@ structure Flags where
   nuw : Bool := false
   /-- No signed overflow: `add`, `sub`, `mul`, `shl`, `trunc`. -/
   nsw : Bool := false
-  /-- No set bit is shifted out: `lshr`, `ashr`. -/
+  /-- No set bit is shifted out: `lshr`, `ashr`. The division has no remainder: `udiv`. -/
   exact : Bool := false
   /-- The operands have no set bit in common: `or`. -/
   disjoint : Bool := false
@@ -58,8 +58,21 @@ structure FastMathFlags where
   ninf : Bool := false
   deriving DecidableEq
 
+/-- Integer instructions of two operands, and the intrinsics `llvm.umin`, `llvm.umax`, `llvm.smin`
+and `llvm.smax`. -/
 inductive IntBinOp where
   | add | sub | mul | and | or | xor | shl | lshr | ashr
+  | udiv | urem | umin | umax | smin | smax
+  deriving DecidableEq
+
+/-- The integer intrinsics of one operand: `llvm.ctlz`, `llvm.cttz`, `llvm.ctpop` and `llvm.abs`. -/
+inductive IntUnOp where
+  | ctlz | cttz | ctpop | abs
+  deriving DecidableEq
+
+/-- The funnel shifts `llvm.fshl` and `llvm.fshr`. -/
+inductive FunnelShift where
+  | fshl | fshr
   deriving DecidableEq
 
 inductive ICmp where
@@ -92,6 +105,11 @@ inductive CoreOp where
 
 inductive Instr where
   | intBin (op : IntBinOp) (a b : Operand) (flags : Flags := {})
+  /-- An integer intrinsic of one operand. `poison` is the constant second argument of `llvm.ctlz`
+  and `llvm.cttz` (`is_zero_poison`) and of `llvm.abs` (`is_int_min_poison`). -/
+  | intUn (op : IntUnOp) (a : Operand) (poison : Bool := false)
+  /-- `a` and `b` concatenated, shifted by `c` modulo the width. -/
+  | funnelShift (op : FunnelShift) (a b c : Operand)
   | icmp (pred : ICmp) (a b : Operand) (flags : Flags := {})
   | zext (width : ℕ) (a : Operand) (flags : Flags := {})
   | sext (width : ℕ) (a : Operand)
@@ -118,6 +136,10 @@ inductive Instr where
   | isFpClass (fmt : FloatFormat) (a : Operand) (mask : ℕ)
   /-- A bit cast between an integer and a floating-point type; the bits are unchanged. -/
   | bitcast (a : Operand)
+  /-- `freeze`: the operand itself, as there are no poison or undefined values. -/
+  | freeze (a : Operand)
+  /-- `llvm.assume`: has a result, of width zero, only when the condition holds. -/
+  | assume (cond : Operand)
   /-- Read element `index` of constant table `table`. -/
   | load (table : ℕ) (index : Operand)
   | call (op : CoreOp) (args : List Operand)
@@ -126,6 +148,8 @@ inductive Terminator where
   | ret (a : Operand)
   | br (target : ℕ)
   | condBr (cond : Operand) (ifTrue ifFalse : ℕ)
+  /-- Reaching this terminator is undefined. -/
+  | unreachable
 
 structure Block where
   /-- Phi nodes: the register defined, and its value for each predecessor block. -/
