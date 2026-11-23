@@ -1,9 +1,0 @@
-/home/schrodingerzy/Documents/proof/extract/build/CMakeFiles/intrinsics_gen.dir
-/home/schrodingerzy/Documents/proof/extract/build/CMakeFiles/vt_gen.dir
-/home/schrodingerzy/Documents/proof/extract/build/CMakeFiles/omp_gen.dir
-/home/schrodingerzy/Documents/proof/extract/build/CMakeFiles/acc_gen.dir
-/home/schrodingerzy/Documents/proof/extract/build/CMakeFiles/target_parser_gen.dir
-/home/schrodingerzy/Documents/proof/extract/build/CMakeFiles/MarkCoreOps.dir
-/home/schrodingerzy/Documents/proof/extract/build/CMakeFiles/ir2lean.dir
-/home/schrodingerzy/Documents/proof/extract/build/CMakeFiles/edit_cache.dir
-/home/schrodingerzy/Documents/proof/extract/build/CMakeFiles/rebuild_cache.dir
