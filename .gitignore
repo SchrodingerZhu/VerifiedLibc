@@ -2,3 +2,11 @@
 /.direnv
 /result
 /extract/build
+
+# Generated certificate sets (scripts/exhaustive.py generate); only the demo set is kept.
+/LibcMath/Exhaustive/Run/Kernel/*
+/LibcMath/Exhaustive/Run/Native/*
+!/LibcMath/Exhaustive/Run/Kernel/Demo
+!/LibcMath/Exhaustive/Run/Kernel/Demo.lean
+!/LibcMath/Exhaustive/Run/Native/Demo
+!/LibcMath/Exhaustive/Run/Native/Demo.lean

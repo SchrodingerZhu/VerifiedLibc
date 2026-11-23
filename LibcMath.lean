@@ -25,3 +25,5 @@ import LibcMath.Extracted.ExpfPaths.Ranges
 import LibcMath.Oracle.Exp
 import LibcMath.Oracle.ExpExamples
 import LibcMath.Extracted.ExpfMain
+import LibcMath.Exhaustive.Run.Kernel.Demo
+import LibcMath.Exhaustive.Run.Native.Demo
