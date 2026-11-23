@@ -8,7 +8,9 @@ import FloatLib.Floats.Formats.BinaryInterchange.DType.Cast
 /-!
 # Meaning of extracted code
 
-Execution of a `Func` under a rounding direction, as a relation between arguments and results.
+Execution of a `Func` under a rounding direction, as a relation between arguments and results
+(`Func.Returns`), together with the executions that reach an operation LLVM leaves undefined
+(`Func.GoesWrong`).
 
 * A floating-point instruction is the corresponding IEEE 754 operation of FloatLib in the
   rounding direction in effect. LLVM itself only defines these instructions under the default
@@ -27,6 +29,10 @@ Execution of a `Func` under a rounding direction, as a relation between argument
   There are therefore no poison or undefined values: an execution that returns a result has
   produced none. This also covers the `inbounds`, `nuw` and `nusw` flags of the address of a
   table access and `noundef` on the arguments of a call.
+* An execution that reaches such an instruction goes wrong (`Func.GoesWrong`). So does one that
+  reaches an ill-formed operation: an operand of the wrong width or an unassigned register, a
+  branch to a block that does not exist, a phi node without a value for the block it is entered
+  from. An execution that runs forever neither returns nor goes wrong.
 * Not represented, and rejected by `ir2lean` instead: fast-math flags, and metadata and
   attributes of an instruction under which its result is poison (`range`, `nofpclass`, …).
   Attributes of the function itself and of its parameters are not examined.
@@ -254,12 +260,71 @@ inductive Run (mode : IEEERoundingMode) (f : Func) : (pred cur : ℕ) → Env �
 def Func.Returns (mode : IEEERoundingMode) (f : Func) (args : List Val) (result : Val) : Prop :=
   Run mode f 0 0 (Env.ofArgs args) result
 
-/-- The extracted unary function `f` is a correctly rounded implementation of `S`: on every input
-it has a result, and every result it can have is the prescribed one. -/
+/-- Executing the instructions of a block in order reaches one that has no result. -/
+inductive BodyGoesWrong (mode : IEEERoundingMode) (f : Func) : Env → List (Reg × Instr) → Prop
+  | here {env : Env} {r : Reg} {i : Instr} {rest : List (Reg × Instr)} :
+    (∀ v, ¬i.Eval mode f env v) → BodyGoesWrong mode f env ((r, i) :: rest)
+  | later {env : Env} {r : Reg} {i : Instr} {v : Val} {rest : List (Reg × Instr)} :
+    i.Eval mode f env v → BodyGoesWrong mode f (env.set r v) rest →
+    BodyGoesWrong mode f env ((r, i) :: rest)
+
+/-- Starting at block `cur`, entered from block `pred` with environment `env`, the function can
+reach, in finitely many steps, a point at which it has no next step and has not returned. -/
+inductive GoesWrong (mode : IEEERoundingMode) (f : Func) : (pred cur : ℕ) → Env → Prop
+  /-- There is no block `cur`. -/
+  | block {pred cur : ℕ} {env : Env} : f.blocks[cur]? = none → GoesWrong mode f pred cur env
+  /-- A phi node has no value on entry from `pred`. Phi nodes have at most one outcome, so this
+  is the case when they have none. -/
+  | phis {pred cur : ℕ} {env : Env} {b : Block} :
+    f.blocks[cur]? = some b → (∀ env₁, ¬EnterPhis pred env env b.phis env₁) →
+    GoesWrong mode f pred cur env
+  /-- An instruction of the block has no result. -/
+  | body {pred cur : ℕ} {env env₁ : Env} {b : Block} :
+    f.blocks[cur]? = some b → EnterPhis pred env env b.phis env₁ →
+    BodyGoesWrong mode f env₁ b.body → GoesWrong mode f pred cur env
+  /-- The operand of `ret` has no value. -/
+  | ret {pred cur : ℕ} {env env₁ env₂ : Env} {b : Block} {a : Operand} :
+    f.blocks[cur]? = some b → EnterPhis pred env env b.phis env₁ →
+    ExecBody mode f env₁ b.body env₂ → b.term = .ret a → a.eval env₂ = none →
+    GoesWrong mode f pred cur env
+  /-- The condition of a branch is not a boolean. -/
+  | cond {pred cur ifTrue ifFalse : ℕ} {env env₁ env₂ : Env} {b : Block} {cond : Operand} :
+    f.blocks[cur]? = some b → EnterPhis pred env env b.phis env₁ →
+    ExecBody mode f env₁ b.body env₂ → b.term = .condBr cond ifTrue ifFalse →
+    (∀ c, cond.eval env₂ ≠ some (.ofBool c)) → GoesWrong mode f pred cur env
+  /-- Execution goes wrong after a branch. -/
+  | br {pred cur target : ℕ} {env env₁ env₂ : Env} {b : Block} :
+    f.blocks[cur]? = some b → EnterPhis pred env env b.phis env₁ →
+    ExecBody mode f env₁ b.body env₂ → b.term = .br target →
+    GoesWrong mode f cur target env₂ → GoesWrong mode f pred cur env
+  /-- Execution goes wrong after a conditional branch. -/
+  | condBr {pred cur ifTrue ifFalse : ℕ} {env env₁ env₂ : Env} {b : Block} {cond : Operand}
+      {c : Bool} :
+    f.blocks[cur]? = some b → EnterPhis pred env env b.phis env₁ →
+    ExecBody mode f env₁ b.body env₂ → b.term = .condBr cond ifTrue ifFalse →
+    cond.eval env₂ = some (.ofBool c) →
+    GoesWrong mode f cur (if c then ifTrue else ifFalse) env₂ → GoesWrong mode f pred cur env
+
+/-- Called on `args` under rounding direction `mode`, the function has an execution that reaches
+an operation without a result: one that LLVM leaves undefined or whose result would be poison, or
+one that is ill-formed. This is the undefined behavior of extracted code. -/
+def Func.GoesWrong (mode : IEEERoundingMode) (f : Func) (args : List Val) : Prop :=
+  IR.GoesWrong mode f 0 0 (Env.ofArgs args)
+
+/-- The extracted unary function `f` is a correctly rounded implementation of `S`. On every input,
+
+* it has a result;
+* every result it can have is the prescribed one;
+* no execution goes wrong, so the function has no undefined behavior.
+
+Results are not unique: an instruction may return any NaN, and `raiseExcept` any integer. The
+third component is therefore not implied by the first two, which only speak of the executions
+that return. -/
 def Func.CorrectlyRounded {fmt : FloatFormat} (S : Spec fmt) (modes : Set IEEERoundingMode)
     (f : Func) : Prop :=
   ∀ mode ∈ modes, ∀ x : Model fmt,
     (∃ r, f.Returns mode [.ofModel x] r) ∧
-    ∀ r, f.Returns mode [.ofModel x] r → r.Encodes (S.eval mode x)
+    (∀ r, f.Returns mode [.ofModel x] r → r.Encodes (S.eval mode x)) ∧
+    ¬f.GoesWrong mode [.ofModel x]
 
 end LibcMath.IR
