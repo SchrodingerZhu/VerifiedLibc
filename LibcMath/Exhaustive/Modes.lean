@@ -1,5 +1,6 @@
 import LibcMath.Exhaustive.Reduction
 import LibcMath.Functions
+import LibcMath.Functions.RoundingRanges
 
 /-!
 # Reusing a checked range for a related rounding direction or input
@@ -74,8 +75,7 @@ end IR.Func.IsComputedBy
 /-- Rounding a positive real toward zero is rounding it down. -/
 theorem roundReal_towardZero_of_pos (fmt : FloatFormat) {r : ℝ} (hr : 0 < r) :
     Model.roundReal fmt .towardZero r = Model.roundReal fmt .down r := by
-  have hcmp : cmp r ((0 : ℚ) : ℝ) = .gt := (cmp_eq_gt_iff _ _).2 (by simpa using hr)
-  simp only [Model.roundReal, Model.AlgebraicRounding.roundSigned, hcmp]
+  rw [roundReal_of_pos _ hr, roundReal_of_pos _ hr]
   rfl
 
 /-- `exp` is positive, so rounding it toward zero and rounding it down prescribe the same

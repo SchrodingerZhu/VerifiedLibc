@@ -1,0 +1,20 @@
+\title{Closed forms of correctly rounded binary32 \code{\verb~|exp~} on ranges of arguments}
+\taxon{Change}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{spec}
+\tag{exp}
+\meta{pr}{4}
+\import{base-macros}
+
+\p{Three files under \code{\verb~|LibcMath/Functions/~} give the value of \code{\verb~|(Spec.exp .binary32).eval mode x~} on whole blocks of bit patterns, for the four rounding directions of C. They are about the specification only. \pr{4}.}
+\ul{
+\li{\code{\verb~|ExpRanges.lean~}: NaNs, zeros and infinities; tiny arguments, where the result is \code{\verb~|1~} or a neighbour of \code{\verb~|1~}; overflow from \code{\verb~|0x42B17218~}; underflow from \code{\verb~|0xC2CFF1B5~}; and the 90 853 patterns just before it, where the exponential lies between half the least positive value and that value. \code{\verb~|closedForm?~} collects the blocks into one executable function, and \code{\verb~|eval_eq_of_closedForm?~} says its answer is the correctly rounded result.}
+\li{\code{\verb~|Binary32Bits.lean~}: \code{\verb~|isNaN~}, \code{\verb~|isInfinite~}, \code{\verb~|isZero~} and \code{\verb~|isFinite~} of a binary32 value as conditions on its bit pattern, and the order of the real values of finite values of one sign through their patterns.}
+\li{\code{\verb~|RoundingRanges.lean~}: ranges of reals on which \code{\verb~|Model.roundReal~} is constant, for any format.}
+\li{The method: a real between two positive rationals that round alike rounds like them, and the rounding of a rational is evaluated by the kernel with \code{\verb~|decide +kernel~}. Bounds on the exponential come from Mathlib.}
+\li{On 2026-11-23 the branch of \pr{13} used the theorems for tiny arguments, overflow, underflow and the exceptional arguments one by one. It did not use \code{\verb~|closedForm?~} or the block just before underflow, because the code computes those arguments with its polynomial.}
+}
+\p{Left open: [prob-TZIY](prob-TZIY).}
