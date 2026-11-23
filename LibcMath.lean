@@ -19,3 +19,5 @@ import LibcMath.Extracted.Sinpif
 import LibcMath.Exhaustive.ExpfInterp
 import LibcMath.Exhaustive.Run.Kernel.Demo
 import LibcMath.Exhaustive.Run.Native.Demo
+import LibcMath.Oracle.Exp
+import LibcMath.Oracle.ExpExamples
