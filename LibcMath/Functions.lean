@@ -10,26 +10,28 @@ Special cases follow ISO C23 Annex F.10.
 
 namespace LibcMath.Spec
 
+open FloatLib.Floats.Formats.BinaryInterchange Model
+
 /-- `exp`: `exp(±0) = 1`, `exp(+∞) = +∞`, `exp(-∞) = +0`. -/
-noncomputable def exp : Spec where
+noncomputable def exp (fmt : FloatFormat) : Spec fmt where
   real := Real.exp
-  atZero _ := .num 1
-  atInf neg := if neg then .zero false else .inf false
+  atZero _ := posOne fmt
+  atInf negative := if negative then posZero fmt else posInf fmt
   exact _ := none
 
 open Classical in
 /-- `log`: `log(±0) = -∞`, `log(1) = +0`, `log(+∞) = +∞`, and NaN for negative arguments. -/
-noncomputable def log : Spec where
+noncomputable def log (fmt : FloatFormat) : Spec fmt where
   real := Real.log
-  atZero _ := .inf true
-  atInf neg := if neg then .nan else .inf false
-  exact x := if x < 0 then some .nan else if x = 1 then some (.zero false) else none
+  atZero _ := negInf fmt
+  atInf negative := if negative then canonicalNaN fmt else posInf fmt
+  exact x := if x < 0 then some (canonicalNaN fmt) else if x = 1 then some (posZero fmt) else none
 
 /-- `sin`: `sin(±0) = ±0`, and NaN at infinities. -/
-noncomputable def sin : Spec where
+noncomputable def sin (fmt : FloatFormat) : Spec fmt where
   real := Real.sin
-  atZero neg := .zero neg
-  atInf _ := .nan
+  atZero negative := zero fmt negative
+  atInf _ := canonicalNaN fmt
   exact _ := none
 
 end LibcMath.Spec
