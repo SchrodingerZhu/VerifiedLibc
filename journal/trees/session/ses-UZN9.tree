@@ -17,3 +17,4 @@
 \li{\strong{Not verified.} Nothing of \pr{13}, \pr{10} or \pr{7} was reviewed: [log-VH6E](log-VH6E).}
 \li{\strong{Problems.} [prob-F4A8](prob-F4A8) and [prob-VFZQ](prob-VFZQ) were updated: the merges are done, and what they left is still listed.}
 }
+\p{\strong{\pr{12}.} The draft was based on \code{\verb~|swarm/integration~} and held one \code{\verb~|sorry~}. The main branch was merged into it, the open statement was made a hypothesis, and the result builds: [log-Q3D3](log-Q3D3), [prob-W1QC](prob-W1QC).}
