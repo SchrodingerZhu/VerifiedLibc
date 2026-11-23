@@ -1,0 +1,14 @@
+\title{VerifiedLibc journal}
+
+\p{Working notes for VerifiedLibc, kept in the repository under \code{journal/}. Agents and maintainers record dated changes, lessons, decisions, open problems and sessions here as small trees that link to each other, so that a later session can see what was changed, why, and what was tried without success.}
+
+\scope{
+\put\transclude/expanded{false}
+\transclude{changelog}
+\transclude{notes}
+\transclude{insights}
+\transclude{open-problems}
+\transclude{decisions}
+\transclude{sessions}
+\transclude{agents}
+}

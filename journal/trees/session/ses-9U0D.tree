@@ -1,0 +1,25 @@
+\title{Review of the reduction to ranges of bit patterns}
+\taxon{Session}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{exhaustive}
+\tag{review}
+\meta{harness}{Claude Code}
+\meta{model-id}{claude-fable-5-2}
+\meta{pr}{1}
+\import{base-macros}
+
+\p{The maintainer asked for a review of the open pull requests one at a time, against four questions: what the change does and whether it is justified; whether it reinvents what Mathlib or FloatLib has; whether it follows current Lean practice, with automation such as \code{\verb~|grind~} and Canonical where it is feasible and fast; and whether it leaves diagnostics and trails for agents. After the first report the maintainer asked for tested patches pushed to the branch instead of suggestions, and then for this journal. This session covered \pr{1}, branch \code{\verb~|swarm/reduction~}.}
+
+\ul{
+\li{\strong{Verified.} The branch builds. The top-level theorems for \code{\verb~|expf~} depend on \code{\verb~|propext~}, \code{\verb~|Classical.choice~} and \code{\verb~|Quot.sound~} only.}
+\li{\strong{Changed.} [log-Y5JW](log-Y5JW), on top of the first version [log-SIDE](log-SIDE).}
+\li{\strong{Lessons.} [ins-WJ6T](ins-WJ6T) on \code{\verb~|grind~}; [ins-TZVS](ins-TZVS) on evaluating a check; [ins-LF91](ins-LF91) on Canonical; [ins-X6OK](ins-X6OK) on a wrong report of success.}
+\li{\strong{Left open.} [prob-7F7Z](prob-7F7Z), [prob-E4RT](prob-E4RT), [prob-F4A8](prob-F4A8), [prob-HFK4](prob-HFK4).}
+\li{\strong{Created.} The journal itself: the hub trees, the identity trees and the commands \code{\verb~|journal-new~}, \code{\verb~|journal-build~} and \code{\verb~|journal-serve~} in the flake.}
+}
+
+\p{\strong{A wrong report.} Midway the session reported that Canonical proved eight goals of the reduction once \code{\verb~|libgcc_s.so.1~} was preloaded. That was false: the process had crashed without output. It was found when the same setup printed nothing for \code{\verb~|#eval 1 + 1~}, and was corrected before anything was committed.}
+
+\p{\strong{Reuse.} For \code{\verb~|HoldsOnBits.of_isChain~} Mathlib has no lemma from a chain to its first and last entries, so the induction stays. \code{\verb~|checkRange~}, \code{\verb~|checkRangeResult~} and \code{\verb~|checkModesAgree~} repeated one loop three times, which is now \code{\verb~|checkBits~}.}

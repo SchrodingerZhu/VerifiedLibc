@@ -1,0 +1,14 @@
+\title{Basic macros}
+
+\p{Shared macros. Every tree that uses a table, a pull-request link or a source link imports this tree with \code{\verb~|\import{base-macros}~}.}
+
+\xmlns:html{http://www.w3.org/1999/xhtml}
+
+\def\table[body]{\<html:table>{\body}}
+\def\tr[body]{\<html:tr>{\body}}
+\def\td[body]{\<html:td>{\body}}
+\def\th[body]{\<html:th>{\body}}
+
+\def\pr[n]{\<html:a>[href]{https://github.com/SchrodingerZhu/VerifiedLibc/pull/\n}{\verb~|#~\n}}
+\def\issue[n]{\<html:a>[href]{https://github.com/SchrodingerZhu/VerifiedLibc/issues/\n}{\verb~|#~\n}}
+\def\src[path]{\<html:a>[href]{https://github.com/SchrodingerZhu/VerifiedLibc/blob/main/\path}{\code{\path}}}

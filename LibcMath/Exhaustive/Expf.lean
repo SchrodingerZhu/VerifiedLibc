@@ -71,4 +71,22 @@ theorem expf_holdsOnBits_towardZero_of_down (hrun : expf.IsComputedBy run) {firs
     HoldsOnBits (expf.CorrectAt (Spec.exp .binary32) .towardZero) first (first + count) :=
   hrun.holdsOnBits_of_checkModesAgree (fun x => .of_eq (Spec.exp_eval_towardZero _ x).symm) down h
 
+/-! ### Axioms
+
+The reduction uses no axiom beyond the three of Mathlib; in particular not `sorryAx`, and not
+`Lean.ofReduceBool` or `Lean.trustCompiler`, which `native_decide` would bring in. The build fails
+if that changes. -/
+
+/--
+info: 'LibcMath.Extracted.expfCorrectlyRounded_of_checkBlocks' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in
+#print axioms expfCorrectlyRounded_of_checkBlocks
+
+/--
+info: 'LibcMath.Extracted.expf_holdsOnBits_towardZero_of_down' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in
+#print axioms expf_holdsOnBits_towardZero_of_down
+
 end LibcMath.Extracted

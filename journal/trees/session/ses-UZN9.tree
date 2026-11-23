@@ -1,0 +1,19 @@
+\title{The remaining pull requests are merged}
+\taxon{Session}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{integration}
+\meta{harness}{Claude Code}
+\meta{model-id}{claude-fable-5-2}
+\meta{pr}{13}
+\import{base-macros}
+
+\p{The maintainer asked for all open pull requests to be merged. \pr{6} was merged as it was. For \pr{13}, which contains \pr{10} and \pr{7}, the main branch was merged into \code{\verb~|swarm/integration~} first.}
+\ul{
+\li{\strong{Conflicts.} The earlier pull requests had been merged as single commits, so git saw the files they share with the branch as added on both sides. For the six files that the branch had not changed, the version of the main branch was taken. \code{\verb~|LibcMath/Exhaustive/Reduction.lean~} and \code{\verb~|LibcMath/IR/Interp.lean~} were merged against their versions before the reviews, and both merged without a conflict in the text.}
+\li{\strong{Repairs.} \code{\verb~|LibcMath/IR/InterpDiag.lean~} names the new kinds of instruction and the terminator \code{\verb~|unreachable~}. The copy of \code{\verb~|Val.toModel?_ofModel~} in \code{\verb~|LibcMath/IR/InterpLemmas.lean~} is deleted. \code{\verb~|docs/expf-status.md~} became [note-expf-status](note-expf-status), and \code{\verb~|docs/extraction-coverage.md~} is deleted there as it is on the main branch.}
+\li{\strong{Verified.} The merged branch builds, with the examples and the checks of axioms of the earlier reviews.}
+\li{\strong{Not verified.} Nothing of \pr{13}, \pr{10} or \pr{7} was reviewed: [log-VH6E](log-VH6E).}
+\li{\strong{Problems.} [prob-F4A8](prob-F4A8) and [prob-VFZQ](prob-VFZQ) were updated: the merges are done, and what they left is still listed.}
+}

@@ -1,0 +1,7 @@
+\title{Open problems}
+
+\p{Unresolved questions and work that was deliberately left out, each in its own tree of taxon \code{Problem} with a status. A closed problem stays here and links what resolved it.}
+
+\query\datalog{
+ ?X -: {\rel/has-taxon ?X '{Problem}}
+}

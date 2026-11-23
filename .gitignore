@@ -10,3 +10,5 @@
 !/LibcMath/Exhaustive/Run/Kernel/Demo.lean
 !/LibcMath/Exhaustive/Run/Native/Demo
 !/LibcMath/Exhaustive/Run/Native/Demo.lean
+/journal/output
+__pycache__/

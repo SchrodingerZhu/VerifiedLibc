@@ -1,0 +1,7 @@
+\title{Notes}
+
+\p{Longer documents of taxon \code{\verb~|Note~}: surveys, designs and descriptions of how a part works. A note has a readable address \code{\verb~|note-<slug>~}, because other trees and the sources refer to it, and may be split into several trees that the first one transcludes.}
+
+\query\datalog{
+ ?X -: {\rel/has-taxon ?X '{Note}}
+}

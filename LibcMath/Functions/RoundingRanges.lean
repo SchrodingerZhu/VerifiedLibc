@@ -12,6 +12,10 @@ of arguments of a function be treated at once:
 * from the first power of two beyond the finite range upwards (`roundReal_of_two_zpow_le`);
 * strictly between zero and half the least subnormal (`roundReal_of_lt_two_zpow`,
   `roundReal_of_le_two_zpow_mul`).
+
+`roundReal_of_pos` is the common first step: the rounding of a positive real is
+`roundMagnitude` with a clear sign bit. These are facts about FloatLib's rounding in any format
+and belong there; they are kept here until a release of FloatLib has them.
 -/
 
 namespace LibcMath
@@ -32,7 +36,7 @@ theorem roundReal_eq_of_mem_Icc_rat (hfmt : fmt.isIEEE = true) (mode : IEEERound
     (hroundLo.trans hroundHi.symm), hroundLo]
 
 /-- A positive real is rounded by `roundMagnitude` on its own comparisons. -/
-private theorem roundReal_of_pos (mode : IEEERoundingMode) {y : ℝ} (hy : 0 < y) :
+theorem roundReal_of_pos (mode : IEEERoundingMode) {y : ℝ} (hy : 0 < y) :
     roundReal fmt mode y =
       roundMagnitude fmt mode false (fun boundary : ℚ => cmp y (boundary : ℝ)) := by
   have hcmp : cmp y ((0 : ℚ) : ℝ) = .gt := (cmp_eq_gt_iff _ _).mpr (by simpa using hy)

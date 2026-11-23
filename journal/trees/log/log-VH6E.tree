@@ -1,0 +1,21 @@
+\title{The proof of \code{\verb~|expf~} up to a finite computation, with its oracle and its runner}
+\taxon{Change}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{exp}
+\tag{integration}
+\meta{pr}{13}
+\import{base-macros}
+
+\p{\pr{13} brings together the work on \code{\verb~|expf~} and adds the parts that were missing. It was merged with \pr{10} and \pr{7}, which it contains. The state it reaches is in the note [note-expf-status](note-expf-status).}
+\ul{
+\li{\strong{Statement.} \code{\verb~|expfCorrectlyRounded_of_mainRanges~} in \code{\verb~|LibcMath/Extracted/ExpfMain.lean~}: \code{\verb~|expf~} is correctly rounded provided the interpreter returns the correctly rounded value on the two ranges of bit patterns where the code evaluates its polynomial.}
+\li{\strong{Semantics.} Flags of instructions such as \code{\verb~|nsw~}, more instructions, and executions that go wrong: \code{\verb~|Func.CorrectlyRounded~} now also says that no execution reaches an undefined operation. \code{\verb~|LibcMath/IR/SemanticsExamples.lean~} shows why.}
+\li{\strong{Short paths.} \code{\verb~|LibcMath/Extracted/ExpfPaths/~} proves the other ranges by evaluating the interpreter on a symbolic input, with \code{\verb~|LibcMath/IR/InterpLemmas.lean~} and the closed forms of [log-VSAO](log-VSAO).}
+\li{\strong{Oracle, \pr{10}.} \code{\verb~|LibcMath/Oracle/Exp.lean~}: \code{\verb~|expOracle~} decides whether a bit pattern is the correctly rounded exponential, for every format and direction, and never gives up.}
+\li{\strong{Runner, \pr{7}.} \code{\verb~|LibcMath/Exhaustive/Run/~}, the program \code{\verb~|checkrange~} and \code{\verb~|scripts/exhaustive.py~} split the computation into blocks and turn blocks into theorems, by the kernel or by \code{\verb~|native_decide~}. Only the small sets \code{\verb~|Demo~} are in the repository.}
+\li{\strong{Other.} \code{\verb~|Cospif~} and \code{\verb~|Sinpif~} are extracted. A differential test compares the model with the machine (\code{\verb~|scripts/difftest-expf.sh~}).}
+}
+\p{\strong{Merged without the review of this series.} \pr{1}, \pr{2} and \pr{4} were reviewed one at a time (sessions [ses-9U0D](ses-9U0D), [ses-D5OC](ses-D5OC), [ses-0YU4](ses-0YU4)). The maintainer then asked for the remaining pull requests to be merged. For \pr{13}, \pr{10} and \pr{7} the session [ses-UZN9](ses-UZN9) only merged the main branch into the branch, resolved the conflicts and built the result. Files that prove a block by \code{\verb~|native_decide~} are under \code{\verb~|LibcMath/Exhaustive/Run/Native/~}.}
