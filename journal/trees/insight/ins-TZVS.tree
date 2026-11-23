@@ -1,0 +1,16 @@
+\title{A definition that takes an \code{\verb~|Oracle S~} cannot be compiled at a concrete specification}
+\taxon{Insight}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{exhaustive}
+\tag{tooling}
+\import{base-macros}
+
+\p{Source: session [ses-9U0D](ses-9U0D), on \pr{1}. Verified with \code{\verb~|#eval~}.}
+\ul{
+\li{A specification such as \code{\verb~|Spec.exp~} is noncomputable, and it is a value, not a type, so the compiler does not erase it. \code{\verb~|checkRange~} receives it as the implicit argument of its oracle. \code{\verb~|#eval checkRange O run mode first count~} at a concrete oracle fails with \code{\verb~|depends on 'Spec.exp', which is 'noncomputable'~}, and \code{\verb~|native_decide~} fails likewise.}
+\li{Pass the test instead: a definition that takes \code{\verb~|O.check~}, a plain function, compiles. \code{\verb~|checkRange.test~} and \code{\verb~|checkRange.firstFailure~} are written that way, and \code{\verb~|checkRange_eq_checkBits~} connects them to \code{\verb~|checkRange~}.}
+\li{Evaluation in the kernel is not affected: \code{\verb~|decide +kernel~} proves \code{\verb~|checkRange O run mode first count = true~} directly.}
+\li{\pr{7} met the same obstacle and introduced \code{\verb~|checkBlock~} for it. The two forms should become one: [prob-F4A8](prob-F4A8).}
+}

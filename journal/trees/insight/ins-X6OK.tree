@@ -1,0 +1,15 @@
+\title{A tool run that prints nothing is not a success}
+\taxon{Insight}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{tooling}
+\tag{process}
+\import{base-macros}
+
+\p{Source: session [ses-9U0D](ses-9U0D), on \pr{1}.}
+\ul{
+\li{With \code{\verb~|LD_PRELOAD~} set as in [ins-LF91](ins-LF91), \code{\verb~|lake lean File.lean~} printed nothing, and eight goals were reported as proved by Canonical. The process had died with a segmentation fault, status 139, before printing anything; the status was hidden because the output went through a pipe to \code{\verb~|grep~}.}
+\li{When trying a tactic or a tool, put a command with known output in the same file, such as \code{\verb~|#eval 1 + 1~} or a goal that must fail, and read the exit status of the Lean process itself, not of the last command of a pipe.}
+\li{Do not record a tool as working until a proof it found has been compiled without it or printed.}
+}

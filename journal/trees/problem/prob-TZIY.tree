@@ -1,0 +1,17 @@
+\title{The blocks of the closed forms of \code{\verb~|exp~} are not proved maximal}
+\taxon{Problem}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{spec}
+\tag{exp}
+\meta{status}{open}
+\meta{created}{2026-11-23}
+\import{base-macros}
+
+\p{\strong{Status:} open.}
+\p{\code{\verb~|LibcMath/Functions/ExpRanges.lean~} says in its module docstring that each block ends where the closed form stops: the patterns \code{\verb~|0x33800000~} to nearest, \code{\verb~|0x34000000~}, \code{\verb~|0xB3000001~} to nearest, \code{\verb~|0xB3800001~}, \code{\verb~|0x42B17217~} and \code{\verb~|0xC2CE8ECF~} round differently or depend on the argument. The author checked this numerically; no theorem states it, and the review did not repeat the check.}
+\ul{
+\li{Nothing depends on it for correctness: a block that is too short only leaves more for the exhaustive computation, whose ranges are \code{\verb~|ExpRanges.uncovered mode~}.}
+\li{A proof for one neighbour needs the correctly rounded value at one argument, which an oracle for \code{\verb~|exp~} gives by evaluation. With the oracle of \pr{10} each of the six is one checked example.}
+}

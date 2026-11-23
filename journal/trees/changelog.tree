@@ -1,0 +1,8 @@
+\title{Changelog}
+
+\p{Dated changes to VerifiedLibc, grouped by month, newest first. Each entry is its own tree of taxon \code{Change} and names its pull request.}
+
+\scope{
+\put\transclude/expanded{false}
+\transclude{log-2026-11}
+}

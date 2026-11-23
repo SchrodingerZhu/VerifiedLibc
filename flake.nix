@@ -3,7 +3,15 @@
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-  outputs = {nixpkgs, ...}: let
+  # Forester renders the journal under ./journal. It is not in nixpkgs; its flake builds it
+  # against its own nixpkgs pin, which is kept so that the result comes from a binary cache.
+  inputs.forester.url = "sourcehut:~jonsterling/ocaml-forester/6.0";
+
+  outputs = {
+    nixpkgs,
+    forester,
+    ...
+  }: let
     # Must agree with ./lean-toolchain.
     leanVersion = "4.36.0";
     leanHashes = {
@@ -17,8 +25,81 @@
         version = leanVersion;
         hashes = leanHashes;
       };
+
+    foresterFor = pkgs: forester.legacyPackages.${pkgs.stdenv.hostPlatform.system}.forester;
+
+    # The journal commands work from any directory of the checkout. Forester copies its theme
+    # out of the Nix store with read-only permissions, so a previous output is made writable
+    # before building again.
+    enterJournal = ''
+      cd "$(git rev-parse --show-toplevel)/journal"
+      if [ -d output ]; then chmod -R u+w output; fi
+    '';
+    journalTools = pkgs: let
+      foresterPkg = foresterFor pkgs;
+    in {
+      build = pkgs.writeShellApplication {
+        name = "journal-build";
+        runtimeInputs = [foresterPkg pkgs.git];
+        text =
+          enterJournal
+          + ''
+            forester build forest.toml "$@" 2>&1 | tee output.log
+            if grep -qiE '(error|warning)' output.log; then
+              echo "forester reported diagnostics" >&2
+              rm output.log
+              exit 1
+            fi
+            rm output.log
+          '';
+      };
+      serve = pkgs.writeShellApplication {
+        name = "journal-serve";
+        runtimeInputs = [foresterPkg pkgs.git pkgs.python3];
+        text =
+          enterJournal
+          + ''
+            forester build forest.toml
+            port="''${1:-1313}"
+            echo "serving on http://localhost:$port/"
+            exec python3 -m http.server "$port" -d output
+          '';
+      };
+      # journal-new <kind>: allocate a random address and print the path of the new tree.
+      new = pkgs.writeShellApplication {
+        name = "journal-new";
+        runtimeInputs = [foresterPkg pkgs.git];
+        text =
+          enterJournal
+          + ''
+            kind="''${1:-}"
+            case "$kind" in
+              log)      prefix="log"; dir="log" ;;
+              insight)  prefix="ins"; dir="insight" ;;
+              problem)  prefix="prob"; dir="problem" ;;
+              decision) prefix="dec"; dir="decision" ;;
+              session)  prefix="ses"; dir="session" ;;
+              *)
+                echo "usage: journal-new <log|insight|problem|decision|session>" >&2
+                exit 2
+                ;;
+            esac
+            mkdir -p "trees/$dir"
+            exec forester new forest.toml --random --prefix "$prefix" --dest "trees/$dir"
+          '';
+      };
+    };
   in {
-    packages = forAllSystems (pkgs: {lean = leanFor pkgs;});
+    packages = forAllSystems (pkgs: {
+      lean = leanFor pkgs;
+      forester = foresterFor pkgs;
+    });
+
+    apps = forAllSystems (pkgs:
+      builtins.mapAttrs (_: drv: {
+        type = "app";
+        program = nixpkgs.lib.getExe drv;
+      }) (journalTools pkgs));
 
     devShells = forAllSystems (pkgs: {
       default = pkgs.mkShell {
@@ -49,6 +130,12 @@
           z3
           cvc5
           bitwuzla
+
+          # The journal under ./journal (see CLAUDE.md).
+          (foresterFor pkgs)
+          (journalTools pkgs).build
+          (journalTools pkgs).serve
+          (journalTools pkgs).new
         ];
       };
     });
