@@ -162,8 +162,8 @@ static bool hasImpliedRange(const Instruction &I) {
     return false;
   std::optional<ConstantRange> Range = II->getRange();
   unsigned Width = II->getType()->getIntegerBitWidth();
-  return Range &&
-         Range->contains(ConstantRange(APInt(Width, 0), APInt(Width, Width) + 1));
+  return Range && Range->contains(
+                      ConstantRange(APInt(Width, 0), APInt(Width, Width) + 1));
 }
 
 SmallVector<StringRef, 2> Translator::poisonFlags(const Instruction &I) const {
@@ -286,70 +286,60 @@ void Translator::translateLoad(const LoadInst &I) {
   Emitter.load(reg(I), GV->getName(), typedOperand(Index), type(I.getType(), I));
 }
 
-void Translator::translateCall(const CallInst &I,
-                               ArrayRef<StringRef> Flags) {
+/// The name under which an intrinsic is printed: its own without `llvm.` and
+/// the type suffix. Empty if the intrinsic is outside the fragment.
+static StringRef intrinsicOpcode(Intrinsic::ID ID) {
+  switch (ID) {
+  case Intrinsic::fabs:
+    return "fabs";
+  case Intrinsic::fmuladd:
+    return "fmuladd";
+  case Intrinsic::sqrt:
+    return "sqrt";
+  case Intrinsic::copysign:
+    return "copysign";
+  case Intrinsic::is_fpclass:
+    return "is.fpclass";
+  case Intrinsic::ctlz:
+    return "ctlz";
+  case Intrinsic::cttz:
+    return "cttz";
+  case Intrinsic::ctpop:
+    return "ctpop";
+  case Intrinsic::abs:
+    return "abs";
+  case Intrinsic::umin:
+    return "umin";
+  case Intrinsic::umax:
+    return "umax";
+  case Intrinsic::smin:
+    return "smin";
+  case Intrinsic::smax:
+    return "smax";
+  case Intrinsic::fshl:
+    return "fshl";
+  case Intrinsic::fshr:
+    return "fshr";
+  case Intrinsic::assume:
+    return "assume";
+  default:
+    return "";
+  }
+}
+
+void Translator::translateCall(const CallInst &I, ArrayRef<StringRef> Flags) {
   if (const auto *II = dyn_cast<IntrinsicInst>(&I)) {
-    // Printed under the name of the intrinsic without `llvm.`, with the type
-    // of its first argument.
-    StringRef Opcode;
-    switch (II->getIntrinsicID()) {
-    case Intrinsic::fabs:
-      Opcode = "fabs";
-      break;
-    case Intrinsic::fmuladd:
-      Opcode = "fmuladd";
-      break;
-    case Intrinsic::sqrt:
-      Opcode = "sqrt";
-      break;
-    case Intrinsic::copysign:
-      Opcode = "copysign";
-      break;
-    case Intrinsic::is_fpclass:
-      Opcode = "is.fpclass";
-      break;
-    case Intrinsic::ctlz:
-      Opcode = "ctlz";
-      break;
-    case Intrinsic::cttz:
-      Opcode = "cttz";
-      break;
-    case Intrinsic::ctpop:
-      Opcode = "ctpop";
-      break;
-    case Intrinsic::abs:
-      Opcode = "abs";
-      break;
-    case Intrinsic::umin:
-      Opcode = "umin";
-      break;
-    case Intrinsic::umax:
-      Opcode = "umax";
-      break;
-    case Intrinsic::smin:
-      Opcode = "smin";
-      break;
-    case Intrinsic::smax:
-      Opcode = "smax";
-      break;
-    case Intrinsic::fshl:
-      Opcode = "fshl";
-      break;
-    case Intrinsic::fshr:
-      Opcode = "fshr";
-      break;
-    case Intrinsic::assume:
-      // Operand bundles state assumptions that the condition does not.
-      if (II->hasOperandBundles())
-        unsupported("operand bundle", I);
-      Opcode = "assume";
-      break;
-    default:
+    StringRef Opcode = intrinsicOpcode(II->getIntrinsicID());
+    if (Opcode.empty())
       unsupported("intrinsic", I);
-    }
+    // Operand bundles state assumptions that the condition does not.
+    if (II->getIntrinsicID() == Intrinsic::assume && II->hasOperandBundles())
+      unsupported("operand bundle", I);
     SmallVector<Operand> Args;
     for (const Use &Arg : II->args())
       Args.push_back(operand(Arg));
+    // The type printed is that of the first argument, which differs from the
+    // type of the call for `is.fpclass` and `assume`.
     Emitter.operation(reg(I), Opcode, Flags, Args,
                       type(II->getArgOperand(0)->getType(), I));
     return;

@@ -10,10 +10,10 @@ floating-point function. Both are computable and are meant to be run on every in
 any NaN where FloatLib returns one, and `raiseExcept` returns an unspecified integer. The
 interpreter therefore computes with an `AbsVal` per register, which is either the exact value of
 the register or a description of the values it may hold. Instructions that copy a value (`phi`,
-`select`, `bitcast`, `freeze`, `ret`) accept any `AbsVal`; every other instruction needs exact operands, and
-the interpreter gives up (`none`) otherwise. In particular it gives up when a NaN produced by
-arithmetic is the operand of further arithmetic. It also answers `none` where an instruction has
-no result, such as one whose flag condition fails.
+`select`, `bitcast`, `freeze`, `ret`) accept any `AbsVal`; every other instruction needs exact
+operands, and the interpreter gives up (`none`) otherwise. In particular it gives up when a NaN
+produced by arithmetic is the operand of further arithmetic. It also answers `none` where an
+instruction has no result, such as one whose flag condition fails.
 
 The soundness theorems are `Func.exec_sound`, `Func.run_sound`, `Func.runFloat_sound` and
 `Func.runUnary_sound`: when the interpreter answers, the function can return the answer, and
@@ -369,7 +369,8 @@ def Instr.exec (mode : IEEERoundingMode) (f : Func) (s : Store) : Instr → Opti
   | uitofp dst a flags => do
     let v ← a.execExact s
     if flags.zextDefined v.bits then
-      some (.ofFloat (ExecDType.convertFromInt dst ⟨v.bits.setWidth (v.width + 1)⟩ mode : Model dst))
+      some (.ofFloat
+        (ExecDType.convertFromInt dst ⟨v.bits.setWidth (v.width + 1)⟩ mode : Model dst))
     else none
   | sqrt fmt a fmf => do
     let x ← a.execFloat fmt s

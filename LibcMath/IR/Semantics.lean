@@ -29,16 +29,15 @@ Execution of a `Func` under a rounding direction, as a relation between argument
 * An instruction that LLVM leaves undefined, or whose result would be poison, has no result:
   an out-of-range `fptosi`, `fptoui` or table index, a shift by the width or more, a division
   by zero, `llvm.ctlz`, `llvm.cttz` or `llvm.abs` on the operand their second argument excludes,
-  `llvm.assume` of a false condition, and an instruction with
-  a flag (`Flags`, `FastMathFlags`) whose condition fails. The conditions are those of the LLVM
-  Language Reference.
-  There are therefore no poison or undefined values: an execution that returns a result has
-  produced none. This also covers the `inbounds`, `nuw` and `nusw` flags of the address of a
-  table access and `noundef` on the arguments of a call.
+  `llvm.assume` of a false condition, and an instruction with a flag (`Flags`, `FastMathFlags`)
+  whose condition fails. The conditions are those of the LLVM Language Reference. There are
+  therefore no poison or undefined values: an execution that returns a result has produced none.
+  This also covers the `inbounds`, `nuw` and `nusw` flags of the address of a table access and
+  `noundef` on the arguments of a call.
 * An execution that reaches such an instruction goes wrong (`Func.GoesWrong`). So does one that
-  reaches `unreachable`, or an ill-formed operation: an operand of the wrong width or an unassigned register, a
-  branch to a block that does not exist, a phi node without a value for the block it is entered
-  from. An execution that runs forever neither returns nor goes wrong.
+  reaches `unreachable`, or an ill-formed operation: an operand of the wrong width or an
+  unassigned register, a branch to a block that does not exist, a phi node without a value for
+  the block it is entered from. An execution that runs forever neither returns nor goes wrong.
 * Not represented, and rejected by `ir2lean` instead: fast-math flags other than `nnan` and
   `ninf`, and metadata and attributes of an instruction under which its result is poison
   (`range`, `nofpclass`, …).
@@ -94,9 +93,9 @@ def Flags.noWrap (flags : Flags) (w : ℕ) (unsigned signed : ℤ) : Bool :=
     (!flags.nsw || (-2 ^ (w - 1) ≤ signed && signed < 2 ^ (w - 1)))
 
 /-- The instruction has a result on `a` and `b`: a shift amount is less than the width, a divisor
-is not zero, and the conditions of the flags that are set hold. A left shift by `b` multiplies by `2 ^ b`, so the bits
-it shifts out are zero (`nuw`), or agree with the sign of the result (`nsw`), exactly when that
-product does not overflow. -/
+is not zero, and the conditions of the flags that are set hold. A left shift by `b` multiplies by
+`2 ^ b`, so the bits it shifts out are zero (`nuw`), or agree with the sign of the result (`nsw`),
+exactly when that product does not overflow. -/
 def IntBinOp.defined {w : ℕ} (flags : Flags) (a b : BitVec w) : IntBinOp → Bool
   | .add => flags.noWrap w (a.toNat + b.toNat) (a.toInt + b.toInt)
   | .sub => flags.noWrap w (a.toNat - b.toNat) (a.toInt - b.toInt)
