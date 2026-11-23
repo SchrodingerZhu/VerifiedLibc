@@ -17,3 +17,5 @@ import LibcMath.Extracted.Statements
 import LibcMath.Extracted.Cospif
 import LibcMath.Extracted.Sinpif
 import LibcMath.Exhaustive.ExpfInterp
+import LibcMath.Oracle.Exp
+import LibcMath.Oracle.ExpExamples
