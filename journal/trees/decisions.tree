@@ -1,0 +1,7 @@
+\title{Decisions}
+
+\p{Choices made by a maintainer, each in its own tree of taxon \code{Decision}, with the date and the alternatives that were set aside.}
+
+\query\datalog{
+ ?X -: {\rel/has-taxon ?X '{Decision}}
+}
