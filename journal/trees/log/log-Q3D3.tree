@@ -1,0 +1,16 @@
+\title{A structured form of the main path of \code{\verb~|expf~}}
+\taxon{Change}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{exp}
+\meta{pr}{12}
+\import{base-macros}
+
+\p{\pr{12} writes the path of \code{\verb~|expf~} through the tables and the polynomial as a Lean function over FloatLib's operations, \code{\verb~|expfStructured~} in \code{\verb~|LibcMath/Extracted/ExpfStructured.lean~}, with a checker \code{\verb~|checkBlockMain~} that runs on it in place of the interpreter (\code{\verb~|checkrange --structured~}).}
+\ul{
+\li{The pull request reports that the compiled check is about twice as fast as with the interpreter, 30 against 61 microseconds for an input when rounding to nearest, and three to four times as fast in the kernel. These measurements were made on a loaded machine and were not repeated.}
+\li{The transfer back to the interpreter, \code{\verb~|holdsOnBits_of_checkBlockMain'~}, rests on one statement that is not proved in the build: [prob-W1QC](prob-W1QC). The pull request was a draft and stated it with \code{\verb~|sorry~}. When it was merged at the request of the maintainer, the statement became the proposition \code{\verb~|Block15ComputesExpfMain~}, which the theorems take as a hypothesis, so that the build has no \code{\verb~|sorry~}; a check of axioms was added. Session [ses-UZN9](ses-UZN9).}
+\li{\code{\verb~|LibcMath/Extracted/ExpfStructuredExec.lean~} holds the attempted proof and is not imported.}
+}

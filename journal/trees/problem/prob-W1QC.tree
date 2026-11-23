@@ -1,0 +1,20 @@
+\title{The kernel does not finish the proof that block 15 of \code{\verb~|expf~} computes \code{\verb~|expfMain~}}
+\taxon{Problem}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{exp}
+\tag{kernel}
+\meta{status}{open}
+\meta{created}{2026-11-23}
+\meta{pr}{12}
+\import{base-macros}
+
+\p{\strong{Status:} open.}
+\p{\code{\verb~|Block15ComputesExpfMain~} in \code{\verb~|LibcMath/Extracted/ExpfStructuredOpen.lean~} says that from block 15 on the interpreter computes \code{\verb~|expfMain~}, for every argument and rounding direction. It is a hypothesis of \code{\verb~|runUnary_eq_expfStructured~} and of \code{\verb~|holdsOnBits_of_checkBlockMain'~}, so the faster check on the structured form ([log-Q3D3](log-Q3D3)) does not yet give a theorem about the extracted code.}
+\ul{
+\li{\code{\verb~|LibcMath/Extracted/ExpfStructuredExec.lean~} has a proof in which every tactic step elaborates. According to the description of \pr{12}, the kernel checks the first 8 of the 22 instructions of block 20 in seconds and did not finish the whole within 25 minutes on a loaded machine; whether it terminates is not known. The file is not imported, and was not built by the session that merged it.}
+\li{The same description records two traps in \code{\verb~|LibcMath/IR/InterpLemmas.lean~}: simplifying a whole block under \code{\verb~|Option.bind~} is exponential in its length, and \code{\verb~|Option.bind_eq_bind~} as a \code{\verb~|rfl~} lemma leaves the kernel to compare the two forms by unfolding.}
+\li{To try: split block 20 into lemmas of a few instructions each, so that the kernel checks short terms; or prove the equality by the method of the short paths in \code{\verb~|LibcMath/Extracted/ExpfPaths/Exec.lean~}.}
+\li{The structured form is also what a bound on the error of this path would be stated about.}
+}
