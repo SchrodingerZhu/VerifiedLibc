@@ -33,15 +33,15 @@ variable {fmt : FloatFormat} {S : Spec fmt}
 result under `mode`, and the same one under `mode'`. -/
 def checkModesAgree (run : IEEERoundingMode → Model fmt → Option (Model fmt))
     (mode mode' : IEEERoundingMode) (first count : ℕ) : Bool :=
-  (List.range count).all fun i =>
-    let input : Model fmt := .ofNatBits (first + i)
+  checkBits (first := first) (count := count) fun input =>
     (run mode input).isSome && decide (run mode input = run mode' input)
 
+@[grind =]
 theorem checkModesAgree_eq_true_iff :
     checkModesAgree run mode mode' first count = true ↔
       ∀ i < count, ∃ y, run mode (.ofNatBits (first + i)) = some y ∧
         run mode' (.ofNatBits (first + i)) = some y := by
-  simp only [checkModesAgree, List.all_eq_true, List.mem_range]
+  rw [checkModesAgree, checkBits_eq_true_iff]
   refine forall₂_congr fun i _ => ?_
   cases run mode (.ofNatBits (first + i)) <;> simp [eq_comm]
 
