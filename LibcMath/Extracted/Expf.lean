@@ -100,12 +100,12 @@ llvm_func expf(float %0) {
   ^bb2:
     %5 = fabs %0 : float
     %6 = bitcast %5 : float -> i32
-    %7 = add %6, 0xBD4E0000 : i32
+    %7 = add nsw %6, 0xBD4E0000 : i32
     %8 = icmp ult %7, 0xEFCE0001 : i32
     br %8, ^bb3, ^bb15
   ^bb3:
     %9 = and %1, 0x7F000000 : i32
-    %10 = icmp ult %9, 0x33000000 : i32
+    %10 = icmp samesign ult %9, 0x33000000 : i32
     br %10, ^bb4, ^bb5
   ^bb4:
     %11 = fadd %0, 0x3F800000 : float
@@ -117,7 +117,7 @@ llvm_func expf(float %0) {
     %13 = icmp eq %6, 0x7F800000 : i32
     br %13, ^bb21, ^bb7
   ^bb7:
-    %14 = icmp ugt %6, 0x7F800000 : i32
+    %14 = icmp samesign ugt %6, 0x7F800000 : i32
     br %14, ^bb21, ^bb8
   ^bb8:
     %15 = call isRoundUp()
@@ -130,7 +130,7 @@ llvm_func expf(float %0) {
     %18 = icmp sgt %1, 0x42B1FFFF : i32
     br %18, ^bb11, ^bb15
   ^bb11:
-    %19 = icmp ult %1, 0x7F800000 : i32
+    %19 = icmp samesign ult %1, 0x7F800000 : i32
     br %19, ^bb12, ^bb14
   ^bb12:
     %20 = call quickGetRound()
@@ -179,7 +179,7 @@ llvm_func expf(float %0) {
     %47 = sext %46 : i32 -> i64
     %48 = load @_ZN11__llvm_libc4math6EXP_M1E[i64 %47] : double
     %49 = and %44, 0x7F : i32
-    %50 = zext %49 : i32 -> i64
+    %50 = zext nneg %49 : i32 -> i64
     %51 = load @_ZN11__llvm_libc4math6EXP_M2E[i64 %50] : double
     %52 = fmul %43, 0x3FA55555555EF243 : double
     %53 = fadd %52, 0x3FC555566668E5E7 : double

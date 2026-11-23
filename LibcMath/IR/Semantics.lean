@@ -8,7 +8,9 @@ import FloatLib.Floats.Formats.BinaryInterchange.DType.Cast
 /-!
 # Meaning of extracted code
 
-Execution of a `Func` under a rounding direction, as a relation between arguments and results.
+Execution of a `Func` under a rounding direction, as a relation between arguments and results
+(`Func.Returns`), together with the executions that reach an operation LLVM leaves undefined
+(`Func.GoesWrong`).
 
 * A floating-point instruction is the corresponding IEEE 754 operation of FloatLib in the
   rounding direction in effect. LLVM itself only defines these instructions under the default
@@ -16,14 +18,30 @@ Execution of a `Func` under a rounding direction, as a relation between argument
   file states that behavior.
 * The result of an arithmetic instruction or conversion is any bit pattern with the same value as
   FloatLib's result (`SameValue`), so nothing can be concluded about the sign or payload of a NaN
-  it produces. `fneg` and `fabs` only change the sign bit, and their results are exact.
+  it produces. `fneg`, `fabs` and `llvm.copysign` only change the sign bit, and their results are
+  exact.
+* `uitofp` and `fptoui` are FloatLib's conversions from and to a signed integer one bit wider,
+  which holds every unsigned integer of the instruction's width.
 * `llvm.fmuladd` is a multiplication followed by an addition, and `quickGetRound` returns the
   `FE_*` constants of x86-64. Both describe x86-64 without FMA instructions.
 * Core operations are given their intended behavior. Reporting through `errno` and the status
   flags has no effect on the values computed.
-* Flags under which LLVM instructions yield poison (`nsw`, `nuw`, `samesign`, `inbounds`, …) are
-  not represented, and shifts by the width or more are defined. Operations that are undefined for
-  other reasons, such as an out-of-range `fptosi` or table index, have no result.
+* An instruction that LLVM leaves undefined, or whose result would be poison, has no result:
+  an out-of-range `fptosi`, `fptoui` or table index, a shift by the width or more, a division
+  by zero, `llvm.ctlz`, `llvm.cttz` or `llvm.abs` on the operand their second argument excludes,
+  `llvm.assume` of a false condition, and an instruction with a flag (`Flags`, `FastMathFlags`)
+  whose condition fails. The conditions are those of the LLVM Language Reference. There are
+  therefore no poison or undefined values: an execution that returns a result has produced none.
+  This also covers the `inbounds`, `nuw` and `nusw` flags of the address of a table access and
+  `noundef` on the arguments of a call.
+* An execution that reaches such an instruction goes wrong (`Func.GoesWrong`). So does one that
+  reaches `unreachable`, or an ill-formed operation: an operand of the wrong width or an
+  unassigned register, a branch to a block that does not exist, a phi node without a value for
+  the block it is entered from. An execution that runs forever neither returns nor goes wrong.
+* Not represented, and rejected by `ir2lean` instead: fast-math flags other than `nnan` and
+  `ninf`, and metadata and attributes of an instruction under which its result is poison
+  (`range`, `nofpclass`, …).
+  Attributes of the function itself and of its parameters are not examined.
 -/
 
 namespace LibcMath.IR
@@ -66,6 +84,31 @@ def Operand.eval (env : Env) : Operand → Option Val
   | .reg r => env r
   | .const width bits => some (.ofNat width bits)
 
+/-- The result of `add`, `sub`, `mul` or `shl` on `w`-bit operands does not overflow in the ways
+`nuw` and `nsw` forbid: when `nuw` is set, the mathematical result `unsigned` on the operands read
+as unsigned integers is an unsigned `w`-bit integer, and when `nsw` is set, the mathematical
+result `signed` on the operands read as signed integers is a signed `w`-bit integer. -/
+def Flags.noWrap (flags : Flags) (w : ℕ) (unsigned signed : ℤ) : Bool :=
+  (!flags.nuw || (0 ≤ unsigned && unsigned < 2 ^ w)) &&
+    (!flags.nsw || (-2 ^ (w - 1) ≤ signed && signed < 2 ^ (w - 1)))
+
+/-- The instruction has a result on `a` and `b`: a shift amount is less than the width, a divisor
+is not zero, and the conditions of the flags that are set hold. A left shift by `b` multiplies by
+`2 ^ b`, so the bits it shifts out are zero (`nuw`), or agree with the sign of the result (`nsw`),
+exactly when that product does not overflow. -/
+def IntBinOp.defined {w : ℕ} (flags : Flags) (a b : BitVec w) : IntBinOp → Bool
+  | .add => flags.noWrap w (a.toNat + b.toNat) (a.toInt + b.toInt)
+  | .sub => flags.noWrap w (a.toNat - b.toNat) (a.toInt - b.toInt)
+  | .mul => flags.noWrap w (a.toNat * b.toNat) (a.toInt * b.toInt)
+  | .and | .xor => true
+  | .or => !flags.disjoint || a &&& b == 0
+  | .shl => b.toNat < w && flags.noWrap w (a.toNat * 2 ^ b.toNat) (a.toInt * 2 ^ b.toNat)
+  | .lshr | .ashr => b.toNat < w && (!flags.exact || a.toNat % 2 ^ b.toNat == 0)
+  | .udiv => b != 0 && (!flags.exact || a.toNat % b.toNat == 0)
+  | .urem => b != 0
+  | .umin | .umax | .smin | .smax => true
+
+/-- The result of the instruction where `IntBinOp.defined` holds. -/
 def IntBinOp.eval {w : ℕ} (a b : BitVec w) : IntBinOp → BitVec w
   | .add => a + b
   | .sub => a - b
@@ -76,6 +119,47 @@ def IntBinOp.eval {w : ℕ} (a b : BitVec w) : IntBinOp → BitVec w
   | .shl => a <<< b
   | .lshr => a >>> b
   | .ashr => a.sshiftRight' b
+  | .udiv => a / b
+  | .urem => a % b
+  | .umin => if a.ult b then a else b
+  | .umax => if a.ult b then b else a
+  | .smin => if a.slt b then a else b
+  | .smax => if a.slt b then b else a
+
+/-- The intrinsic has a result on `a`: when `poison` is set, `a` is not zero for `llvm.ctlz` and
+`llvm.cttz`, and not the least signed integer for `llvm.abs`. -/
+def IntUnOp.defined {w : ℕ} (poison : Bool) (a : BitVec w) : IntUnOp → Bool
+  | .ctlz | .cttz => !poison || a != 0
+  | .ctpop => true
+  | .abs => !poison || a != BitVec.intMin w
+
+/-- The result of the intrinsic where `IntUnOp.defined` holds. The counts of zero are the width,
+and the absolute value of the least signed integer is itself. -/
+def IntUnOp.eval {w : ℕ} (a : BitVec w) : IntUnOp → BitVec w
+  | .ctlz => a.clz
+  | .cttz => a.ctz
+  | .ctpop => a.cpop
+  | .abs => a.abs
+
+/-- `a` followed by `b`, shifted left (`fshl`) or right (`fshr`) by `c` modulo the width; the
+result is the half of the shifted value in which `a` (`fshl`) or `b` (`fshr`) started. -/
+def FunnelShift.eval {w : ℕ} (a b c : BitVec w) : FunnelShift → BitVec w
+  | .fshl => ((a ++ b) <<< (c.toNat % w)).extractLsb' w w
+  | .fshr => ((a ++ b) >>> (c.toNat % w)).extractLsb' 0 w
+
+/-- An `icmp` has a result on `a` and `b`: with `samesign`, their sign bits agree. -/
+def Flags.icmpDefined {w : ℕ} (flags : Flags) (a b : BitVec w) : Bool :=
+  !flags.samesign || a.msb == b.msb
+
+/-- A `zext` has a result on `a`: with `nneg`, its sign bit is clear. -/
+def Flags.zextDefined {w : ℕ} (flags : Flags) (a : BitVec w) : Bool :=
+  !flags.nneg || !a.msb
+
+/-- A `trunc` to `width` bits has a result on `a`: the truncated value is `a` as an unsigned
+integer with `nuw`, and as a signed integer with `nsw`. -/
+def Flags.truncDefined {w : ℕ} (flags : Flags) (width : ℕ) (a : BitVec w) : Bool :=
+  (!flags.nuw || (a.setWidth width).toNat == a.toNat) &&
+    (!flags.nsw || (a.setWidth width).toInt == a.toInt)
 
 def ICmp.eval {w : ℕ} (a b : BitVec w) : ICmp → Bool
   | .eq => a == b
@@ -107,11 +191,30 @@ def FCmp.eval : FCmp → Option Ordering → Bool
   | .une, o => o != some .eq
   | .uno, o => o.isNone
 
+/-- The flags admit `x` as an argument or result: it is not a NaN under `nnan`, and not an
+infinity under `ninf`. -/
+def FastMathFlags.admits {fmt : FloatFormat} (fmf : FastMathFlags) (x : Model fmt) : Bool :=
+  !(fmf.nnan && x.isNaN) && !(fmf.ninf && x.isInfinite)
+
 def FBinOp.eval {fmt : FloatFormat} (mode : IEEERoundingMode) (x y : Model fmt) :
     FBinOp → Model fmt
   | .fadd => Model.add x y mode
   | .fsub => Model.sub x y mode
   | .fmul => Model.mul x y mode
+  | .fdiv => Model.div x y mode
+
+/-- The bit of the mask of `llvm.is.fpclass` that selects a class. -/
+def fpClassBit : FloatLib.Numerics.IEEEClass → ℕ
+  | .signalingNaN => 0
+  | .quietNaN => 1
+  | .negativeInfinity => 2
+  | .negativeNormal => 3
+  | .negativeSubnormal => 4
+  | .negativeZero => 5
+  | .positiveZero => 6
+  | .positiveSubnormal => 7
+  | .positiveNormal => 8
+  | .positiveInfinity => 9
 
 /-- The value of `fegetround()` on x86-64, for the rounding directions C can select. -/
 def roundingConstant : IEEERoundingMode → Option ℕ
@@ -133,35 +236,76 @@ def CoreOp.Eval (mode : IEEERoundingMode) : CoreOp → Val → Prop
 
 /-- `r` is a possible result of the instruction. -/
 def Instr.Eval (mode : IEEERoundingMode) (f : Func) (env : Env) : Instr → Val → Prop
-  | .intBin op a b, r =>
-    ∃ w x y, a.eval env = some ⟨w, x⟩ ∧ b.eval env = some ⟨w, y⟩ ∧ r = ⟨w, op.eval x y⟩
-  | .icmp pred a b, r =>
-    ∃ w x y, a.eval env = some ⟨w, x⟩ ∧ b.eval env = some ⟨w, y⟩ ∧ r = .ofBool (pred.eval x y)
-  | .zext width a, r => ∃ v, a.eval env = some v ∧ r = ⟨width, v.bits.setWidth width⟩
+  | .intBin op a b flags, r =>
+    ∃ w x y, a.eval env = some ⟨w, x⟩ ∧ b.eval env = some ⟨w, y⟩ ∧
+      op.defined flags x y = true ∧ r = ⟨w, op.eval x y⟩
+  | .intUn op a poison, r =>
+    ∃ v, a.eval env = some v ∧ op.defined poison v.bits = true ∧ r = ⟨v.width, op.eval v.bits⟩
+  | .funnelShift op a b c, r =>
+    ∃ w x y z, a.eval env = some ⟨w, x⟩ ∧ b.eval env = some ⟨w, y⟩ ∧ c.eval env = some ⟨w, z⟩ ∧
+      r = ⟨w, op.eval x y z⟩
+  | .icmp pred a b flags, r =>
+    ∃ w x y, a.eval env = some ⟨w, x⟩ ∧ b.eval env = some ⟨w, y⟩ ∧
+      flags.icmpDefined x y = true ∧ r = .ofBool (pred.eval x y)
+  | .zext width a flags, r =>
+    ∃ v, a.eval env = some v ∧ flags.zextDefined v.bits = true ∧
+      r = ⟨width, v.bits.setWidth width⟩
   | .sext width a, r => ∃ v, a.eval env = some v ∧ r = ⟨width, v.bits.signExtend width⟩
-  | .trunc width a, r => ∃ v, a.eval env = some v ∧ r = ⟨width, v.bits.setWidth width⟩
+  | .trunc width a flags, r =>
+    ∃ v, a.eval env = some v ∧ flags.truncDefined width v.bits = true ∧
+      r = ⟨width, v.bits.setWidth width⟩
   | .select cond a b, r =>
     ∃ c, cond.eval env = some (.ofBool c) ∧ (if c then a.eval env else b.eval env) = some r
-  | .fBin fmt op a b, r =>
+  | .fBin fmt op a b fmf, r =>
     ∃ x y, (a.eval env).bind (·.toModel? fmt) = some x ∧
-      (b.eval env).bind (·.toModel? fmt) = some y ∧ r.Encodes (op.eval mode x y)
-  | .fneg fmt a, r => ∃ x, (a.eval env).bind (·.toModel? fmt) = some x ∧ r = .ofModel x.neg
-  | .fabs fmt a, r => ∃ x, (a.eval env).bind (·.toModel? fmt) = some x ∧ r = .ofModel x.abs
-  | .fmuladd fmt a b c, r =>
+      (b.eval env).bind (·.toModel? fmt) = some y ∧
+      (fmf.admits x && fmf.admits y && fmf.admits (op.eval mode x y)) = true ∧
+      r.Encodes (op.eval mode x y)
+  | .fneg fmt a fmf, r =>
+    ∃ x, (a.eval env).bind (·.toModel? fmt) = some x ∧ fmf.admits x = true ∧ r = .ofModel x.neg
+  | .fabs fmt a fmf, r =>
+    ∃ x, (a.eval env).bind (·.toModel? fmt) = some x ∧ fmf.admits x = true ∧ r = .ofModel x.abs
+  | .fmuladd fmt a b c fmf, r =>
     ∃ x y z, (a.eval env).bind (·.toModel? fmt) = some x ∧
       (b.eval env).bind (·.toModel? fmt) = some y ∧
       (c.eval env).bind (·.toModel? fmt) = some z ∧
+      (fmf.admits x && fmf.admits y && fmf.admits z &&
+        fmf.admits (Model.add (Model.mul x y mode) z mode)) = true ∧
       r.Encodes (Model.add (Model.mul x y mode) z mode)
-  | .fcmp fmt pred a b, r =>
+  | .fcmp fmt pred a b fmf, r =>
     ∃ x y, (a.eval env).bind (·.toModel? fmt) = some x ∧
-      (b.eval env).bind (·.toModel? fmt) = some y ∧ r = .ofBool (pred.eval (Model.compare x y))
-  | .fpConvert src dst a, r =>
-    ∃ x, (a.eval env).bind (·.toModel? src) = some x ∧ r.Encodes (Model.cast src dst x mode)
+      (b.eval env).bind (·.toModel? fmt) = some y ∧ (fmf.admits x && fmf.admits y) = true ∧
+      r = .ofBool (pred.eval (Model.compare x y))
+  | .fpConvert src dst a fmf, r =>
+    ∃ x, (a.eval env).bind (·.toModel? src) = some x ∧
+      (fmf.admits x && fmf.admits (Model.cast src dst x mode)) = true ∧
+      r.Encodes (Model.cast src dst x mode)
   | .fptosi src width a, r =>
     ∃ x n status, (a.eval env).bind (·.toModel? src) = some x ∧
       ExecDType.convertToInteger (width := width) x .towardZero = .success n status ∧
       r = ⟨width, n.bits⟩
+  | .fptoui src width a, r =>
+    ∃ x n status, (a.eval env).bind (·.toModel? src) = some x ∧
+      ExecDType.convertToInteger (width := width + 1) x .towardZero = .success n status ∧
+      n.bits.msb = false ∧ r = ⟨width, n.bits.setWidth width⟩
+  | .sitofp dst a, r =>
+    ∃ v, a.eval env = some v ∧ r.Encodes (ExecDType.convertFromInt dst ⟨v.bits⟩ mode : Model dst)
+  | .uitofp dst a flags, r =>
+    ∃ v, a.eval env = some v ∧ flags.zextDefined v.bits = true ∧
+      r.Encodes (ExecDType.convertFromInt dst ⟨v.bits.setWidth (v.width + 1)⟩ mode : Model dst)
+  | .sqrt fmt a fmf, r =>
+    ∃ x, (a.eval env).bind (·.toModel? fmt) = some x ∧
+      (fmf.admits x && fmf.admits (Model.sqrt x mode)) = true ∧ r.Encodes (Model.sqrt x mode)
+  | .copysign fmt a b fmf, r =>
+    ∃ x y, (a.eval env).bind (·.toModel? fmt) = some x ∧
+      (b.eval env).bind (·.toModel? fmt) = some y ∧ (fmf.admits x && fmf.admits y) = true ∧
+      r = .ofModel (Model.copySign x y)
+  | .isFpClass fmt a mask, r =>
+    ∃ x, (a.eval env).bind (·.toModel? fmt) = some x ∧
+      r = .ofBool (mask.testBit (fpClassBit (Model.classify x)))
   | .bitcast a, r => a.eval env = some r
+  | .freeze a, r => a.eval env = some r
+  | .assume cond, r => cond.eval env = some (.ofBool true) ∧ r = .ofNat 0 0
   | .load table index, r =>
     ∃ t i e, f.tables[table]? = some t ∧ index.eval env = some i ∧
       t.elems[i.bits.toNat]? = some e ∧ r = .ofNat t.width e
@@ -206,12 +350,75 @@ inductive Run (mode : IEEERoundingMode) (f : Func) : (pred cur : ℕ) → Env �
 def Func.Returns (mode : IEEERoundingMode) (f : Func) (args : List Val) (result : Val) : Prop :=
   Run mode f 0 0 (Env.ofArgs args) result
 
-/-- The extracted unary function `f` is a correctly rounded implementation of `S`: on every input
-it has a result, and every result it can have is the prescribed one. -/
+/-- Executing the instructions of a block in order reaches one that has no result. -/
+inductive BodyGoesWrong (mode : IEEERoundingMode) (f : Func) : Env → List (Reg × Instr) → Prop
+  | here {env : Env} {r : Reg} {i : Instr} {rest : List (Reg × Instr)} :
+    (∀ v, ¬i.Eval mode f env v) → BodyGoesWrong mode f env ((r, i) :: rest)
+  | later {env : Env} {r : Reg} {i : Instr} {v : Val} {rest : List (Reg × Instr)} :
+    i.Eval mode f env v → BodyGoesWrong mode f (env.set r v) rest →
+    BodyGoesWrong mode f env ((r, i) :: rest)
+
+/-- Starting at block `cur`, entered from block `pred` with environment `env`, the function can
+reach, in finitely many steps, a point at which it has no next step and has not returned. -/
+inductive GoesWrong (mode : IEEERoundingMode) (f : Func) : (pred cur : ℕ) → Env → Prop
+  /-- There is no block `cur`. -/
+  | block {pred cur : ℕ} {env : Env} : f.blocks[cur]? = none → GoesWrong mode f pred cur env
+  /-- A phi node has no value on entry from `pred`. Phi nodes have at most one outcome, so this
+  is the case when they have none. -/
+  | phis {pred cur : ℕ} {env : Env} {b : Block} :
+    f.blocks[cur]? = some b → (∀ env₁, ¬EnterPhis pred env env b.phis env₁) →
+    GoesWrong mode f pred cur env
+  /-- An instruction of the block has no result. -/
+  | body {pred cur : ℕ} {env env₁ : Env} {b : Block} :
+    f.blocks[cur]? = some b → EnterPhis pred env env b.phis env₁ →
+    BodyGoesWrong mode f env₁ b.body → GoesWrong mode f pred cur env
+  /-- The operand of `ret` has no value. -/
+  | ret {pred cur : ℕ} {env env₁ env₂ : Env} {b : Block} {a : Operand} :
+    f.blocks[cur]? = some b → EnterPhis pred env env b.phis env₁ →
+    ExecBody mode f env₁ b.body env₂ → b.term = .ret a → a.eval env₂ = none →
+    GoesWrong mode f pred cur env
+  /-- The condition of a branch is not a boolean. -/
+  | cond {pred cur ifTrue ifFalse : ℕ} {env env₁ env₂ : Env} {b : Block} {cond : Operand} :
+    f.blocks[cur]? = some b → EnterPhis pred env env b.phis env₁ →
+    ExecBody mode f env₁ b.body env₂ → b.term = .condBr cond ifTrue ifFalse →
+    (∀ c, cond.eval env₂ ≠ some (.ofBool c)) → GoesWrong mode f pred cur env
+  /-- The block ends in `unreachable`. -/
+  | unreachable {pred cur : ℕ} {env env₁ env₂ : Env} {b : Block} :
+    f.blocks[cur]? = some b → EnterPhis pred env env b.phis env₁ →
+    ExecBody mode f env₁ b.body env₂ → b.term = .unreachable → GoesWrong mode f pred cur env
+  /-- Execution goes wrong after a branch. -/
+  | br {pred cur target : ℕ} {env env₁ env₂ : Env} {b : Block} :
+    f.blocks[cur]? = some b → EnterPhis pred env env b.phis env₁ →
+    ExecBody mode f env₁ b.body env₂ → b.term = .br target →
+    GoesWrong mode f cur target env₂ → GoesWrong mode f pred cur env
+  /-- Execution goes wrong after a conditional branch. -/
+  | condBr {pred cur ifTrue ifFalse : ℕ} {env env₁ env₂ : Env} {b : Block} {cond : Operand}
+      {c : Bool} :
+    f.blocks[cur]? = some b → EnterPhis pred env env b.phis env₁ →
+    ExecBody mode f env₁ b.body env₂ → b.term = .condBr cond ifTrue ifFalse →
+    cond.eval env₂ = some (.ofBool c) →
+    GoesWrong mode f cur (if c then ifTrue else ifFalse) env₂ → GoesWrong mode f pred cur env
+
+/-- Called on `args` under rounding direction `mode`, the function has an execution that reaches
+an operation without a result: one that LLVM leaves undefined or whose result would be poison, or
+one that is ill-formed. This is the undefined behavior of extracted code. -/
+def Func.GoesWrong (mode : IEEERoundingMode) (f : Func) (args : List Val) : Prop :=
+  IR.GoesWrong mode f 0 0 (Env.ofArgs args)
+
+/-- The extracted unary function `f` is a correctly rounded implementation of `S`. On every input,
+
+* it has a result;
+* every result it can have is the prescribed one;
+* no execution goes wrong, so the function has no undefined behavior.
+
+Results are not unique: an instruction may return any NaN, and `raiseExcept` any integer. The
+third component is therefore not implied by the first two, which only speak of the executions
+that return. -/
 def Func.CorrectlyRounded {fmt : FloatFormat} (S : Spec fmt) (modes : Set IEEERoundingMode)
     (f : Func) : Prop :=
   ∀ mode ∈ modes, ∀ x : Model fmt,
     (∃ r, f.Returns mode [.ofModel x] r) ∧
-    ∀ r, f.Returns mode [.ofModel x] r → r.Encodes (S.eval mode x)
+    (∀ r, f.Returns mode [.ofModel x] r → r.Encodes (S.eval mode x)) ∧
+    ¬f.GoesWrong mode [.ofModel x]
 
 end LibcMath.IR

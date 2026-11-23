@@ -2,6 +2,7 @@
 
 #include "llvm/Demangle/Demangle.h"
 #include "llvm/IR/Function.h"
+#include <cstdlib>
 
 using namespace llvm;
 
@@ -24,27 +25,25 @@ static const CoreOp CoreOps[] = {
 };
 
 std::string relativeName(const Function &F) {
-  std::string Demangled = demangle(F.getName());
-  std::string Result;
-  unsigned Depth = 0;
-  for (char C : Demangled) {
-    if (C == '(' && Depth == 0)
-      break;
-    if (C == '<')
-      ++Depth;
-    else if (C == '>')
-      --Depth;
-    else if (Depth == 0)
-      Result.push_back(C);
-  }
-  StringRef Name = Result;
-  // The return type precedes the name of a template specialization.
-  size_t Space = Name.rfind(' ');
-  if (Space != StringRef::npos)
-    Name = Name.substr(Space + 1);
-  if (Name.starts_with("__llvm_libc"))
-    Name = Name.substr(Name.find("::") + 2);
-  return Name.str();
+  ItaniumPartialDemangler Demangler;
+  std::string Mangled = F.getName().str();
+  if (Demangler.partialDemangle(Mangled.c_str()) || !Demangler.isFunction())
+    return Mangled;
+
+  auto Take = [](char *Buffer) {
+    std::string Result = Buffer ? Buffer : "";
+    std::free(Buffer);
+    return Result;
+  };
+  std::string Scope =
+      Take(Demangler.getFunctionDeclContextName(nullptr, nullptr));
+  std::string Base = Take(Demangler.getFunctionBaseName(nullptr, nullptr));
+  std::string Name = Scope.empty() ? Base : Scope + "::" + Base;
+
+  StringRef Relative = Name;
+  if (Relative.consume_front("__llvm_libc"))
+    Relative = Relative.substr(Relative.find("::") + 2);
+  return Relative.str();
 }
 
 std::optional<CoreOp> lookupCoreOp(const Function &F) {

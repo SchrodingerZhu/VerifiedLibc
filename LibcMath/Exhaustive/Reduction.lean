@@ -15,7 +15,8 @@ function is correctly rounded.
   result with the value `S` prescribes. A successful `checkRange` gives this for every input of
   its block (`RunsCorrectlyAt.of_checkRange`).
 * `IR.Func.IsComputedBy f run`: the hypothesis that `run` is a sound interpreter for the extracted
-  function `f`.
+  function `f`. Where `run` produces a result, it is the value of every result of `f`, and no
+  execution of `f` goes wrong.
 * `IR.Func.CorrectAt f S mode x`: `f` is correctly rounded on the single input `x`. It is the
   statement of `IR.Func.CorrectlyRounded` for one rounding direction and one input, and it follows
   from `RunsCorrectlyAt` when `run` is sound (`IR.Func.IsComputedBy.correctAt`).
@@ -37,7 +38,7 @@ so no side condition about coverage has to be evaluated. A statement for one ran
 * a description of the prescribed results proved by other means, together with a run of the
   implementation alone: `IR.Func.IsComputedBy.holdsOnBits_of_checkRangeResult`;
 * any proof of `f.CorrectAt S mode` for the inputs of the range, for instance one that reasons
-  about `f.Returns` directly.
+  about `f.Returns` and `f.GoesWrong` directly.
 
 ## How a block check is established
 
@@ -194,16 +195,19 @@ namespace IR.Func
 variable {f : Func} {modes : Set IEEERoundingMode}
 
 /-- `run` is a sound interpreter for the unary function `f`: whenever it produces a result, `f`
-can return on that input, and everything `f` can return encodes that result. -/
+can return on that input, everything `f` can return encodes that result, and no execution of `f`
+on that input goes wrong. -/
 def IsComputedBy (f : Func) (run : IEEERoundingMode → Model fmt → Option (Model fmt)) : Prop :=
   ∀ mode x y, run mode x = some y →
-    (∃ r, f.Returns mode [.ofModel x] r) ∧ ∀ r, f.Returns mode [.ofModel x] r → r.Encodes y
+    (∃ r, f.Returns mode [.ofModel x] r) ∧
+      (∀ r, f.Returns mode [.ofModel x] r → r.Encodes y) ∧ ¬f.GoesWrong mode [.ofModel x]
 
-/-- Under the rounding direction `mode`, the unary function `f` has a result on the input `x`, and
-every result it can have is the one `S` prescribes. -/
+/-- Under the rounding direction `mode`, the unary function `f` has a result on the input `x`,
+every result it can have is the one `S` prescribes, and no execution on `x` goes wrong. -/
 def CorrectAt (f : Func) (S : Spec fmt) (mode : IEEERoundingMode) (x : Model fmt) : Prop :=
   (∃ r, f.Returns mode [.ofModel x] r) ∧
-    ∀ r, f.Returns mode [.ofModel x] r → r.Encodes (S.eval mode x)
+    (∀ r, f.Returns mode [.ofModel x] r → r.Encodes (S.eval mode x)) ∧
+    ¬f.GoesWrong mode [.ofModel x]
 
 theorem correctlyRounded_iff_forall_correctAt :
     f.CorrectlyRounded S modes ↔ ∀ mode ∈ modes, ∀ x, f.CorrectAt S mode x :=
@@ -215,8 +219,8 @@ namespace IsComputedBy
 input. -/
 theorem correctAt_of_sameValue (hrun : f.IsComputedBy run) (hy : run mode x = some y)
     (h : SameValue y (S.eval mode x)) : f.CorrectAt S mode x :=
-  let ⟨hex, hall⟩ := hrun mode x y hy
-  ⟨hex, fun r hr => (hall r hr).of_sameValue h⟩
+  let ⟨hex, hall, hsafe⟩ := hrun mode x y hy
+  ⟨hex, fun r hr => (hall r hr).of_sameValue h, hsafe⟩
 
 theorem correctAt (hrun : f.IsComputedBy run) (h : RunsCorrectlyAt S run mode x) :
     f.CorrectAt S mode x :=
@@ -227,8 +231,8 @@ theorem correctAt (hrun : f.IsComputedBy run) (h : RunsCorrectlyAt S run mode x)
 value. -/
 theorem sameValue_of_correctAt (hrun : f.IsComputedBy run) (h : f.CorrectAt S mode x)
     (hy : run mode x = some y) : SameValue y (S.eval mode x) :=
-  let ⟨⟨r, hr⟩, hall⟩ := hrun mode x y hy
-  (hall r hr).sameValue (h.2 r hr)
+  let ⟨⟨r, hr⟩, hall, _⟩ := hrun mode x y hy
+  (hall r hr).sameValue (h.2.1 r hr)
 
 theorem holdsOnBits_correctAt (hrun : f.IsComputedBy run)
     (h : HoldsOnBits (RunsCorrectlyAt S run mode) lo hi) :

@@ -5,11 +5,13 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/IR/ConstantRange.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -34,10 +36,10 @@ private:
   void numberValues();
   void collectTables();
   void translate(const Instruction &I);
-  void translateBinary(const BinaryOperator &I);
-  void translateCast(const CastInst &I);
+  void translateBinary(const BinaryOperator &I, ArrayRef<StringRef> Flags);
+  void translateCast(const CastInst &I, ArrayRef<StringRef> Flags);
   void translateLoad(const LoadInst &I);
-  void translateCall(const CallInst &I);
+  void translateCall(const CallInst &I, ArrayRef<StringRef> Flags);
   void translateTerminator(const Instruction &I);
 
   std::string type(const Type *Ty, const Value &Context) const;
@@ -47,8 +49,17 @@ private:
   }
   unsigned reg(const Value &V) const { return Registers.lookup(&V); }
 
+  /// The flags of an instruction under which its result can be poison, in
+  /// LLVM's spelling and order. These are the flags `LibcMath.IR.Flags` and
+  /// `LibcMath.IR.FastMathFlags` represent; an instruction whose result can be
+  /// poison for any other reason, or that carries another fast-math flag, is
+  /// rejected.
+  SmallVector<StringRef, 2> poisonFlags(const Instruction &I) const;
+
   /// The constant table a load reads and the index it reads at. The address
-  /// must be that of a whole element of the type being read.
+  /// must be that of a whole element of the type being read. The flags of the
+  /// address computation are not exported: an index within the table, which
+  /// the Lean side requires, satisfies `inbounds`, `nusw` and `nuw`.
   std::pair<const GlobalVariable *, const Value *>
   tableAccess(const LoadInst &Load) const;
 
@@ -68,6 +79,8 @@ private:
 std::string Translator::type(const Type *Ty, const Value &Context) const {
   if (Ty->isIntegerTy())
     return "i" + utostr(Ty->getIntegerBitWidth());
+  if (Ty->isHalfTy())
+    return "half";
   if (Ty->isFloatTy())
     return "float";
   if (Ty->isDoubleTy())
@@ -92,6 +105,9 @@ Translator::tableAccess(const LoadInst &Load) const {
     unsupported("memory access", Load);
   const auto *GV = dyn_cast<GlobalVariable>(GEP->getPointerOperand());
   if (!GV || !GV->isConstant() || !GV->hasDefinitiveInitializer())
+    unsupported("memory access", Load);
+  // An index of another width would be sign-extended or truncated first.
+  if (GEP->getOperand(1)->getType() != DL.getIndexType(GEP->getType()))
     unsupported("memory access", Load);
   const auto *Data = dyn_cast<ConstantDataArray>(GV->getInitializer());
   if (!Data || Data->getElementType() != Load.getType() ||
@@ -137,7 +153,83 @@ void Translator::collectTables() {
     }
 }
 
-void Translator::translateBinary(const BinaryOperator &I) {
+/// Whether the instruction is a bit count with a `range` attribute that holds
+/// of every count, which is between zero and the width of the operand.
+static bool hasImpliedRange(const Instruction &I) {
+  const auto *II = dyn_cast<IntrinsicInst>(&I);
+  if (!II || !is_contained({Intrinsic::ctlz, Intrinsic::cttz, Intrinsic::ctpop},
+                           II->getIntrinsicID()))
+    return false;
+  std::optional<ConstantRange> Range = II->getRange();
+  unsigned Width = II->getType()->getIntegerBitWidth();
+  return Range && Range->contains(
+                      ConstantRange(APInt(Width, 0), APInt(Width, Width) + 1));
+}
+
+SmallVector<StringRef, 2> Translator::poisonFlags(const Instruction &I) const {
+  // Clear every flag that is exported on a copy of the instruction, so that
+  // whatever remains is known not to be.
+  SmallVector<StringRef, 2> Flags;
+  Instruction *Rest = I.clone();
+  if (hasImpliedRange(I))
+    cast<CallBase>(Rest)->removeRetAttr(Attribute::Range);
+  if (Rest->hasPoisonGeneratingMetadata() ||
+      Rest->hasPoisonGeneratingAttributes()) {
+    Rest->deleteValue();
+    unsupported("metadata or attribute", I);
+  }
+  if (isa<FPMathOperator>(I)) {
+    FastMathFlags FMF = I.getFastMathFlags();
+    if (FMF.noNaNs())
+      Flags.push_back("nnan");
+    if (FMF.noInfs())
+      Flags.push_back("ninf");
+    FMF.setNoNaNs(false);
+    FMF.setNoInfs(false);
+    // The remaining flags permit results other than the IEEE 754 one.
+    if (FMF.any())
+      unsupported("fast-math flags", I);
+    Rest->copyFastMathFlags(FMF);
+  }
+  if (isa<OverflowingBinaryOperator>(I) || isa<TruncInst>(I)) {
+    if (I.hasNoUnsignedWrap())
+      Flags.push_back("nuw");
+    if (I.hasNoSignedWrap())
+      Flags.push_back("nsw");
+    Rest->setHasNoUnsignedWrap(false);
+    Rest->setHasNoSignedWrap(false);
+  } else if (isa<PossiblyExactOperator>(I)) {
+    if (I.isExact())
+      Flags.push_back("exact");
+    Rest->setIsExact(false);
+  } else if (const auto *Or = dyn_cast<PossiblyDisjointInst>(&I)) {
+    if (Or->isDisjoint())
+      Flags.push_back("disjoint");
+    cast<PossiblyDisjointInst>(Rest)->setIsDisjoint(false);
+  } else if (isa<PossiblyNonNegInst>(I)) {
+    if (I.hasNonNeg())
+      Flags.push_back("nneg");
+    Rest->setNonNeg(false);
+  } else if (const auto *Cmp = dyn_cast<ICmpInst>(&I)) {
+    if (Cmp->hasSameSign())
+      Flags.push_back("samesign");
+    cast<ICmpInst>(Rest)->setSameSign(false);
+  }
+  // LLVM counts the second argument of these intrinsics as a flag. It is
+  // exported as an argument.
+  if (const auto *II = dyn_cast<IntrinsicInst>(&I);
+      II && is_contained({Intrinsic::ctlz, Intrinsic::cttz, Intrinsic::abs},
+                         II->getIntrinsicID()))
+    Rest->setOperand(1, ConstantInt::getFalse(I.getContext()));
+  bool HasOtherFlags = Rest->hasPoisonGeneratingFlags();
+  Rest->deleteValue();
+  if (HasOtherFlags)
+    unsupported("flag", I);
+  return Flags;
+}
+
+void Translator::translateBinary(const BinaryOperator &I,
+                                 ArrayRef<StringRef> Flags) {
   StringRef Opcode;
   switch (I.getOpcode()) {
   case Instruction::Add:
@@ -152,16 +244,20 @@ void Translator::translateBinary(const BinaryOperator &I) {
   case Instruction::FAdd:
   case Instruction::FSub:
   case Instruction::FMul:
+  case Instruction::FDiv:
+  case Instruction::UDiv:
+  case Instruction::URem:
     Opcode = I.getOpcodeName();
     break;
   default:
     unsupported("instruction", I);
   }
-  Emitter.operation(reg(I), Opcode, {operand(I.getOperand(0)), operand(I.getOperand(1))},
+  Emitter.operation(reg(I), Opcode, Flags,
+                    {operand(I.getOperand(0)), operand(I.getOperand(1))},
                     type(I.getType(), I));
 }
 
-void Translator::translateCast(const CastInst &I) {
+void Translator::translateCast(const CastInst &I, ArrayRef<StringRef> Flags) {
   switch (I.getOpcode()) {
   case Instruction::ZExt:
   case Instruction::SExt:
@@ -170,11 +266,18 @@ void Translator::translateCast(const CastInst &I) {
   case Instruction::FPExt:
   case Instruction::FPTrunc:
   case Instruction::FPToSI:
+  case Instruction::FPToUI:
+    break;
+  case Instruction::SIToFP:
+  case Instruction::UIToFP:
+    // The Lean side has no fast-math flags on conversions from integers.
+    if (I.getFastMathFlags().any())
+      unsupported("fast-math flags", I);
     break;
   default:
     unsupported("cast", I);
   }
-  Emitter.cast(reg(I), I.getOpcodeName(), operand(I.getOperand(0)),
+  Emitter.cast(reg(I), I.getOpcodeName(), Flags, operand(I.getOperand(0)),
                type(I.getSrcTy(), I), type(I.getDestTy(), I));
 }
 
@@ -183,25 +286,66 @@ void Translator::translateLoad(const LoadInst &I) {
   Emitter.load(reg(I), GV->getName(), typedOperand(Index), type(I.getType(), I));
 }
 
-void Translator::translateCall(const CallInst &I) {
+/// The name under which an intrinsic is printed: its own without `llvm.` and
+/// the type suffix. Empty if the intrinsic is outside the fragment.
+static StringRef intrinsicOpcode(Intrinsic::ID ID) {
+  switch (ID) {
+  case Intrinsic::fabs:
+    return "fabs";
+  case Intrinsic::fmuladd:
+    return "fmuladd";
+  case Intrinsic::sqrt:
+    return "sqrt";
+  case Intrinsic::copysign:
+    return "copysign";
+  case Intrinsic::is_fpclass:
+    return "is.fpclass";
+  case Intrinsic::ctlz:
+    return "ctlz";
+  case Intrinsic::cttz:
+    return "cttz";
+  case Intrinsic::ctpop:
+    return "ctpop";
+  case Intrinsic::abs:
+    return "abs";
+  case Intrinsic::umin:
+    return "umin";
+  case Intrinsic::umax:
+    return "umax";
+  case Intrinsic::smin:
+    return "smin";
+  case Intrinsic::smax:
+    return "smax";
+  case Intrinsic::fshl:
+    return "fshl";
+  case Intrinsic::fshr:
+    return "fshr";
+  case Intrinsic::assume:
+    return "assume";
+  default:
+    return "";
+  }
+}
+
+void Translator::translateCall(const CallInst &I, ArrayRef<StringRef> Flags) {
   if (const auto *II = dyn_cast<IntrinsicInst>(&I)) {
-    StringRef Opcode;
-    switch (II->getIntrinsicID()) {
-    case Intrinsic::fabs:
-      Opcode = "fabs";
-      break;
-    case Intrinsic::fmuladd:
-      Opcode = "fmuladd";
-      break;
-    default:
+    StringRef Opcode = intrinsicOpcode(II->getIntrinsicID());
+    if (Opcode.empty())
       unsupported("intrinsic", I);
-    }
+    // Operand bundles state assumptions that the condition does not.
+    if (II->getIntrinsicID() == Intrinsic::assume && II->hasOperandBundles())
+      unsupported("operand bundle", I);
     SmallVector<Operand> Args;
     for (const Use &Arg : II->args())
       Args.push_back(operand(Arg));
-    Emitter.operation(reg(I), Opcode, Args, type(I.getType(), I));
+    // The type printed is that of the first argument, which differs from the
+    // type of the call for `is.fpclass` and `assume`.
+    Emitter.operation(reg(I), Opcode, Flags, Args,
+                      type(II->getArgOperand(0)->getType(), I));
     return;
   }
+  if (!Flags.empty())
+    unsupported("flag", I);
 
   const Function *Callee = I.getCalledFunction();
   auto Core = Callee ? lookupCoreOp(*Callee) : std::nullopt;
@@ -214,6 +358,11 @@ void Translator::translateCall(const CallInst &I) {
 }
 
 void Translator::translate(const Instruction &I) {
+  SmallVector<StringRef, 2> Flags = poisonFlags(I);
+  // Integer flags occur only on instructions that pass them on below; fast-math
+  // flags can also be carried by `phi` and `select`.
+  if ((isa<PHINode>(I) || isa<SelectInst>(I)) && !Flags.empty())
+    unsupported("flag", I);
   if (const auto *Phi = dyn_cast<PHINode>(&I)) {
     SmallVector<std::pair<unsigned, Operand>> Incoming;
     for (unsigned N = 0; N != Phi->getNumIncomingValues(); ++N)
@@ -221,26 +370,29 @@ void Translator::translate(const Instruction &I) {
                             operand(Phi->getIncomingValue(N)));
     Emitter.phi(reg(I), Incoming, type(I.getType(), I));
   } else if (const auto *Binary = dyn_cast<BinaryOperator>(&I)) {
-    translateBinary(*Binary);
+    translateBinary(*Binary, Flags);
   } else if (const auto *Cmp = dyn_cast<CmpInst>(&I)) {
-    Emitter.comparison(reg(I), I.getOpcodeName(),
+    Emitter.comparison(reg(I), I.getOpcodeName(), Flags,
                        CmpInst::getPredicateName(Cmp->getPredicate()),
                        operand(I.getOperand(0)), operand(I.getOperand(1)),
                        type(I.getOperand(0)->getType(), I));
   } else if (const auto *Cast = dyn_cast<CastInst>(&I)) {
-    translateCast(*Cast);
+    translateCast(*Cast, Flags);
   } else if (isa<SelectInst>(I)) {
-    Emitter.operation(reg(I), "select",
+    Emitter.operation(reg(I), "select", {},
                       {operand(I.getOperand(0)), operand(I.getOperand(1)),
                        operand(I.getOperand(2))},
                       type(I.getType(), I));
+  } else if (isa<FreezeInst>(I)) {
+    Emitter.operation(reg(I), "freeze", {}, {operand(I.getOperand(0))},
+                      type(I.getType(), I));
   } else if (I.getOpcode() == Instruction::FNeg) {
-    Emitter.operation(reg(I), "fneg", {operand(I.getOperand(0))},
+    Emitter.operation(reg(I), "fneg", Flags, {operand(I.getOperand(0))},
                       type(I.getType(), I));
   } else if (const auto *Load = dyn_cast<LoadInst>(&I)) {
     translateLoad(*Load);
   } else if (const auto *Call = dyn_cast<CallInst>(&I)) {
-    translateCall(*Call);
+    translateCall(*Call, Flags);
   } else {
     unsupported("instruction", I);
   }
@@ -255,6 +407,8 @@ void Translator::translateTerminator(const Instruction &I) {
     Emitter.condBr(operand(Br->getCondition()),
                    Blocks.lookup(Br->getSuccessor(0)),
                    Blocks.lookup(Br->getSuccessor(1)));
+  else if (isa<UnreachableInst>(I))
+    Emitter.unreachable();
   else
     unsupported("terminator", I);
 }

@@ -32,6 +32,8 @@ def AbsVal.describe : AbsVal → String
 /-- The kind of an instruction, for messages. -/
 def Instr.kind : Instr → String
   | intBin .. => "integer arithmetic"
+  | intUn .. => "integer intrinsic"
+  | funnelShift .. => "funnel shift"
   | icmp .. => "icmp"
   | zext .. => "zext"
   | sext .. => "sext"
@@ -44,7 +46,15 @@ def Instr.kind : Instr → String
   | fcmp .. => "fcmp"
   | fpConvert .. => "fpext or fptrunc"
   | fptosi .. => "fptosi"
+  | fptoui .. => "fptoui"
+  | sitofp .. => "sitofp"
+  | uitofp .. => "uitofp"
+  | sqrt .. => "sqrt"
+  | copysign .. => "copysign"
+  | isFpClass .. => "is.fpclass"
   | bitcast .. => "bitcast"
+  | freeze .. => "freeze"
+  | assume .. => "assume"
   | load .. => "load"
   | call .. => "call"
 
@@ -60,7 +70,7 @@ private def Store.report (s : Store) : String :=
   match s.inexact with
   | [] => "Every register assigned so far is known exactly, so look at the instruction itself: \
     operands of different widths, a register that is not assigned, a table index out of range, \
-    or a conversion to an integer that fails."
+    a conversion to an integer that fails, or a flag such as `nsw` that the operands violate."
   | l => "Registers not known exactly: " ++ "; ".intercalate l ++ "."
 
 def explainPhis (cur pred : ℕ) (old : Store) :
@@ -100,6 +110,7 @@ def Func.explainFrom (mode : IEEERoundingMode) (f : Func) :
       match cond.execBool s₂ with
       | some c => f.explainFrom mode fuel cur (if c then ifTrue else ifFalse) s₂
       | none => .error s!"block {cur}: the branch condition is not a known boolean. {s₂.report}"
+    | .unreachable => .error s!"block {cur}: the block ends in `unreachable`."
 
 /-- What `f.exec mode args` answers, or the first step at which it has no answer. -/
 def Func.explain (mode : IEEERoundingMode) (f : Func) (args : List Val) : String :=
