@@ -97,9 +97,9 @@ theorem Store.get_ofArgs (args : List Val) (r : Reg) :
 
 The value of a comparison and the condition of a flag, in terms of `BitVec.toNat` and
 `BitVec.toInt`. Integer constants are written as numerals, because the kernel evaluates a power
-of an integer one multiplication at a time. Together with `toInt_eq_toNat_sub`, `BitVec.toNat_and` and the two lemmas on
-masks below, they turn a branch condition on a 32-bit register into linear arithmetic with
-division by constants, which `omega` decides.
+of an integer one multiplication at a time. Together with `toInt_eq_toNat_sub`,
+`BitVec.toNat_and` and the two lemmas on masks below, they turn a branch condition on a 32-bit
+register into linear arithmetic with division by constants, which `omega` decides.
 
 Two things to avoid with Lean 4.36: `simp only [BitVec.toNat_add]` does not terminate on a sum
 with a literal operand, so that lemma is applied with `rw`; and `omega` is slow on the remainder
@@ -204,13 +204,13 @@ theorem Func.runUnary_of_exec_ofFloat {fmt : FloatFormat} {f : Func} {mode : IEE
 and flag conditions. Evaluation stops at the first condition they do not decide. -/
 macro "exec_blocks" "[" lemmas:Lean.Parser.Tactic.simpLemma,* "]" : tactic =>
   `(tactic| simp only [Func.exec, enterPhis, execBody, Instr.exec, CoreOp.exec, roundingConstant,
-    IntBinOp.eval, Bool.not_false, Operand.exec, Operand.execExact, Operand.execBool, Operand.execFloat, Store.get_set,
-    Store.get_ofArgs, Val.ofModel_binary32, Val.toModel?_binary32, Val.toBits_ofBits_binary32,
-    Val.toBits_abs_binary32, Val.ofNat, Val.toBool?_ofBool,
-    Flags.icmpDefined_default, IntBinOp.defined_and, FastMathFlags.admits_default, Bool.and_self, Option.bind_some, Option.bind_eq_bind, Option.pure_def,
-    Option.map_some, List.getElem?_cons_zero, List.lookup, BitVec.cast_eq, ↓reduceDIte, ↓reduceIte,
+    IntBinOp.eval, Operand.exec, Operand.execExact, Operand.execBool, Operand.execFloat,
+    Store.get_set, Store.get_ofArgs, Val.ofModel_binary32, Val.toModel?_binary32,
+    Val.toBits_ofBits_binary32, Val.toBits_abs_binary32, Val.ofNat, Val.toBool?_ofBool,
+    Flags.icmpDefined_default, IntBinOp.defined_and, FastMathFlags.admits_default,
+    Option.bind_some, Option.bind_eq_bind, Option.pure_def, Option.map_some,
+    List.getElem?_cons_zero, List.lookup, BitVec.cast_eq, ↓reduceDIte, ↓reduceIte,
     Nat.reduceEqDiff, Nat.reduceBEq, reduceCtorEq, decide_true, decide_false, Bool.false_eq_true,
-    or_self, or_true, true_or,
-    $lemmas,*])
+    Bool.not_false, Bool.and_self, or_self, or_true, true_or, $lemmas,*])
 
 end LibcMath.IR
