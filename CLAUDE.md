@@ -61,6 +61,22 @@ definition that takes an `Oracle S` as an argument cannot be compiled at a concr
 `#eval` on it fails with "depends on 'Spec.exp', which is 'noncomputable'". Evaluation in the
 kernel (`decide +kernel`) is not affected.
 
+## When the interpreter answers `none`
+
+`Func.exec`, `Func.run` and `Func.runUnary` (`LibcMath/IR/Interp.lean`) answer `none` when the
+interpreter gives up, which does not mean that the function has no result. Ask why:
+
+```lean
+#eval IO.println (f.explain mode [.ofModel x])          -- first step without an answer
+#eval IO.println (f.explainFloat fmt mode [.ofModel x]) -- also: answer of the wrong width
+```
+
+The report names the block, the register and the kind of instruction, and lists the registers
+that are not known exactly (a NaN from arithmetic, or the result of `raiseExcept`).
+`LibcMath/IR/InterpExamples.lean` has a case. `LibcMath/IR/InterpDiag.lean` follows
+`Func.execFrom` step by step; when the interpreter changes, change it too, and the examples will
+show whether the reports still hold.
+
 ## The journal
 
 `journal/` is a [Forester](https://www.forester-notes.org/) forest: small notes ("trees") with

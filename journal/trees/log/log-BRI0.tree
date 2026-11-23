@@ -1,0 +1,20 @@
+\title{The interpreter says why it gave up, and its store lemmas are proved by \code{\verb~|grind~}}
+\taxon{Change}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{ir}
+\tag{tooling}
+\meta{pr}{2}
+\import{base-macros}
+
+\p{A review of \pr{2} added the following on the same branch, after merging the main branch into it. Session [ses-D5OC](ses-D5OC).}
+\ul{
+\li{\strong{Diagnostic.} \code{\verb~|LibcMath/IR/InterpDiag.lean~}: \code{\verb~|Func.explain mode f args~} reports what the interpreter answers or the first step without an answer, with the block, the register, the kind of instruction and the registers that are not known exactly. \code{\verb~|Func.explainFloat~} also covers an answer that is not a bit pattern of the format asked for. It proves nothing; it calls the pieces of the interpreter instead of repeating them, and consults \code{\verb~|Func.exec~} first, so it cannot report a failure where the interpreter answers. It matches instructions with \code{\verb~|..~} patterns, so that a new field of an instruction does not break it.}
+\li{\strong{Examples.} \code{\verb~|LibcMath/IR/InterpExamples.lean~}, in the build: \code{\verb~|expf~} at \code{\verb~|1~} to nearest and upward, at \code{\verb~|0~}, at \code{\verb~|-∞~} and at a NaN; a function \code{\verb~|nanConsumed~} on which the interpreter gives up at \code{\verb~|+∞~}, with the report of \code{\verb~|Func.explain~}; a result by \code{\verb~|decide +kernel~}; and the axioms of \code{\verb~|expf_isComputedBy~}. The checks were confirmed to fail when an expected value is changed.}
+\li{\strong{Automation.} \code{\verb~|AbsVal.Admits~}, \code{\verb~|Store.Sim~} and \code{\verb~|Store.Tight~} are tagged for \code{\verb~|grind~}, and \code{\verb~|Store.get_set~} is an equation for it. \code{\verb~|Store.get_set~}, \code{\verb~|Store.Sim.set~}, \code{\verb~|Store.Tight.set~} and \code{\verb~|Store.tight_ofArgs~} are proved by \code{\verb~|grind~}; the first was twenty lines. See [ins-AJCO](ins-AJCO).}
+\li{\strong{Reuse.} The private copy of \code{\verb~|Val.toModel?_ofModel~} is gone; the file imports \code{\verb~|LibcMath/SpecLemmas.lean~}, which has it.}
+\li{\strong{Statement for \code{\verb~|expf~}.} \code{\verb~|LibcMath/Exhaustive/ExpfInterp.lean~} is taken unchanged from the branch of \pr{13}, so that the claim that the soundness theorem is the hypothesis of the reduction is checked by the build.}
+}
+\p{The proofs of soundness of the instructions were left as they were, because the branch of \pr{13} rewrites those lines: [prob-VFZQ](prob-VFZQ).}

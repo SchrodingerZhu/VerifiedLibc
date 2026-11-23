@@ -1,0 +1,16 @@
+\title{\code{\verb~|grind~} on the interpreter: stores and uniqueness of results}
+\taxon{Insight}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{automation}
+\tag{ir}
+\import{base-macros}
+
+\p{Source: session [ses-D5OC](ses-D5OC), on \pr{2}. Lean 4.36.0. Each item was compiled, in a file that also printed a known value.}
+\ul{
+\li{\code{\verb~|Store.get_set~}, a case analysis on array bounds of twenty lines, is \code{\verb~|grind [set, get]~}. With \code{\verb~|Store.Sim~}, \code{\verb~|Store.Tight~}, \code{\verb~|AbsVal.Admits~} and \code{\verb~|Env.set~} unfolded by \code{\verb~|grind~} and \code{\verb~|get_set~} as an equation, \code{\verb~|Sim.set~} and \code{\verb~|Tight.set~} are \code{\verb~|grind~} with no argument.}
+\li{The second half of a case of \code{\verb~|Instr.exec_sound~}, that every result of the instruction is the one the interpreter computed, was tried for \code{\verb~|fcmp~}: after the \code{\verb~|simp only~} that splits the hypothesis on the interpreter, and with the two facts from \code{\verb~|Operand.eval_of_execFloat~} in context, \code{\verb~|grind [Instr.Eval, AbsVal.Admits]~} closes it. This replaces the repeated \code{\verb~|rw … at …~} followed by \code{\verb~|cases~}. It was not applied: [prob-VFZQ](prob-VFZQ).}
+\li{\code{\verb~|grind~} fails on \code{\verb~|Val.eq_ofModel_of_toModel?~} and on \code{\verb~|AbsVal.ofFloat_admits_iff~}: both need a dependent case split on an equation between widths, which the proofs do with \code{\verb~|subst~}.}
+\li{\code{\verb~|decide +kernel~} evaluates \code{\verb~|Func.runUnary~} on a function of two instructions at a concrete input. Whether the kernel manages \code{\verb~|expf~} was not tried here.}
+}
