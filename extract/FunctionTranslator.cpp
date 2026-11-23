@@ -10,6 +10,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -34,8 +35,8 @@ private:
   void numberValues();
   void collectTables();
   void translate(const Instruction &I);
-  void translateBinary(const BinaryOperator &I);
-  void translateCast(const CastInst &I);
+  void translateBinary(const BinaryOperator &I, ArrayRef<StringRef> Flags);
+  void translateCast(const CastInst &I, ArrayRef<StringRef> Flags);
   void translateLoad(const LoadInst &I);
   void translateCall(const CallInst &I);
   void translateTerminator(const Instruction &I);
@@ -47,8 +48,16 @@ private:
   }
   unsigned reg(const Value &V) const { return Registers.lookup(&V); }
 
+  /// The flags of an instruction under which its result can be poison, in
+  /// LLVM's spelling and order. These are the flags `LibcMath.IR.Flags`
+  /// represents; an instruction whose result can be poison for any other
+  /// reason is rejected.
+  SmallVector<StringRef, 2> poisonFlags(const Instruction &I) const;
+
   /// The constant table a load reads and the index it reads at. The address
-  /// must be that of a whole element of the type being read.
+  /// must be that of a whole element of the type being read. The flags of the
+  /// address computation are not exported: an index within the table, which
+  /// the Lean side requires, satisfies `inbounds`, `nusw` and `nuw`.
   std::pair<const GlobalVariable *, const Value *>
   tableAccess(const LoadInst &Load) const;
 
@@ -92,6 +101,9 @@ Translator::tableAccess(const LoadInst &Load) const {
     unsupported("memory access", Load);
   const auto *GV = dyn_cast<GlobalVariable>(GEP->getPointerOperand());
   if (!GV || !GV->isConstant() || !GV->hasDefinitiveInitializer())
+    unsupported("memory access", Load);
+  // An index of another width would be sign-extended or truncated first.
+  if (GEP->getOperand(1)->getType() != DL.getIndexType(GEP->getType()))
     unsupported("memory access", Load);
   const auto *Data = dyn_cast<ConstantDataArray>(GV->getInitializer());
   if (!Data || Data->getElementType() != Load.getType() ||
@@ -137,7 +149,50 @@ void Translator::collectTables() {
     }
 }
 
-void Translator::translateBinary(const BinaryOperator &I) {
+SmallVector<StringRef, 2> Translator::poisonFlags(const Instruction &I) const {
+  if (const auto *FP = dyn_cast<FPMathOperator>(&I);
+      FP && FP->getFastMathFlags().any())
+    unsupported("fast-math flags", I);
+  if (I.hasPoisonGeneratingMetadata() || I.hasPoisonGeneratingAttributes())
+    unsupported("metadata or attribute", I);
+
+  // Clear every flag that is exported on a copy of the instruction, so that
+  // whatever remains is known not to be.
+  SmallVector<StringRef, 2> Flags;
+  Instruction *Rest = I.clone();
+  if (isa<OverflowingBinaryOperator>(I) || isa<TruncInst>(I)) {
+    if (I.hasNoUnsignedWrap())
+      Flags.push_back("nuw");
+    if (I.hasNoSignedWrap())
+      Flags.push_back("nsw");
+    Rest->setHasNoUnsignedWrap(false);
+    Rest->setHasNoSignedWrap(false);
+  } else if (isa<PossiblyExactOperator>(I)) {
+    if (I.isExact())
+      Flags.push_back("exact");
+    Rest->setIsExact(false);
+  } else if (const auto *Or = dyn_cast<PossiblyDisjointInst>(&I)) {
+    if (Or->isDisjoint())
+      Flags.push_back("disjoint");
+    cast<PossiblyDisjointInst>(Rest)->setIsDisjoint(false);
+  } else if (isa<PossiblyNonNegInst>(I)) {
+    if (I.hasNonNeg())
+      Flags.push_back("nneg");
+    Rest->setNonNeg(false);
+  } else if (const auto *Cmp = dyn_cast<ICmpInst>(&I)) {
+    if (Cmp->hasSameSign())
+      Flags.push_back("samesign");
+    cast<ICmpInst>(Rest)->setSameSign(false);
+  }
+  bool HasOtherFlags = Rest->hasPoisonGeneratingFlags();
+  Rest->deleteValue();
+  if (HasOtherFlags)
+    unsupported("flag", I);
+  return Flags;
+}
+
+void Translator::translateBinary(const BinaryOperator &I,
+                                 ArrayRef<StringRef> Flags) {
   StringRef Opcode;
   switch (I.getOpcode()) {
   case Instruction::Add:
@@ -157,11 +212,12 @@ void Translator::translateBinary(const BinaryOperator &I) {
   default:
     unsupported("instruction", I);
   }
-  Emitter.operation(reg(I), Opcode, {operand(I.getOperand(0)), operand(I.getOperand(1))},
+  Emitter.operation(reg(I), Opcode, Flags,
+                    {operand(I.getOperand(0)), operand(I.getOperand(1))},
                     type(I.getType(), I));
 }
 
-void Translator::translateCast(const CastInst &I) {
+void Translator::translateCast(const CastInst &I, ArrayRef<StringRef> Flags) {
   switch (I.getOpcode()) {
   case Instruction::ZExt:
   case Instruction::SExt:
@@ -174,7 +230,7 @@ void Translator::translateCast(const CastInst &I) {
   default:
     unsupported("cast", I);
   }
-  Emitter.cast(reg(I), I.getOpcodeName(), operand(I.getOperand(0)),
+  Emitter.cast(reg(I), I.getOpcodeName(), Flags, operand(I.getOperand(0)),
                type(I.getSrcTy(), I), type(I.getDestTy(), I));
 }
 
@@ -199,7 +255,7 @@ void Translator::translateCall(const CallInst &I) {
     SmallVector<Operand> Args;
     for (const Use &Arg : II->args())
       Args.push_back(operand(Arg));
-    Emitter.operation(reg(I), Opcode, Args, type(I.getType(), I));
+    Emitter.operation(reg(I), Opcode, {}, Args, type(I.getType(), I));
     return;
   }
 
@@ -214,6 +270,8 @@ void Translator::translateCall(const CallInst &I) {
 }
 
 void Translator::translate(const Instruction &I) {
+  // Only the instructions that pass their flags on can have any.
+  SmallVector<StringRef, 2> Flags = poisonFlags(I);
   if (const auto *Phi = dyn_cast<PHINode>(&I)) {
     SmallVector<std::pair<unsigned, Operand>> Incoming;
     for (unsigned N = 0; N != Phi->getNumIncomingValues(); ++N)
@@ -221,21 +279,21 @@ void Translator::translate(const Instruction &I) {
                             operand(Phi->getIncomingValue(N)));
     Emitter.phi(reg(I), Incoming, type(I.getType(), I));
   } else if (const auto *Binary = dyn_cast<BinaryOperator>(&I)) {
-    translateBinary(*Binary);
+    translateBinary(*Binary, Flags);
   } else if (const auto *Cmp = dyn_cast<CmpInst>(&I)) {
-    Emitter.comparison(reg(I), I.getOpcodeName(),
+    Emitter.comparison(reg(I), I.getOpcodeName(), Flags,
                        CmpInst::getPredicateName(Cmp->getPredicate()),
                        operand(I.getOperand(0)), operand(I.getOperand(1)),
                        type(I.getOperand(0)->getType(), I));
   } else if (const auto *Cast = dyn_cast<CastInst>(&I)) {
-    translateCast(*Cast);
+    translateCast(*Cast, Flags);
   } else if (isa<SelectInst>(I)) {
-    Emitter.operation(reg(I), "select",
+    Emitter.operation(reg(I), "select", {},
                       {operand(I.getOperand(0)), operand(I.getOperand(1)),
                        operand(I.getOperand(2))},
                       type(I.getType(), I));
   } else if (I.getOpcode() == Instruction::FNeg) {
-    Emitter.operation(reg(I), "fneg", {operand(I.getOperand(0))},
+    Emitter.operation(reg(I), "fneg", {}, {operand(I.getOperand(0))},
                       type(I.getType(), I));
   } else if (const auto *Load = dyn_cast<LoadInst>(&I)) {
     translateLoad(*Load);

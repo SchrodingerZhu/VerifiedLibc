@@ -52,15 +52,18 @@ public:
 
   void beginBlock(unsigned Index);
 
-  /// `%r = opcode a, b, … : type`
+  /// `%r = opcode flags a, b, … : type`
   void operation(unsigned Result, llvm::StringRef Opcode,
+                 llvm::ArrayRef<llvm::StringRef> Flags,
                  llvm::ArrayRef<Operand> Args, llvm::StringRef Type);
-  /// `%r = opcode predicate a, b : type`
+  /// `%r = opcode flags predicate a, b : type`
   void comparison(unsigned Result, llvm::StringRef Opcode,
+                  llvm::ArrayRef<llvm::StringRef> Flags,
                   llvm::StringRef Predicate, const Operand &LHS,
                   const Operand &RHS, llvm::StringRef Type);
-  /// `%r = opcode a : from -> to`
-  void cast(unsigned Result, llvm::StringRef Opcode, const Operand &Arg,
+  /// `%r = opcode flags a : from -> to`
+  void cast(unsigned Result, llvm::StringRef Opcode,
+            llvm::ArrayRef<llvm::StringRef> Flags, const Operand &Arg,
             llvm::StringRef From, llvm::StringRef To);
   /// `%r = phi [^bbN: a], … : type`
   void phi(unsigned Result,
@@ -79,6 +82,9 @@ public:
 
 private:
   llvm::raw_ostream &define(unsigned Result);
+  /// `%r = opcode flags `
+  llvm::raw_ostream &define(unsigned Result, llvm::StringRef Opcode,
+                            llvm::ArrayRef<llvm::StringRef> Flags);
 
   llvm::raw_ostream &OS;
 };

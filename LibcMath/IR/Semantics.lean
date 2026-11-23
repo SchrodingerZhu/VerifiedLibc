@@ -21,9 +21,15 @@ Execution of a `Func` under a rounding direction, as a relation between argument
   `FE_*` constants of x86-64. Both describe x86-64 without FMA instructions.
 * Core operations are given their intended behavior. Reporting through `errno` and the status
   flags has no effect on the values computed.
-* Flags under which LLVM instructions yield poison (`nsw`, `nuw`, `samesign`, `inbounds`, …) are
-  not represented, and shifts by the width or more are defined. Operations that are undefined for
-  other reasons, such as an out-of-range `fptosi` or table index, have no result.
+* An instruction that LLVM leaves undefined, or whose result would be poison, has no result:
+  an out-of-range `fptosi` or table index, a shift by the width or more, and an instruction with
+  a flag (`Flags`) whose condition fails. The conditions are those of the LLVM Language Reference.
+  There are therefore no poison or undefined values: an execution that returns a result has
+  produced none. This also covers the `inbounds`, `nuw` and `nusw` flags of the address of a
+  table access and `noundef` on the arguments of a call.
+* Not represented, and rejected by `ir2lean` instead: fast-math flags, and metadata and
+  attributes of an instruction under which its result is poison (`range`, `nofpclass`, …).
+  Attributes of the function itself and of its parameters are not examined.
 -/
 
 namespace LibcMath.IR
@@ -66,6 +72,28 @@ def Operand.eval (env : Env) : Operand → Option Val
   | .reg r => env r
   | .const width bits => some (.ofNat width bits)
 
+/-- The result of `add`, `sub`, `mul` or `shl` on `w`-bit operands does not overflow in the ways
+`nuw` and `nsw` forbid: when `nuw` is set, the mathematical result `unsigned` on the operands read
+as unsigned integers is an unsigned `w`-bit integer, and when `nsw` is set, the mathematical
+result `signed` on the operands read as signed integers is a signed `w`-bit integer. -/
+def Flags.noWrap (flags : Flags) (w : ℕ) (unsigned signed : ℤ) : Bool :=
+  (!flags.nuw || (0 ≤ unsigned && unsigned < 2 ^ w)) &&
+    (!flags.nsw || (-2 ^ (w - 1) ≤ signed && signed < 2 ^ (w - 1)))
+
+/-- The instruction has a result on `a` and `b`: a shift amount is less than the width, and the
+conditions of the flags that are set hold. A left shift by `b` multiplies by `2 ^ b`, so the bits
+it shifts out are zero (`nuw`), or agree with the sign of the result (`nsw`), exactly when that
+product does not overflow. -/
+def IntBinOp.defined {w : ℕ} (flags : Flags) (a b : BitVec w) : IntBinOp → Bool
+  | .add => flags.noWrap w (a.toNat + b.toNat) (a.toInt + b.toInt)
+  | .sub => flags.noWrap w (a.toNat - b.toNat) (a.toInt - b.toInt)
+  | .mul => flags.noWrap w (a.toNat * b.toNat) (a.toInt * b.toInt)
+  | .and | .xor => true
+  | .or => !flags.disjoint || a &&& b == 0
+  | .shl => b.toNat < w && flags.noWrap w (a.toNat * 2 ^ b.toNat) (a.toInt * 2 ^ b.toNat)
+  | .lshr | .ashr => b.toNat < w && (!flags.exact || a.toNat % 2 ^ b.toNat == 0)
+
+/-- The result of the instruction where `IntBinOp.defined` holds. -/
 def IntBinOp.eval {w : ℕ} (a b : BitVec w) : IntBinOp → BitVec w
   | .add => a + b
   | .sub => a - b
@@ -76,6 +104,20 @@ def IntBinOp.eval {w : ℕ} (a b : BitVec w) : IntBinOp → BitVec w
   | .shl => a <<< b
   | .lshr => a >>> b
   | .ashr => a.sshiftRight' b
+
+/-- An `icmp` has a result on `a` and `b`: with `samesign`, their sign bits agree. -/
+def Flags.icmpDefined {w : ℕ} (flags : Flags) (a b : BitVec w) : Bool :=
+  !flags.samesign || a.msb == b.msb
+
+/-- A `zext` has a result on `a`: with `nneg`, its sign bit is clear. -/
+def Flags.zextDefined {w : ℕ} (flags : Flags) (a : BitVec w) : Bool :=
+  !flags.nneg || !a.msb
+
+/-- A `trunc` to `width` bits has a result on `a`: the truncated value is `a` as an unsigned
+integer with `nuw`, and as a signed integer with `nsw`. -/
+def Flags.truncDefined {w : ℕ} (flags : Flags) (width : ℕ) (a : BitVec w) : Bool :=
+  (!flags.nuw || (a.setWidth width).toNat == a.toNat) &&
+    (!flags.nsw || (a.setWidth width).toInt == a.toInt)
 
 def ICmp.eval {w : ℕ} (a b : BitVec w) : ICmp → Bool
   | .eq => a == b
@@ -133,13 +175,19 @@ def CoreOp.Eval (mode : IEEERoundingMode) : CoreOp → Val → Prop
 
 /-- `r` is a possible result of the instruction. -/
 def Instr.Eval (mode : IEEERoundingMode) (f : Func) (env : Env) : Instr → Val → Prop
-  | .intBin op a b, r =>
-    ∃ w x y, a.eval env = some ⟨w, x⟩ ∧ b.eval env = some ⟨w, y⟩ ∧ r = ⟨w, op.eval x y⟩
-  | .icmp pred a b, r =>
-    ∃ w x y, a.eval env = some ⟨w, x⟩ ∧ b.eval env = some ⟨w, y⟩ ∧ r = .ofBool (pred.eval x y)
-  | .zext width a, r => ∃ v, a.eval env = some v ∧ r = ⟨width, v.bits.setWidth width⟩
+  | .intBin op a b flags, r =>
+    ∃ w x y, a.eval env = some ⟨w, x⟩ ∧ b.eval env = some ⟨w, y⟩ ∧
+      op.defined flags x y = true ∧ r = ⟨w, op.eval x y⟩
+  | .icmp pred a b flags, r =>
+    ∃ w x y, a.eval env = some ⟨w, x⟩ ∧ b.eval env = some ⟨w, y⟩ ∧
+      flags.icmpDefined x y = true ∧ r = .ofBool (pred.eval x y)
+  | .zext width a flags, r =>
+    ∃ v, a.eval env = some v ∧ flags.zextDefined v.bits = true ∧
+      r = ⟨width, v.bits.setWidth width⟩
   | .sext width a, r => ∃ v, a.eval env = some v ∧ r = ⟨width, v.bits.signExtend width⟩
-  | .trunc width a, r => ∃ v, a.eval env = some v ∧ r = ⟨width, v.bits.setWidth width⟩
+  | .trunc width a flags, r =>
+    ∃ v, a.eval env = some v ∧ flags.truncDefined width v.bits = true ∧
+      r = ⟨width, v.bits.setWidth width⟩
   | .select cond a b, r =>
     ∃ c, cond.eval env = some (.ofBool c) ∧ (if c then a.eval env else b.eval env) = some r
   | .fBin fmt op a b, r =>

@@ -25,6 +25,28 @@ inductive Operand where
   | const (width bits : ℕ)
   deriving DecidableEq
 
+/-- The flags of integer instructions under which LLVM produces poison. An instruction whose flag
+is set has a result only when the condition of the flag holds; `Semantics.lean` states the
+conditions. A flag is consulted only by the instructions that carry it in LLVM.
+
+`getelementptr` flags (`inbounds`, `nuw`, `nusw`) have no counterpart here: a table access is one
+`load` instruction, which has a result only when its index is within the table, and that implies
+the conditions of all three. -/
+structure Flags where
+  /-- No unsigned overflow: `add`, `sub`, `mul`, `shl`, `trunc`. -/
+  nuw : Bool := false
+  /-- No signed overflow: `add`, `sub`, `mul`, `shl`, `trunc`. -/
+  nsw : Bool := false
+  /-- No set bit is shifted out: `lshr`, `ashr`. -/
+  exact : Bool := false
+  /-- The operands have no set bit in common: `or`. -/
+  disjoint : Bool := false
+  /-- The operands have the same sign: `icmp`. -/
+  samesign : Bool := false
+  /-- The operand is non-negative: `zext`. -/
+  nneg : Bool := false
+  deriving DecidableEq
+
 inductive IntBinOp where
   | add | sub | mul | and | or | xor | shl | lshr | ashr
   deriving DecidableEq
@@ -58,11 +80,11 @@ inductive CoreOp where
   deriving DecidableEq
 
 inductive Instr where
-  | intBin (op : IntBinOp) (a b : Operand)
-  | icmp (pred : ICmp) (a b : Operand)
-  | zext (width : ℕ) (a : Operand)
+  | intBin (op : IntBinOp) (a b : Operand) (flags : Flags := {})
+  | icmp (pred : ICmp) (a b : Operand) (flags : Flags := {})
+  | zext (width : ℕ) (a : Operand) (flags : Flags := {})
   | sext (width : ℕ) (a : Operand)
-  | trunc (width : ℕ) (a : Operand)
+  | trunc (width : ℕ) (a : Operand) (flags : Flags := {})
   | select (cond a b : Operand)
   | fBin (fmt : FloatFormat) (op : FBinOp) (a b : Operand)
   | fneg (fmt : FloatFormat) (a : Operand)

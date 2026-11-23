@@ -12,7 +12,8 @@ interpreter therefore computes with an `AbsVal` per register, which is either th
 the register or a description of the values it may hold. Instructions that copy a value (`phi`,
 `select`, `bitcast`, `ret`) accept any `AbsVal`; every other instruction needs exact operands, and
 the interpreter gives up (`none`) otherwise. In particular it gives up when a NaN produced by
-arithmetic is the operand of further arithmetic.
+arithmetic is the operand of further arithmetic. It also answers `none` where an instruction has
+no result, such as one whose flag condition fails.
 
 The soundness theorems are `Func.exec_sound`, `Func.run_sound`, `Func.runFloat_sound` and
 `Func.runUnary_sound`: when the interpreter answers, the function can return the answer, and
@@ -279,24 +280,32 @@ def CoreOp.exec (mode : IEEERoundingMode) : CoreOp → Option AbsVal
   | raiseExcept => some (.any 32)
 
 def Instr.exec (mode : IEEERoundingMode) (f : Func) (s : Store) : Instr → Option AbsVal
-  | intBin op a b => do
+  | intBin op a b flags => do
     let x ← a.execExact s
     let y ← b.execExact s
-    if h : y.width = x.width then some (.exact ⟨x.width, op.eval x.bits (y.bits.cast h)⟩) else none
-  | icmp pred a b => do
-    let x ← a.execExact s
-    let y ← b.execExact s
-    if h : y.width = x.width then some (.exact (.ofBool (pred.eval x.bits (y.bits.cast h))))
+    if h : y.width = x.width then
+      if op.defined flags x.bits (y.bits.cast h) then
+        some (.exact ⟨x.width, op.eval x.bits (y.bits.cast h)⟩)
+      else none
     else none
-  | zext width a => do
+  | icmp pred a b flags => do
+    let x ← a.execExact s
+    let y ← b.execExact s
+    if h : y.width = x.width then
+      if flags.icmpDefined x.bits (y.bits.cast h) then
+        some (.exact (.ofBool (pred.eval x.bits (y.bits.cast h))))
+      else none
+    else none
+  | zext width a flags => do
     let v ← a.execExact s
-    some (.exact ⟨width, v.bits.setWidth width⟩)
+    if flags.zextDefined v.bits then some (.exact ⟨width, v.bits.setWidth width⟩) else none
   | sext width a => do
     let v ← a.execExact s
     some (.exact ⟨width, v.bits.signExtend width⟩)
-  | trunc width a => do
+  | trunc width a flags => do
     let v ← a.execExact s
-    some (.exact ⟨width, v.bits.setWidth width⟩)
+    if flags.truncDefined width v.bits then some (.exact ⟨width, v.bits.setWidth width⟩)
+    else none
   | select cond a b => do
     let c ← cond.execBool s
     if c then a.exec s else b.exec s
@@ -358,39 +367,54 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     (h : s.Sim env) {i : Instr} {x : AbsVal} (hx : i.exec mode f s = some x) :
     (s.Tight env → i.Eval mode f env x.toVal) ∧ ∀ r, i.Eval mode f env r → x.Admits r := by
   cases i with
-  | intBin op a b =>
+  | intBin op a b flags =>
     simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
     obtain ⟨⟨w, u⟩, hu, ⟨w', v⟩, hv, hx⟩ := hx
-    split at hx <;> cases hx
+    split at hx <;> [skip; cases hx]
     rename_i hw
     change w' = w at hw
     subst hw
+    split at hx <;> cases hx
+    rename_i hdef
     have ha := Operand.eval_of_execExact h hu
     have hb := Operand.eval_of_execExact h hv
-    refine ⟨fun _ => ⟨_, u, v, ha, hb, rfl⟩, ?_⟩
-    rintro r ⟨w₂, u₂, v₂, ha₂, hb₂, rfl⟩
+    refine ⟨fun _ => ⟨_, u, v, ha, hb, hdef, rfl⟩, ?_⟩
+    rintro r ⟨w₂, u₂, v₂, ha₂, hb₂, -, rfl⟩
     rw [ha] at ha₂
     cases ha₂
     rw [hb] at hb₂
     cases hb₂
     rfl
-  | icmp pred a b =>
+  | icmp pred a b flags =>
     simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
     obtain ⟨⟨w, u⟩, hu, ⟨w', v⟩, hv, hx⟩ := hx
-    split at hx <;> cases hx
+    split at hx <;> [skip; cases hx]
     rename_i hw
     change w' = w at hw
     subst hw
+    split at hx <;> cases hx
+    rename_i hdef
     have ha := Operand.eval_of_execExact h hu
     have hb := Operand.eval_of_execExact h hv
-    refine ⟨fun _ => ⟨_, u, v, ha, hb, rfl⟩, ?_⟩
-    rintro r ⟨w₂, u₂, v₂, ha₂, hb₂, rfl⟩
+    refine ⟨fun _ => ⟨_, u, v, ha, hb, hdef, rfl⟩, ?_⟩
+    rintro r ⟨w₂, u₂, v₂, ha₂, hb₂, -, rfl⟩
     rw [ha] at ha₂
     cases ha₂
     rw [hb] at hb₂
     cases hb₂
     rfl
-  | zext width a | sext width a | trunc width a =>
+  | zext width a flags | trunc width a flags =>
+    simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
+    obtain ⟨v, hv, hx⟩ := hx
+    split at hx <;> cases hx
+    rename_i hdef
+    have ha := Operand.eval_of_execExact h hv
+    refine ⟨fun _ => ⟨v, ha, hdef, rfl⟩, ?_⟩
+    rintro r ⟨v₂, ha₂, -, rfl⟩
+    rw [ha] at ha₂
+    cases ha₂
+    rfl
+  | sext width a =>
     simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
     obtain ⟨v, hv, hx⟩ := hx
     cases hx
