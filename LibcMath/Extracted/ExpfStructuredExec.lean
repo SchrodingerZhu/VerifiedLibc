@@ -10,7 +10,7 @@ arithmetic result is stored as `AbsVal.ofFloat z`, the first instruction that re
 `nonNaN z >>= …`, and `nonNaN_bind_congr` continues on both sides under `z.isNaN = false`.
 
 Status: every tactic step below elaborates, but Lean's kernel did not finish checking the proof
-term of `execFrom_block20` (the 22 instructions of block 20) within fourteen minutes, while the
+term of `execFrom_block20` (the 22 instructions of block 20) within twenty-five minutes, while the
 first eight of its steps are checked within seconds. Until that is resolved this file is not
 imported by any other, and `ExpfStructuredOpen.lean` states `execFrom_block15` as an open theorem.
 -/
