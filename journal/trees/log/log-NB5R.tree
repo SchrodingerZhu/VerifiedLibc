@@ -1,0 +1,20 @@
+\title{The blocks of the closed forms of \code{\verb~|exp~} are data, with checked counts}
+\taxon{Change}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{spec}
+\tag{exp}
+\tag{tooling}
+\meta{pr}{4}
+\import{base-macros}
+
+\p{A review of \pr{4} added the following on the same branch, after merging the main branch into it. Session [ses-0YU4](ses-0YU4).}
+\ul{
+\li{\strong{Blocks as data.} \code{\verb~|ExpRanges.blocks mode~} lists the blocks with the name of the theorem for each; \code{\verb~|closedForm?_isSome_iff~} proves that \code{\verb~|closedForm?~} answers exactly on them. \code{\verb~|blockOf? mode bits~} tells which theorem covers a bit pattern, \code{\verb~|covered mode~} counts the covered patterns, and \code{\verb~|uncovered mode~} lists the ranges left for another method.}
+\li{\strong{Checked counts.} \code{\verb~|LibcMath/Functions/ExpRangesExamples.lean~}, in the build, checks the numbers that the pull request stated in prose: 3 774 873 369 patterns covered to nearest and 3 791 650 585 in the other directions, with \code{\verb~|0x33800000~}–\code{\verb~|0x42B17217~} and \code{\verb~|0xB3000001~}–\code{\verb~|0xC2CE8ECF~} left to nearest. It also has one use of \code{\verb~|eval_eq_of_closedForm?~} at a concrete argument and the axioms of that theorem. The checks were confirmed to fail when a value is changed.}
+\li{\strong{Reuse.} \code{\verb~|roundReal_of_pos~} is public, and \code{\verb~|roundReal_towardZero_of_pos~} in \code{\verb~|LibcMath/Exhaustive/Modes.lean~} is now two rewrites with it instead of a second copy of its proof.}
+\li{\strong{Automation.} In the three theorems for zeros and infinities the facts about \code{\verb~|isNaN~}, \code{\verb~|isInfinite~}, \code{\verb~|isZero~} and the sign are obtained by one \code{\verb~|grind~} from the lemmas of \code{\verb~|Binary32Bits.lean~}. What did not work is in [ins-TJ7G](ins-TJ7G).}
+}
+\p{\code{\verb~|LibcMath/Functions/ExpRanges.lean~} takes about 13 seconds to build instead of 5; the difference is the proof of \code{\verb~|closedForm?_isSome_iff~}.}

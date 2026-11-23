@@ -1,0 +1,13 @@
+\title{No continuous integration}
+\taxon{Problem}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{tooling}
+\tag{ci}
+\meta{status}{open}
+\meta{created}{2026-11-23}
+\import{base-macros}
+
+\p{\strong{Status:} open.}
+\p{On 2026-11-23 the repository had no workflow, and the pull requests had no status checks. That a branch builds, and that it uses no \code{\verb~|sorry~}, rests on what its description says and on whoever builds it locally. A workflow should run \code{\verb~|lake build~} with the Mathlib cache, which also runs the \code{\verb~|…Examples.lean~} files and the checks of axioms, and \code{\verb~|journal-build~} for this forest. Whether it uses the flake or a toolchain installed by elan is open; the flake is what the proofs are developed with.}

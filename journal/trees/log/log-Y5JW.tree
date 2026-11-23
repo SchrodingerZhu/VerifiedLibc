@@ -1,0 +1,22 @@
+\title{The reduction is usable by \code{\verb~|grind~} and a failed block names its first failing input}
+\taxon{Change}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{exhaustive}
+\tag{tooling}
+\meta{pr}{1}
+\import{base-macros}
+
+\p{A review of \pr{1} added, on the same branch, what the first version lacked for later work on top of it. Session [ses-9U0D](ses-9U0D).}
+\ul{
+\li{\strong{Automation.} \code{\verb~|SameValue~}, \code{\verb~|IR.Val.Encodes~} and \code{\verb~|HoldsOnBits~} are tagged for \code{\verb~|grind~}, and the characterisations of the Boolean checks are tagged as equations for it. Ten proofs written by hand became \code{\verb~|by grind~}. What \code{\verb~|grind~} does and does not close is in [ins-WJ6T](ins-WJ6T).}
+\li{\strong{One loop.} \code{\verb~|checkRange~}, \code{\verb~|checkRangeResult~} and \code{\verb~|checkModesAgree~} are all \code{\verb~|checkBits test first count~} for a test on one input. \code{\verb~|checkRange~} keeps its definition in \code{\verb~|LibcMath/Exhaustive/Interface.lean~}; \code{\verb~|checkRange_eq_checkBits~} relates the two by \code{\verb~|rfl~}.}
+\li{\strong{Diagnostic.} \code{\verb~|firstFailingBits test first count~} evaluates to the first bit pattern of a block that the test rejects, and \code{\verb~|checkRange.firstFailure check run mode first count~} is the shorthand for \code{\verb~|checkRange~}. \code{\verb~|firstFailingBits_eq_none_iff~} and \code{\verb~|firstFailingBits_eq_some~} say that the answer is \code{\verb~|none~} exactly when the check passes and otherwise a failing input of the block. It takes the test of the oracle, not the oracle, for the reason in [ins-TZVS](ins-TZVS).}
+\li{\strong{Chaining.} A \code{\verb~|Trans~} instance for \code{\verb~|HoldsOnBits P~} lets ranges chain in \code{\verb~|calc~} and with \code{\verb~|List.IsChain.pairwise~}.}
+\li{\strong{Examples.} \code{\verb~|LibcMath/Exhaustive/ReductionExamples.lean~} is part of the build: a block that passes by \code{\verb~|decide +kernel~}, a block that fails with its diagnosis, and ranges joined by \code{\verb~|grind~}.}
+\li{\strong{Axioms.} The two top-level theorems for \code{\verb~|expf~} carry a check of \code{\verb~|#print axioms~} under \code{\verb~|#guard_msgs~}, so \code{\verb~|sorryAx~} or the axioms of \code{\verb~|native_decide~} fail the build.}
+\li{\strong{Trails.} \code{\verb~|CLAUDE.md~} records how to build, what must stay true and how to diagnose a failed block; this journal records changes, lessons and open problems.}
+}
+\p{Canonical was to be added as a dependency and was not: [ins-LF91](ins-LF91).}

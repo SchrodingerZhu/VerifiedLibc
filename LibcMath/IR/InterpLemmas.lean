@@ -33,13 +33,6 @@ open Model (IEEERoundingMode)
 
 namespace Val
 
-@[simp]
-theorem toModel?_ofModel {fmt : FloatFormat} (x : Model fmt) :
-    (ofModel x).toModel? fmt = some x := by
-  cases x
-  simp only [toModel?, ofModel, Model.ofBits, Model.toBits, ↓reduceDIte]
-  rfl
-
 /-- A binary32 value as a runtime value of width 32. -/
 theorem ofModel_binary32 (x : Model .binary32) : ofModel x = ⟨32, x.toBits⟩ :=
   rfl

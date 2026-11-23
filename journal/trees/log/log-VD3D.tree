@@ -1,0 +1,17 @@
+\title{A survey of how far extraction reaches}
+\taxon{Change}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{extraction}
+\tag{tooling}
+\meta{pr}{6}
+\import{base-macros}
+
+\p{\code{\verb~|scripts/survey-extraction.py~} compiles every \code{\verb~|float~} and \code{\verb~|_Float16~} entrypoint of the math library of LLVM libc and nine double-precision ones as \code{\verb~|extract/extract.sh~} does, runs \code{\verb~|ir2lean~} on the function that holds the body, and lists every construct outside the exported fragment. It takes about ten seconds. \pr{6}.}
+\ul{
+\li{The result is the note [How far extraction reaches](note-extraction-coverage): 27 of 96 single-precision entrypoints export, none of 88 half-precision and none of 9 double-precision ones. What is missing is [prob-IW37](prob-IW37).}
+\li{Three defects of the tools were found on the way: [prob-ZWH4](prob-ZWH4), [prob-HVD8](prob-HVD8), [prob-JYU7](prob-JYU7).}
+\li{The pull request first held the result as \code{\verb~|docs/extraction-coverage.md~}. In review it was moved into this journal without change of content, split into five trees, and \code{\verb~|scripts/md2tree.py~} was added to convert the Markdown that the script prints. The journal gained the kind \code{\verb~|Note~} for such documents, listed under [notes](notes). Session [ses-DARM](ses-DARM).}
+}

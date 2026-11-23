@@ -140,3 +140,9 @@ The test is evidence, not proof. It covers the inputs it ran, on the processor i
 the compiler it was built with; a different processor, compiler version or set of flags (FMA in
 particular) needs its own run. It compares results only, so `errno` and the floating-point status
 flags are not examined, and neither is the sign or payload of a NaN.
+
+## Conventions and journal
+
+`CLAUDE.md` has the conventions for changing proofs. `journal/` is a
+[Forester](https://www.forester-notes.org/) forest of dated changes, lessons, open problems and
+sessions; build and browse it with `journal-serve` from the flake shell.

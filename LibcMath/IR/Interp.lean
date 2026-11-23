@@ -1,4 +1,5 @@
 import LibcMath.IR.Semantics
+import LibcMath.SpecLemmas
 
 /-!
 # An interpreter for extracted code
@@ -55,13 +56,6 @@ theorem toBool?_ofBool (c : Bool) : (ofBool c).toBool? = some c := by
 theorem ofBool_injective : Function.Injective ofBool := fun a b h => by
   simpa using congrArg toBool? h
 
-@[simp]
-private theorem toModel?_ofModel {fmt : FloatFormat} (x : Model fmt) :
-    (ofModel x).toModel? fmt = some x := by
-  cases x
-  simp only [toModel?, ofModel, Model.ofBits, Model.toBits, ↓reduceDIte]
-  rfl
-
 theorem eq_ofModel_of_toModel? {fmt : FloatFormat} {v : Val} {x : Model fmt}
     (h : v.toModel? fmt = some x) : v = .ofModel x := by
   obtain ⟨w, bits⟩ := v
@@ -88,6 +82,7 @@ inductive AbsVal where
 namespace AbsVal
 
 /-- `v` is one of the values described by `a`. -/
+@[grind]
 def Admits : AbsVal → Val → Prop
   | exact v, r => r = v
   | nan fmt _ _, r => ∃ y : Model fmt, r = .ofModel y ∧ y.isNaN = true
@@ -143,43 +138,24 @@ def set (s : Store) (r : Reg) (a : AbsVal) : Store :=
   if r < s.size then s.setIfInBounds r (some a)
   else (s ++ Array.replicate (r - s.size) none).push (some a)
 
+@[grind =]
 theorem get_set (s : Store) (r r' : Reg) (a : AbsVal) :
     (s.set r a).get r' = if r' = r then some a else s.get r' := by
-  unfold set get
-  by_cases hlt : r < s.size
-  · simp only [hlt, ↓reduceIte, Array.getElem?_setIfInBounds]
-    by_cases hr : r' = r
-    · simp [hr]
-    · simp [hr, Ne.symm hr]
-  · have hsize : (s ++ Array.replicate (r - s.size) none).size = r := by
-      rw [Array.size_append, Array.size_replicate]
-      exact Nat.add_sub_cancel' (Nat.le_of_not_lt hlt)
-    simp only [hlt, ↓reduceIte, Array.getElem?_push, hsize]
-    by_cases hr : r' = r
-    · simp [hr]
-    · simp only [hr, ↓reduceIte, Array.getElem?_append]
-      split
-      · rfl
-      · rename_i hr'
-        rw [Array.getElem?_replicate, Array.getElem?_eq_none (Nat.le_of_not_lt hr')]
-        split <;> rfl
+  grind [set, get]
+
+attribute [local grind] Env.set
 
 /-- Every register assigned in `s` is assigned in `env`, to a value that `s` describes. -/
+@[grind]
 def Sim (s : Store) (env : Env) : Prop :=
   ∀ r a, s.get r = some a → ∃ v, env r = some v ∧ a.Admits v
 
 theorem Sim.set {s : Store} {env : Env} (h : s.Sim env) (r : Reg) {a : AbsVal} {v : Val}
     (hv : a.Admits v) : (s.set r a).Sim (env.set r v) := by
-  intro r' a' ha'
-  rw [get_set] at ha'
-  unfold Env.set
-  by_cases hr : r' = r
-  · simp only [hr, ↓reduceIte, Option.some.injEq] at ha' ⊢
-    exact ⟨v, rfl, ha' ▸ hv⟩
-  · simp only [hr, ↓reduceIte] at ha' ⊢
-    exact h r' a' ha'
+  grind
 
 /-- Every register assigned in `s` is assigned in `env`, to the value `AbsVal.toVal` selects. -/
+@[grind]
 def Tight (s : Store) (env : Env) : Prop :=
   ∀ r a, s.get r = some a → env r = some a.toVal
 
@@ -188,25 +164,10 @@ theorem Tight.sim {s : Store} {env : Env} (h : s.Tight env) : s.Sim env :=
 
 theorem Tight.set {s : Store} {env : Env} (h : s.Tight env) (r : Reg) (a : AbsVal) :
     (s.set r a).Tight (env.set r a.toVal) := by
-  intro r' a' ha'
-  rw [get_set] at ha'
-  unfold Env.set
-  by_cases hr : r' = r
-  · simp only [hr, ↓reduceIte, Option.some.injEq] at ha' ⊢
-    rw [ha']
-  · simp only [hr, ↓reduceIte] at ha' ⊢
-    exact h r' a' ha'
+  grind
 
 theorem tight_ofArgs (args : List Val) : (ofArgs args).Tight (Env.ofArgs args) := by
-  intro r a ha
-  simp only [get, ofArgs, Array.getElem?_map, List.getElem?_toArray] at ha
-  unfold Env.ofArgs
-  cases hr : args[r]? with
-  | none => simp [hr] at ha
-  | some v =>
-    simp only [hr, Option.map_some, Option.join_some, Option.some.injEq] at ha
-    rw [← ha]
-    rfl
+  grind [get, ofArgs, Env.ofArgs, AbsVal.toVal]
 
 theorem sim_ofArgs (args : List Val) : (ofArgs args).Sim (Env.ofArgs args) :=
   (tight_ofArgs args).sim

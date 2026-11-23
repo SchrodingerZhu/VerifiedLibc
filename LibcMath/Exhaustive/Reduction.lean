@@ -49,6 +49,16 @@ is proved. It is a closed Boolean computation, so the possibilities are evaluati
 trusted base; `native_decide`, which trusts the compiler and should stay in files that are
 clearly separated from the rest; or a checker outside Lean whose verdicts enter as explicit
 hypotheses. `checkRange_add` splits a block, so the block size can be chosen to suit the method.
+
+## When a block check fails
+
+Each check is `checkBits` of a test on one input (`checkRange_eq_checkBits`, and the definitions
+of `checkRangeResult` and `checkModesAgree`). If a check evaluates to `false`, evaluate
+`checkRange.firstFailure O.check run mode first count` (or `firstFailingBits` with the test of the
+check at hand): it returns the first bit pattern of the block that fails, and
+`checkRange.firstFailure_eq_none_iff` says it returns `none` exactly when the check passes.
+`LibcMath/Exhaustive/ReductionExamples.lean` shows the whole route on a small block, including a
+failing one.
 -/
 
 namespace LibcMath
@@ -67,20 +77,50 @@ def RunsCorrectlyAt (S : Spec fmt) (run : IEEERoundingMode → Model fmt → Opt
 
 /-! ### Blocks checked against an oracle -/
 
+/-- The test `checkRange` applies to one input. It takes the oracle's test as a plain function:
+specifications are noncomputable, so a definition that receives an `Oracle S` cannot be compiled
+at a concrete `S`, while one that receives `O.check` can. -/
+def checkRange.test (check : IEEERoundingMode → Model fmt → Model fmt → Bool)
+    (run : IEEERoundingMode → Model fmt → Option (Model fmt))
+    (mode : IEEERoundingMode) (input : Model fmt) : Bool :=
+  match run mode input with
+  | some result => check mode input result
+  | none => false
+
+theorem checkRange_eq_checkBits (O : Oracle S)
+    (run : IEEERoundingMode → Model fmt → Option (Model fmt)) (mode : IEEERoundingMode)
+    (first count : ℕ) :
+    checkRange O run mode first count = checkBits (checkRange.test O.check run mode) first count :=
+  rfl
+
+/-- The first bit pattern of a block on which `checkRange` fails: either `run` produces no
+result there, or the oracle's test `check` does not accept it. Compilable, so it can be used with
+`#eval` as `checkRange.firstFailure O.check run mode first count`. -/
+def checkRange.firstFailure (check : IEEERoundingMode → Model fmt → Model fmt → Bool)
+    (run : IEEERoundingMode → Model fmt → Option (Model fmt)) (mode : IEEERoundingMode)
+    (first count : ℕ) : Option ℕ :=
+  firstFailingBits (checkRange.test check run mode) first count
+
+theorem checkRange.firstFailure_eq_none_iff {O : Oracle S} :
+    checkRange.firstFailure O.check run mode first count = none ↔
+      checkRange O run mode first count = true :=
+  firstFailingBits_eq_none_iff
+
+@[grind =]
 theorem checkRange_eq_true_iff {O : Oracle S} :
     checkRange O run mode first count = true ↔
       ∀ i < count, ∃ y, run mode (.ofNatBits (first + i)) = some y ∧
         O.check mode (.ofNatBits (first + i)) y = true := by
-  simp only [checkRange, List.all_eq_true, List.mem_range]
+  rw [checkRange_eq_checkBits, checkBits_eq_true_iff]
   refine forall₂_congr fun i _ => ?_
-  cases run mode (.ofNatBits (first + i)) <;> simp
+  cases h : run mode (.ofNatBits (first + i)) <;> simp [checkRange.test, h]
 
 /-- A block is checked by checking an initial part and the rest. -/
 theorem checkRange_add (O : Oracle S) (run : IEEERoundingMode → Model fmt → Option (Model fmt))
     (mode : IEEERoundingMode) (first m n : ℕ) :
     checkRange O run mode first (m + n) =
-      (checkRange O run mode first m && checkRange O run mode (first + m) n) := by
-  simp [checkRange, List.range_add, List.all_map, Function.comp_def, Nat.add_assoc]
+      (checkRange O run mode first m && checkRange O run mode (first + m) n) :=
+  checkBits_add (checkRange.test O.check run mode) first m n
 
 /-- A checked block: on each of its inputs, `run` produces the prescribed result. -/
 theorem RunsCorrectlyAt.of_checkRange {O : Oracle S}
@@ -125,17 +165,17 @@ the `count` bit patterns starting at `first`. No oracle is involved: this is the
 the prescribed results on a range are known by proof. -/
 def checkRangeResult (run : IEEERoundingMode → Model fmt → Option (Model fmt))
     (mode : IEEERoundingMode) (expected : Model fmt → Model fmt) (first count : ℕ) : Bool :=
-  (List.range count).all fun i =>
-    let input : Model fmt := .ofNatBits (first + i)
+  checkBits (first := first) (count := count) fun input =>
     match run mode input with
     | some result => decide (SameValue result (expected input))
     | none => false
 
+@[grind =]
 theorem checkRangeResult_eq_true_iff {expected : Model fmt → Model fmt} :
     checkRangeResult run mode expected first count = true ↔
       ∀ i < count, ∃ y, run mode (.ofNatBits (first + i)) = some y ∧
         SameValue y (expected (.ofNatBits (first + i))) := by
-  simp only [checkRangeResult, List.all_eq_true, List.mem_range]
+  rw [checkRangeResult, checkBits_eq_true_iff]
   refine forall₂_congr fun i _ => ?_
   cases run mode (.ofNatBits (first + i)) <;> simp
 

@@ -1,0 +1,17 @@
+\title{Case analyses over nested conditionals on bit patterns}
+\taxon{Insight}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{automation}
+\tag{spec}
+\import{base-macros}
+
+\p{Source: session [ses-0YU4](ses-0YU4), on \pr{4}. Lean 4.36.0. Each item was compiled.}
+\ul{
+\li{Facts such as \code{\verb~|x.isNaN = false ∧ x.isInfinite = true ∧ x.signBit = false~} from an equation or bounds on \code{\verb~|x.toNatBits~} are one \code{\verb~|grind~} with \code{\verb~|Binary32.isNaN_iff~}, \code{\verb~|Binary32.isInfinite_iff~}, \code{\verb~|Binary32.isZero_iff~} and \code{\verb~|Binary32.signBit_eq_false_iff~} as arguments.}
+\li{\code{\verb~|grind~} does not prove \code{\verb~|eval_eq_of_closedForm?~} from the eleven block theorems and the definition of \code{\verb~|closedForm?~}; it fails within seconds. \code{\verb~|split_ifs~} on the hypothesis is no shortcut either: it also splits the conditionals on the rounding direction inside the results, so the cases no longer match the statements of the block theorems. The proof by \code{\verb~|by_cases~} on each condition in turn stays.}
+\li{To relate two functions defined by different case analyses on a bit pattern, state what both mean as one plain condition with \code{\verb~|≤~} and prove each side equivalent to it; \code{\verb~|simp~} then \code{\verb~|omega~} closes each. Going from one function to the other directly, with \code{\verb~|cases~} on the rounding direction, exceeded the heartbeat limit.}
+\li{Split on \code{\verb~|mode = .nearest~} with \code{\verb~|by_cases~}, not on \code{\verb~|mode~} with \code{\verb~|cases~}: the type of rounding directions of FloatLib has more constructors than the four of C, and each one multiplies the work.}
+\li{A definition that mentions \code{\verb~|2 ^ 32~} was suspected of a timeout that was in fact the next theorem. Read the line of the error before changing the suspect.}
+}
