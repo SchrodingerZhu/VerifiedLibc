@@ -1,4 +1,4 @@
-import LibcMath.Exhaustive.Run.StandInOpen
+import LibcMath.Oracle.Exp
 import LibcMath.Exhaustive.ExpfInterp
 
 /-!
@@ -6,8 +6,7 @@ import LibcMath.Exhaustive.ExpfInterp
 
 The exhaustive check of `expf` runs `checkRange Run.oracle Run.run` over blocks of bit patterns.
 Every certificate file, the `checkrange` executable and the generator in `scripts/` refer to the
-definitions below and to nothing else, so replacing the stand-in oracle by the proved one is a
-change to this file only.
+definitions below and to nothing else.
 -/
 
 namespace LibcMath.Exhaustive.Run
@@ -15,8 +14,8 @@ namespace LibcMath.Exhaustive.Run
 open FloatLib.Floats.Formats.BinaryInterchange
 open Model (IEEERoundingMode)
 
-/-- The oracle certificates are stated for. Currently a stand-in. -/
-abbrev oracle : Oracle (Spec.exp .binary32) := StandIn.oracle
+/-- The oracle certificates are stated for. -/
+abbrev oracle : Oracle (Spec.exp .binary32) := expOracle .binary32
 
 /-- The implementation certificates are stated for: the interpreter on the extracted `expf`. -/
 abbrev run : IEEERoundingMode → Model .binary32 → Option (Model .binary32) :=

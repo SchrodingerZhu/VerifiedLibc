@@ -23,7 +23,3 @@ name = "LibcMath"
 [[lean_exe]]
 name = "checkrange"
 root = "LibcMath.Exhaustive.Run.Main"
-
-[[lean_exe]]
-name = "enclosure-experiment"
-root = "LibcMath.Exhaustive.Run.EnclosureExperiment"

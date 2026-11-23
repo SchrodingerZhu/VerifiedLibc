@@ -67,7 +67,7 @@ passed inside Lean, which is what produces theorems.
 ```bash
 lake build checkrange
 
-# 1. Split a range into blocks. The manifest has one row per block: check, first, count, status,
+# 1. Split a range into blocks. The manifest has one row per block: mode, first, count, status,
 #    milliseconds.
 scripts/exhaustive.py plan nearest 0x3f800000 0x10000 0x1000 > manifest.tsv
 
@@ -101,16 +101,13 @@ only what is missing, and several machines can each build part of a set. The met
 what a certificate rests on:
 
 - `Kernel`: each block is evaluated by Lean's kernel (`decide +kernel`). Nothing is trusted beyond
-  the kernel, but evaluation is several thousand times slower than compiled code, so this suits
-  small ranges only.
+  the kernel, but evaluation takes about 0.4 s per input, so this suits small ranges only.
 - `Native`: each block is proved by `native_decide`, which trusts the Lean compiler and the
-  compiled code of the definitions involved.
+  compiled code of the definitions involved. It takes about 0.45 ms per input.
 
-The first argument of `plan` names the check: a rounding direction, for `checkRange` under that
-direction, or `towardZero=down`, for a comparison of the implementation's results rounding toward
-zero with those rounding down (`checkModesAgree`). The comparison needs no oracle, and because
-`exp` is positive it turns a range established for rounding down into the same range for rounding
-toward zero; the index of a set that contains both states the result.
+For comparison, `checkrange` takes about 30 µs per input rounding to nearest and 80 µs in the
+other directions where `expf` does real work, and under 10 µs elsewhere, on one thread of a 2025
+desktop processor: about 70 CPU-hours for all `2^32` inputs in four directions.
 
 Only the set `Demo` of each method is kept in the repository; other generated sets are ignored by
 git.

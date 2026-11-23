@@ -1,5 +1,5 @@
 import LibcMath.Exhaustive.Run.Block
-import LibcMath.Exhaustive.Run.TowardZero
+import LibcMath.Exhaustive.Run.Target
 
 /-!
 # Blocks `nearest` 0x3f800000 to 0x3f800020

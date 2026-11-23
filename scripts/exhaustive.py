@@ -3,11 +3,9 @@
 
 A manifest is a tab-separated file with one row per block of consecutive bit patterns:
 
-    check    first    count    status    millis
+    mode    first    count    status    millis
 
-`check` is nearest, towardZero, up or down for a check of the implementation against the oracle
-under that rounding direction, or `towardZero=down` for a check that the implementation returns
-the same results rounding toward zero as rounding down; `first` and `count` are decimal; `status` is
+`mode` is nearest, towardZero, up or down; `first` and `count` are decimal; `status` is
 `pending`, `ok` or `fail`; `millis` is the time the compiled check of the block took, or `-`.
 The `checkrange` executable prints rows in the same format, so a result file is a manifest of
 finished blocks.
@@ -28,17 +26,18 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-AGREE = "towardZero=down"
-CHECKS = ["nearest", "towardZero", "up", "down", AGREE]
-HEADER = ["check", "first", "count", "status", "millis"]
+MODES = ["nearest", "towardZero", "up", "down"]
+HEADER = ["mode", "first", "count", "status", "millis"]
 
 # How a block is proved, by certificate directory. `Native` trusts the Lean compiler.
 METHODS = {
     "Kernel": {
+        "proof": " by\n  decide +kernel",
         "trust": "Each block is checked by evaluation in Lean's kernel (`decide +kernel`), which "
                  "adds nothing to\nthe trusted base.",
     },
     "Native": {
+        "proof": "\n  checkRange_of_checkBlock (by native_decide)",
         "trust": "Each block is checked by `native_decide`: the theorems here trust the Lean "
                  "compiler and the\ncompiled code of every definition the check runs, in "
                  "addition to the kernel.",
@@ -46,19 +45,8 @@ METHODS = {
 }
 
 
-def lean_forms(check):
-    """How certificate files state the block check named `check` and what they conclude from it:
-    a label for names, the Boolean term applied to `first count`, the conversion used inside
-    `native_decide` proofs, the lemma turning a block into a range, and the range statement."""
-    if check == AGREE:
-        return ("towardZeroDown", "checkModesAgree run .towardZero .down", "",
-                "agreeOn_of_checkModesAgree", "AgreeOn")
-    return (check, f"checkRange oracle run .{check}", "checkRange_of_checkBlock ",
-            "holdsOnBits_of_checkRange", f"CheckedOn .{check}")
-
-
 def read_rows(path):
-    """The rows of a manifest or result file as (check, first, count, status, millis)."""
+    """The rows of a manifest or result file as (mode, first, count, status, millis)."""
     rows = []
     with open(path) as file:
         for line in file:
@@ -66,8 +54,8 @@ def read_rows(path):
             # A worker killed while writing leaves a partial last line; its block stays pending.
             if fields == HEADER or len(fields) != len(HEADER) or not line.endswith("\n"):
                 continue
-            check, first, count, status, millis = fields
-            rows.append((check, int(first), int(count), status, millis))
+            mode, first, count, status, millis = fields
+            rows.append((mode, int(first), int(count), status, millis))
     return rows
 
 
@@ -93,7 +81,7 @@ def plan(args):
     rows = []
     for first in range(args.first, args.first + args.count, args.block):
         count = min(args.block, args.first + args.count - first)
-        rows.append((args.check, first, count, "pending", "-"))
+        rows.append((args.mode, first, count, "pending", "-"))
     write_rows(sys.stdout, rows)
 
 
@@ -109,8 +97,8 @@ def run(args):
             # One process per stretch of equal-sized blocks; it prints a row as each finishes.
             for count, group in itertools.groupby(blocks, key=lambda row: row[2]):
                 group = list(group)
-                check, first = group[0][0], group[0][1]
-                command = [str(args.checkrange), check, str(first), str(count * len(group)),
+                mode, first = group[0][0], group[0][1]
+                command = [str(args.checkrange), mode, str(first), str(count * len(group)),
                            str(count)]
                 subprocess.run(command, stdout=results, check=False)
 
@@ -118,8 +106,8 @@ def run(args):
 def record(args):
     status = {}
     for path in args.results:
-        for check, first, count, state, millis in read_rows(path):
-            status[check, first, count] = (state, millis)
+        for mode, first, count, state, millis in read_rows(path):
+            status[mode, first, count] = (state, millis)
     rows = [row[:3] + status.get(row[:3], row[3:]) for row in read_rows(args.manifest)]
     with open(args.manifest, "w") as file:
         write_rows(file, rows)
@@ -136,30 +124,23 @@ def balanced(terms, depth=2):
             f"\n{pad}({balanced(terms[middle:], depth + 1)})")
 
 
-def range_name(check, lo, hi):
-    return f"checked_{lean_forms(check)[0]}_{lo:#010x}_{hi:#010x}"
+def range_name(mode, lo, hi):
+    return f"checked_{mode}_{lo:#010x}_{hi:#010x}"
 
 
-def range_theorem(check, lo, hi, proof):
-    return (f"theorem {range_name(check, lo, hi)} :\n"
-            f"    {lean_forms(check)[4]} {lo:#010x} {hi:#010x} :=\n  {proof}\n")
+def range_theorem(mode, lo, hi, proof):
+    return (f"theorem {range_name(mode, lo, hi)} :\n"
+            f"    CheckedOn .{mode} {lo:#010x} {hi:#010x} :=\n  {proof}\n")
 
 
-def batch_file(namespace, method, check, blocks):
-    label, term, conversion, to_range, _ = lean_forms(check)
-    if method == "Kernel":
-        proof = " by\n  decide +kernel"
-    elif conversion:
-        proof = f"\n  {conversion}(by native_decide)"
-    else:
-        proof = " by\n  native_decide"
+def batch_file(namespace, method, mode, blocks):
     lo, hi = blocks[0][1], blocks[-1][1] + blocks[-1][2]
     lines = [
         "import LibcMath.Exhaustive.Run.Block",
-        "import LibcMath.Exhaustive.Run.TowardZero",
+        "import LibcMath.Exhaustive.Run.Target",
         "",
         "/-!",
-        f"# Blocks `{check}` {lo:#010x} to {hi:#010x}",
+        f"# Blocks `{mode}` {lo:#010x} to {hi:#010x}",
         "",
         "Generated by `scripts/exhaustive.py generate`; do not edit.",
         "",
@@ -173,15 +154,18 @@ def batch_file(namespace, method, check, blocks):
     ]
     leaves = []
     for _, first, count, _, _ in blocks:
-        name = f"block_{label}_{first:#010x}_{count}"
-        lines += [f"theorem {name} :", f"    {term} {first:#010x} {count} = true :={proof}", ""]
-        leaves.append(f"{to_range} {name}")
-    lines += [range_theorem(check, lo, hi, balanced(leaves)), f"end {namespace}", ""]
+        name = f"block_{mode}_{first:#010x}_{count}"
+        lines += [f"theorem {name} :",
+                  f"    checkRange oracle run .{mode} {first:#010x} {count} = true :="
+                  + METHODS[method]["proof"],
+                  ""]
+        leaves.append(f"holdsOnBits_of_checkRange {name}")
+    lines += [range_theorem(mode, lo, hi, balanced(leaves)), f"end {namespace}", ""]
     return "\n".join(lines)
 
 
 def index_file(namespace, method, name, batches):
-    """`batches` is a list of (module, check, lo, hi), in manifest order."""
+    """`batches` is a list of (module, mode, lo, hi), in manifest order."""
     lines = [f"import {module}" for module, _, _, _ in batches]
     lines += [
         "",
@@ -189,8 +173,7 @@ def index_file(namespace, method, name, batches):
         f"# Certificate set `{name}`",
         "",
         "Generated by `scripts/exhaustive.py generate`; do not edit. One theorem for each stretch",
-        "of consecutive batches of the set, and rounding toward zero wherever the set has both",
-        "rounding down and the agreement of the two directions on the same range.",
+        "of consecutive batches of the set.",
         "",
         METHODS[method]["trust"],
         "-/",
@@ -198,18 +181,11 @@ def index_file(namespace, method, name, batches):
         f"namespace {namespace}",
         "",
     ]
-    ranges = set()
-    for stretch in consecutive_runs([(check, lo, hi - lo) for _, check, lo, hi in batches]):
+    for stretch in consecutive_runs([(mode, lo, hi - lo) for _, mode, lo, hi in batches]):
         if len(stretch) > 1:
-            check, lo, hi = stretch[0][0], stretch[0][1], stretch[-1][1] + stretch[-1][2]
-            parts = [range_name(check, first, first + count) for _, first, count in stretch]
-            lines.append(range_theorem(check, lo, hi, balanced(parts)))
-        ranges.add((stretch[0][0], stretch[0][1], stretch[-1][1] + stretch[-1][2]))
-    for check, lo, hi in sorted(ranges):
-        if check == AGREE and ("down", lo, hi) in ranges and ("towardZero", lo, hi) not in ranges:
-            proof = (f"CheckedOn.towardZero {range_name('down', lo, hi)}\n"
-                     f"    {range_name(AGREE, lo, hi)}")
-            lines.append(range_theorem("towardZero", lo, hi, proof))
+            mode, lo, hi = stretch[0][0], stretch[0][1], stretch[-1][1] + stretch[-1][2]
+            parts = [range_name(mode, first, first + count) for _, first, count in stretch]
+            lines.append(range_theorem(mode, lo, hi, balanced(parts)))
     lines += [f"end {namespace}", ""]
     return "\n".join(lines)
 
@@ -223,12 +199,11 @@ def generate(args):
     for stretch in consecutive_runs(rows):
         for start in range(0, len(stretch), args.batch):
             blocks = stretch[start:start + args.batch]
-            check, lo, hi = blocks[0][0], blocks[0][1], blocks[-1][1] + blocks[-1][2]
-            label = lean_forms(check)[0]
-            file_name = f"{label[0].upper()}{label[1:]}{lo:08X}"
+            mode, lo, hi = blocks[0][0], blocks[0][1], blocks[-1][1] + blocks[-1][2]
+            file_name = f"{mode[0].upper()}{mode[1:]}{lo:08X}"
             (directory / f"{file_name}.lean").write_text(
-                batch_file(module, args.method, check, blocks))
-            batches.append((f"{module}.{file_name}", check, lo, hi))
+                batch_file(module, args.method, mode, blocks))
+            batches.append((f"{module}.{file_name}", mode, lo, hi))
     directory.with_suffix(".lean").write_text(index_file(module, args.method, args.name, batches))
     print(f"{len(rows)} blocks in {len(batches)} files; check them with `lake build {module}`",
           file=sys.stderr)
@@ -239,7 +214,7 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
 
     command = commands.add_parser("plan", help="print a manifest of pending blocks")
-    command.add_argument("check", choices=CHECKS)
+    command.add_argument("mode", choices=MODES)
     command.add_argument("first", type=lambda text: int(text, 0), help="first bit pattern")
     command.add_argument("count", type=lambda text: int(text, 0), help="number of bit patterns")
     command.add_argument("block", type=lambda text: int(text, 0), help="bit patterns per block")
