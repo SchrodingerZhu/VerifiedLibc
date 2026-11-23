@@ -14,12 +14,14 @@ the input decide every branch on the way. This file collects what such an evalua
   pattern, and `Val.toBits_abs_binary32` is the pattern of `fabs`, so that integer instructions on
   the pattern of a floating-point register reduce. The input is best written `Model.ofBits b` for
   a variable `b : BitVec 32`.
-* `IntBinOp.defined_add_nsw` and `Flags.icmpDefined_samesign` state the flag conditions as
-  bit-vector facts that `bv_decide` proves.
+* `ICmp.eval_ult` and its companions, `IntBinOp.defined_add_nsw` and
+  `Flags.icmpDefined_samesign` state comparisons and flag conditions in terms of `BitVec.toNat`,
+  where `omega` proves them.
 * `Func.runUnary_of_exec_exact` and `Func.runUnary_of_exec_ofFloat` read off the result of
   `Func.runUnary`.
 
-The tactic `exec_blocks [h₁, h₂, …]` rewrites with all of these. The `hᵢ` are the block lemmas
+The tactic `exec_blocks [h₁, h₂, …]` evaluates `Func.exec` with the lemmas on stores and values
+above. The `hᵢ` are the block lemmas
 `Func.execFrom_of_block hblock` of the function at hand, the values of its branch conditions
 (`ICmp.eval a b pred = c`), and the flag conditions of its instructions.
 -/
@@ -58,7 +60,26 @@ theorem toBits_abs_binary32 (bits : BitVec 32) :
   have hzero : Model.signBit (Model.posZero .binary32) = false := rfl
   have hbits (b : BitVec 32) :
       (if (b.msb == false) = true then b else b ^^^ 0x80000000#32) = b &&& 0x7FFFFFFF#32 := by
-    split <;> bv_decide
+    have hlt := b.isLt
+    apply BitVec.eq_of_toNat_eq
+    rw [BitVec.toNat_and, show (0x7FFFFFFF#32).toNat = 2 ^ 31 - 1 from rfl,
+      Nat.and_two_pow_sub_one_eq_mod]
+    split <;> rename_i hmsb <;>
+      simp only [BitVec.msb_eq_decide, beq_iff_eq, decide_eq_false_iff_not, not_le] at hmsb
+    · omega
+    · rw [BitVec.toNat_xor, show (0x80000000#32).toNat = 2 ^ 31 from rfl]
+      apply Nat.eq_of_testBit_eq
+      intro i
+      rw [Nat.testBit_xor, Nat.testBit_two_pow, Nat.testBit_mod_two_pow]
+      rcases Nat.lt_trichotomy i 31 with hi | rfl | hi
+      · simp [hi, Nat.ne_of_gt hi]
+      · have htop : b.toNat.testBit 31 = true := by
+          rw [Nat.testBit_eq_decide_div_mod_eq, decide_eq_true_eq]
+          omega
+        simp [htop]
+      · have htop : b.toNat.testBit i = false :=
+          Nat.testBit_lt_two_pow (hlt.trans_le (Nat.pow_le_pow_right (by norm_num) hi))
+        simp [htop, Nat.ne_of_lt hi, Nat.not_lt_of_gt hi]
   simp only [Model.abs, Model.copySign, hsigned, Bool.not_true, Bool.false_and, Bool.false_eq_true,
     ↓reduceIte, hzero, Model.signBit_eq_msb, Model.toggleSign, hmask, Model.toBits, Model.ofBits]
   rw [← hbits bits]
@@ -72,28 +93,69 @@ theorem Store.get_ofArgs (args : List Val) (r : Reg) :
     (Store.ofArgs args).get r = args[r]?.map .exact := by
   cases h : args[r]? <;> simp [Store.get, Store.ofArgs, h]
 
-/-- `add nsw` has a result exactly when the signed addition does not overflow. -/
-theorem IntBinOp.defined_add_nsw {w : ℕ} (a b : BitVec w) :
-    IntBinOp.add.defined { nsw := true } a b = !a.saddOverflow b := by
-  simp only [defined, Flags.noWrap, Bool.not_false, Bool.true_or, Bool.not_true, Bool.false_or,
-    Bool.true_and, BitVec.saddOverflow]
+/-! ## Integer conditions as statements about natural numbers
+
+The value of a comparison and the condition of a flag, in terms of `BitVec.toNat` and
+`BitVec.toInt`. Integer constants are written as numerals, because the kernel evaluates a power
+of an integer one multiplication at a time. Together with `toInt_eq_toNat_sub`, `BitVec.toNat_and` and the two lemmas on
+masks below, they turn a branch condition on a 32-bit register into linear arithmetic with
+division by constants, which `omega` decides.
+
+Two things to avoid with Lean 4.36: `simp only [BitVec.toNat_add]` does not terminate on a sum
+with a literal operand, so that lemma is applied with `rw`; and `omega` is slow on the remainder
+of a sum of large constants, where it helps to say first whether the sum wraps around. -/
+
+theorem ICmp.eval_eq {w : ℕ} (a b : BitVec w) :
+    ICmp.eq.eval a b = decide (a.toNat = b.toNat) := by
   rw [Bool.eq_iff_iff]
-  simp only [Bool.and_eq_true, decide_eq_true_eq, Bool.not_eq_true', Bool.or_eq_false_iff,
-    decide_eq_false_iff_not, ge_iff_le, not_le, not_lt]
-  constructor
-  · rintro ⟨h₁, h₂⟩
-    exact ⟨by exact_mod_cast h₂, by exact_mod_cast h₁⟩
-  · rintro ⟨h₁, h₂⟩
-    exact ⟨by exact_mod_cast h₂, by exact_mod_cast h₁⟩
+  simp [ICmp.eval, BitVec.toNat_inj]
+
+theorem ICmp.eval_ult {w : ℕ} (a b : BitVec w) :
+    ICmp.ult.eval a b = decide (a.toNat < b.toNat) :=
+  rfl
+
+theorem ICmp.eval_ugt {w : ℕ} (a b : BitVec w) :
+    ICmp.ugt.eval a b = decide (b.toNat < a.toNat) :=
+  rfl
+
+theorem ICmp.eval_sgt {w : ℕ} (a b : BitVec w) :
+    ICmp.sgt.eval a b = decide (b.toInt < a.toInt) :=
+  rfl
+
+/-- `add nsw` has a result exactly when the signed sum is a signed integer of the width. -/
+theorem IntBinOp.defined_add_nsw (a b : BitVec 32) :
+    IntBinOp.add.defined { nsw := true } a b =
+      decide (-0x80000000 ≤ a.toInt + b.toInt ∧ a.toInt + b.toInt < 0x80000000) := by
+  simp [defined, Flags.noWrap]
+
+/-- `icmp samesign` has a result exactly when the sign bits of its operands agree. -/
+theorem Flags.icmpDefined_samesign (a b : BitVec 32) :
+    Flags.icmpDefined { samesign := true } a b =
+      decide (2 ^ 31 ≤ a.toNat ↔ 2 ^ 31 ≤ b.toNat) := by
+  simp [Flags.icmpDefined, BitVec.msb_eq_decide]
+
+/-- The signed value of a 32-bit vector. -/
+theorem toInt_eq_toNat_sub (a : BitVec 32) :
+    a.toInt = (a.toNat : ℤ) - 0x100000000 * (a.toNat / 2 ^ 31 : ℕ) := by
+  have hlt := a.isLt
+  rw [BitVec.toInt_eq_toNat_cond]
+  split <;> omega
+
+/-- Masking with `k` set bits starting at bit `s` selects those bits. -/
+theorem and_shiftLeft_mask (n k s : ℕ) :
+    n &&& (2 ^ k - 1) <<< s = n / 2 ^ s % 2 ^ k * 2 ^ s := by
+  apply Nat.eq_of_testBit_eq
+  intro i
+  rw [← Nat.shiftRight_eq_div_pow, ← Nat.shiftLeft_eq, Nat.testBit_and, Nat.testBit_shiftLeft,
+    Nat.testBit_shiftLeft, Nat.testBit_mod_two_pow, Nat.testBit_shiftRight,
+    Nat.testBit_two_pow_sub_one]
+  by_cases hi : s ≤ i
+  · simp [hi, Nat.add_sub_cancel' hi, Bool.and_comm]
+  · simp [hi]
 
 /-- `and` always has a result. -/
 theorem IntBinOp.defined_and {w : ℕ} (flags : Flags) (a b : BitVec w) :
     IntBinOp.and.defined flags a b = true :=
-  rfl
-
-/-- `icmp samesign` has a result exactly when the sign bits of its operands agree. -/
-theorem Flags.icmpDefined_samesign {w : ℕ} (a b : BitVec w) :
-    Flags.icmpDefined { samesign := true } a b = (a.msb == b.msb) :=
   rfl
 
 /-- An `icmp` without flags always has a result. -/

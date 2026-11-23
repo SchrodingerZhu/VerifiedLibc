@@ -7,7 +7,8 @@ import LibcMath.IR.InterpLemmas
 
 The interpreter's result on `expf` for the arguments that never reach the polynomial evaluation,
 with the argument kept symbolic. Each theorem assumes a condition on the bit pattern of the
-argument that decides every branch on one path through the function:
+argument that decides every branch on one path through the function. The argument is
+`Model.ofBits b` for a variable `b : BitVec 32`, and the conditions are on `b.toNat`:
 
 * `exec_of_small`: `|x| ≤ 2⁻²⁶` (patterns up to `0x32800000` after clearing the sign), blocks
   0, 2, 3, 4, 21. The result is `x + 1`.
@@ -106,84 +107,110 @@ variable {mode : IEEERoundingMode} (b : BitVec 32)
 /-- The binary32 value with bit pattern `b`. -/
 local notation "f32(" b ")" => (Model.ofBits b : Model FloatFormat.binary32)
 
-/-- Prove the value of an integer comparison or a flag condition from bit-vector hypotheses. -/
-local macro "bv_fact" : tactic =>
-  `(tactic| (simp only [ICmp.eval, IntBinOp.defined_add_nsw, Flags.icmpDefined_samesign]; bv_decide))
+private theorem and_abs_mask (n : ℕ) : n &&& 0x7FFFFFFF = n % 2 ^ 31 :=
+  Nat.and_two_pow_sub_one_eq_mod n 31
+
+private theorem and_exponent_mask (n : ℕ) : n &&& 0x7F000000 = n / 2 ^ 24 % 2 ^ 7 * 2 ^ 24 :=
+  and_shiftLeft_mask n 7 24
+
+/-- Prove the value of an integer comparison or a flag condition on the pattern `b` from
+hypotheses about `b.toNat`. -/
+local macro "bv_fact" b:ident : tactic =>
+  `(tactic| (
+    have := BitVec.isLt $b
+    simp only [ICmp.eval_eq, ICmp.eval_ult, ICmp.eval_ugt, ICmp.eval_sgt,
+      IntBinOp.defined_add_nsw, Flags.icmpDefined_samesign, toInt_eq_toNat_sub, BitVec.toNat_and,
+      BitVec.toNat_ofNat, and_abs_mask, and_exponent_mask, decide_eq_true_eq,
+      decide_eq_false_iff_not, Nat.reducePow, Nat.reduceMod]
+    omega))
 
 /-- Block 2 sends the argument to block 3 when its pattern without the sign is at most
 `0x32800000` or at least `0x42B20000`. -/
 private theorem block2_facts
-    (hb : b &&& 0x7FFFFFFF#32 ≤ 0x32800000#32 ∨ 0x42B20000#32 ≤ b &&& 0x7FFFFFFF#32) :
+    (hb : b.toNat % 2 ^ 31 ≤ 0x32800000 ∨ 0x42B20000 ≤ b.toNat % 2 ^ 31) :
     ICmp.eval b 0xC236BD8C#32 .eq = false ∧
       IntBinOp.add.defined { nsw := true } (b &&& 0x7FFFFFFF#32) 0xBD4E0000#32 = true ∧
       ICmp.eval ((b &&& 0x7FFFFFFF#32) + 0xBD4E0000#32) 0xEFCE0001#32 .ult = true ∧
       Flags.icmpDefined { samesign := true } (b &&& 0x7F000000#32) 0x33000000#32 = true := by
-  refine ⟨?_, ?_, ?_, ?_⟩ <;> bv_fact
+  refine ⟨by bv_fact b, by bv_fact b, ?_, by bv_fact b⟩
+  -- The sum wraps around exactly in the second case; `omega` alone is slow here.
+  rw [ICmp.eval_ult, decide_eq_true_eq, BitVec.toNat_add, BitVec.toNat_and]
+  simp only [BitVec.toNat_ofNat, and_abs_mask, Nat.reducePow, Nat.reduceMod] at hb ⊢
+  have hlt : b.toNat % 2147483648 < 2147483648 := Nat.mod_lt _ (by norm_num)
+  rcases hb with hb | hb
+  · rw [Nat.mod_eq_of_lt (by omega)]
+    omega
+  · rw [Nat.mod_eq_sub_mod (by omega), Nat.mod_eq_of_lt (by omega)]
+    omega
 
-theorem exec_of_small (hb : b &&& 0x7FFFFFFF#32 ≤ 0x32800000#32) :
+/-- For `|x| ≤ 2⁻²⁶`, zeros included, the code returns `x + 1`. -/
+theorem exec_of_small (hb : b.toNat % 2 ^ 31 ≤ 0x32800000) :
     expf.exec mode [.ofModel f32(b)] =
       some (.ofFloat (Model.add f32(b) f32(0x3F800000#32) mode)) := by
   obtain ⟨h2, h7, h8, h10d⟩ := block2_facts b (.inl hb)
-  have h10 : ICmp.eval (b &&& 0x7F000000#32) 0x33000000#32 .ult = true := by bv_fact
+  have h10 : ICmp.eval (b &&& 0x7F000000#32) 0x33000000#32 .ult = true := by bv_fact b
   exec_expf [h2, h7, h8, h10d, h10]
   rfl
 
-private theorem exec_of_eq_negInf (hb : b = 0xFF800000#32) :
-    expf.exec mode [.ofModel f32(b)] = some (.exact (.ofModel f32(0#32))) := by
-  obtain ⟨h2, h7, h8, h10d⟩ := block2_facts b (.inr (by bv_decide))
-  have h10 : ICmp.eval (b &&& 0x7F000000#32) 0x33000000#32 .ult = false := by bv_fact
-  have h12 : ICmp.eval b 0xC2CFF1B4#32 .ugt = true := by bv_fact
-  have h13 : ICmp.eval (b &&& 0x7FFFFFFF#32) 0x7F800000#32 .eq = true := by bv_fact
-  exec_expf [h2, h7, h8, h10d, h10, h12, h13]
+/-- The facts that send a pattern from `0xC2CFF1B5` to block 7. -/
+private theorem block7_facts (hb : 0xC2CFF1B5 ≤ b.toNat) :
+    ICmp.eval (b &&& 0x7F000000#32) 0x33000000#32 .ult = false ∧
+      ICmp.eval b 0xC2CFF1B4#32 .ugt = true ∧
+      Flags.icmpDefined { samesign := true } (b &&& 0x7FFFFFFF#32) 0x7F800000#32 = true := by
+  refine ⟨?_, ?_, ?_⟩ <;> bv_fact b
 
+/-- At `-∞` the code returns `+0`. -/
 theorem exec_of_negInf :
     expf.exec mode [.ofModel (Model.negInf .binary32)] =
-      some (.exact (.ofModel (Model.posZero .binary32))) :=
-  exec_of_eq_negInf 0xFF800000#32 rfl
+      some (.exact (.ofModel (Model.posZero .binary32))) := by
+  have hb : (0xFF800000#32).toNat = 0xFF800000 := rfl
+  obtain ⟨h2, h7, h8, h10d⟩ := block2_facts 0xFF800000#32 (.inr (by omega))
+  obtain ⟨h10, h12, -⟩ := block7_facts 0xFF800000#32 (by omega)
+  have h13 : ICmp.eval (0xFF800000#32 &&& 0x7FFFFFFF#32) 0x7F800000#32 .eq = true := rfl
+  change expf.exec mode [.ofModel f32(0xFF800000#32)] = some (.exact (.ofModel f32(0x0#32)))
+  exec_expf [h2, h7, h8, h10d, h10, h12, h13]
 
-theorem exec_of_neg_nan (hb : 0xFF800001#32 ≤ b) :
-    expf.exec mode [.ofModel f32(b)] =
-      some (.exact (.ofModel f32(b))) := by
-  obtain ⟨h2, h7, h8, h10d⟩ := block2_facts b (.inr (by bv_decide))
-  have h10 : ICmp.eval (b &&& 0x7F000000#32) 0x33000000#32 .ult = false := by bv_fact
-  have h12 : ICmp.eval b 0xC2CFF1B4#32 .ugt = true := by bv_fact
-  have h13 : ICmp.eval (b &&& 0x7FFFFFFF#32) 0x7F800000#32 .eq = false := by bv_fact
-  have h14d : Flags.icmpDefined { samesign := true } (b &&& 0x7FFFFFFF#32) 0x7F800000#32 = true := by
-    bv_fact
-  have h14 : ICmp.eval (b &&& 0x7FFFFFFF#32) 0x7F800000#32 .ugt = true := by bv_fact
+/-- A NaN with the sign bit set is returned unchanged. -/
+theorem exec_of_neg_nan (hb : 0xFF800001 ≤ b.toNat) :
+    expf.exec mode [.ofModel f32(b)] = some (.exact (.ofModel f32(b))) := by
+  obtain ⟨h2, h7, h8, h10d⟩ := block2_facts b (.inr (by have := b.isLt; omega))
+  obtain ⟨h10, h12, h14d⟩ := block7_facts b (by omega)
+  have h13 : ICmp.eval (b &&& 0x7FFFFFFF#32) 0x7F800000#32 .eq = false := by bv_fact b
+  have h14 : ICmp.eval (b &&& 0x7FFFFFFF#32) 0x7F800000#32 .ugt = true := by bv_fact b
   exec_expf [h2, h7, h8, h10d, h10, h12, h13, h14d, h14]
 
-theorem exec_of_large_neg (hmode : mode ∈ cModes) (hlo : 0xC2CFF1B5#32 ≤ b)
-    (hhi : b ≤ 0xFF7FFFFF#32) :
+/-- From `0xC2CFF1B5` to the least finite value the code returns the least positive value when
+rounding up, and `+0` otherwise. -/
+theorem exec_of_large_neg (hmode : mode ∈ cModes) (hlo : 0xC2CFF1B5 ≤ b.toNat)
+    (hhi : b.toNat ≤ 0xFF7FFFFF) :
     expf.exec mode [.ofModel f32(b)] =
       some (.exact (.ofModel
         (if mode = .up then Model.posMinSubnormal .binary32 else Model.posZero .binary32))) := by
-  obtain ⟨h2, h7, h8, h10d⟩ := block2_facts b (.inr (by bv_decide))
-  have h10 : ICmp.eval (b &&& 0x7F000000#32) 0x33000000#32 .ult = false := by bv_fact
-  have h12 : ICmp.eval b 0xC2CFF1B4#32 .ugt = true := by bv_fact
-  have h13 : ICmp.eval (b &&& 0x7FFFFFFF#32) 0x7F800000#32 .eq = false := by bv_fact
-  have h14d : Flags.icmpDefined { samesign := true } (b &&& 0x7FFFFFFF#32) 0x7F800000#32 = true := by
-    bv_fact
-  have h14 : ICmp.eval (b &&& 0x7FFFFFFF#32) 0x7F800000#32 .ugt = false := by bv_fact
+  obtain ⟨h2, h7, h8, h10d⟩ := block2_facts b (.inr (by omega))
+  obtain ⟨h10, h12, h14d⟩ := block7_facts b hlo
+  have h13 : ICmp.eval (b &&& 0x7FFFFFFF#32) 0x7F800000#32 .eq = false := by bv_fact b
+  have h14 : ICmp.eval (b &&& 0x7FFFFFFF#32) 0x7F800000#32 .ugt = false := by bv_fact b
   rcases hmode with rfl | rfl | rfl | rfl <;>
     exec_expf [h2, h7, h8, h10d, h10, h12, h13, h14d, h14] <;> rfl
 
 /-- The facts that send a positive pattern from `0x42B20000` to block 11. -/
-private theorem block11_facts (hlo : 0x42B20000#32 ≤ b) (hhi : b ≤ 0x7FFFFFFF#32) :
+private theorem block11_facts (hlo : 0x42B20000 ≤ b.toNat) (hhi : b.toNat ≤ 0x7FFFFFFF) :
     ICmp.eval (b &&& 0x7F000000#32) 0x33000000#32 .ult = false ∧
       ICmp.eval b 0xC2CFF1B4#32 .ugt = false ∧ ICmp.eval b 0x42B1FFFF#32 .sgt = true ∧
       Flags.icmpDefined { samesign := true } b 0x7F800000#32 = true := by
-  refine ⟨?_, ?_, ?_, ?_⟩ <;> bv_fact
+  refine ⟨?_, ?_, ?_, ?_⟩ <;> bv_fact b
 
-theorem exec_of_large_pos (hmode : mode ∈ cModes) (hlo : 0x42B20000#32 ≤ b)
-    (hhi : b ≤ 0x7F7FFFFF#32) :
+/-- From `0x42B20000` to the largest finite value the code returns the largest finite value when
+rounding toward zero or down, and `x + ∞` otherwise. -/
+theorem exec_of_large_pos (hmode : mode ∈ cModes) (hlo : 0x42B20000 ≤ b.toNat)
+    (hhi : b.toNat ≤ 0x7F7FFFFF) :
     expf.exec mode [.ofModel f32(b)] =
       some (if mode = .towardZero ∨ mode = .down then
         .exact (.ofModel (Model.posMaxFinite .binary32))
       else .ofFloat (Model.add f32(b) (Model.posInf .binary32) mode)) := by
-  obtain ⟨h2, h7, h8, h10d⟩ := block2_facts b (.inr (by bv_decide))
-  obtain ⟨h10, h12, h18, h19d⟩ := block11_facts b hlo (by bv_decide)
-  have h19 : ICmp.eval b 0x7F800000#32 .ult = true := by bv_fact
+  obtain ⟨h2, h7, h8, h10d⟩ := block2_facts b (.inr (by omega))
+  obtain ⟨h10, h12, h18, h19d⟩ := block11_facts b hlo (by omega)
+  have h19 : ICmp.eval b 0x7F800000#32 .ult = true := by bv_fact b
   rcases hmode with rfl | rfl | rfl | rfl
   · have h22 : ICmp.eval (0x0#32 &&& 0xFFFFF7FF#32) 0x400#32 .eq = false := rfl
     exec_expf [h2, h7, h8, h10d, h10, h12, h18, h19d, h19, h22]
@@ -198,12 +225,13 @@ theorem exec_of_large_pos (hmode : mode ∈ cModes) (hlo : 0x42B20000#32 ≤ b)
     exec_expf [h2, h7, h8, h10d, h10, h12, h18, h19d, h19, h22]
     rfl
 
-theorem exec_of_posInf_or_pos_nan (hlo : 0x7F800000#32 ≤ b) (hhi : b ≤ 0x7FFFFFFF#32) :
+/-- At `+∞` and at a NaN with the sign bit clear the code returns `x + ∞`. -/
+theorem exec_of_posInf_or_pos_nan (hlo : 0x7F800000 ≤ b.toNat) (hhi : b.toNat ≤ 0x7FFFFFFF) :
     expf.exec mode [.ofModel f32(b)] =
       some (.ofFloat (Model.add f32(b) (Model.posInf .binary32) mode)) := by
-  obtain ⟨h2, h7, h8, h10d⟩ := block2_facts b (.inr (by bv_decide))
-  obtain ⟨h10, h12, h18, h19d⟩ := block11_facts b (by bv_decide) hhi
-  have h19 : ICmp.eval b 0x7F800000#32 .ult = false := by bv_fact
+  obtain ⟨h2, h7, h8, h10d⟩ := block2_facts b (.inr (by omega))
+  obtain ⟨h10, h12, h18, h19d⟩ := block11_facts b (by omega) hhi
+  have h19 : ICmp.eval b 0x7F800000#32 .ult = false := by bv_fact b
   exec_expf [h2, h7, h8, h10d, h10, h12, h18, h19d, h19]
   rfl
 
