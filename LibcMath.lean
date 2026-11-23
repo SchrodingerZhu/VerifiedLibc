@@ -4,3 +4,5 @@ import LibcMath.SpecExamples
 import LibcMath.IR.Semantics
 import LibcMath.Exhaustive.Interface
 import LibcMath.Extracted.Statements
+import LibcMath.Oracle.Exp
+import LibcMath.Oracle.ExpExamples
