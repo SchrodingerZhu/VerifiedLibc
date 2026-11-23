@@ -77,6 +77,21 @@ that are not known exactly (a NaN from arithmetic, or the result of `raiseExcept
 `Func.execFrom` step by step; when the interpreter changes, change it too, and the examples will
 show whether the reports still hold.
 
+## Which closed form covers a bit pattern of `exp`
+
+`LibcMath/Functions/ExpRanges.lean` proves the correctly rounded binary32 `exp` on whole blocks of
+bit patterns. The blocks are also data:
+
+```lean
+#eval ExpRanges.blockOf? .nearest 0x33000000   -- the block and the theorem that covers it
+#eval ExpRanges.uncovered .nearest             -- ranges with no closed form
+#eval ExpRanges.covered .nearest               -- how many patterns have one
+```
+
+When a block is added or changed, change `closedForm?` and `blocks` together
+(`closedForm?_isSome_iff` fails otherwise) and update the counts in
+`LibcMath/Functions/ExpRangesExamples.lean`.
+
 ## The journal
 
 `journal/` is a [Forester](https://www.forester-notes.org/) forest: small notes ("trees") with

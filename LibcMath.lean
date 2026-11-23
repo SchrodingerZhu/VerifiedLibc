@@ -1,5 +1,9 @@
 import LibcMath.Spec
 import LibcMath.Functions
+import LibcMath.Functions.Binary32Bits
+import LibcMath.Functions.RoundingRanges
+import LibcMath.Functions.ExpRanges
+import LibcMath.Functions.ExpRangesExamples
 import LibcMath.SpecExamples
 import LibcMath.IR.Semantics
 import LibcMath.IR.Interp
