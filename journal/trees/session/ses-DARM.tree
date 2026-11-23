@@ -1,0 +1,18 @@
+\title{The survey of extraction moves into the journal}
+\taxon{Session}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{extraction}
+\tag{review}
+\meta{harness}{Claude Code}
+\meta{model-id}{claude-fable-5-2}
+\meta{pr}{6}
+\import{base-macros}
+
+\p{Fourth session of the series described in [ses-9U0D](ses-9U0D), on \pr{6}, branch \code{\verb~|swarm/survey~}, after \pr{4} was merged. The maintainer asked for the survey to be reworked into the journal and for nothing else, so this was not a review: the script was not run again and the numbers of the survey were not checked.}
+\ul{
+\li{\strong{Changed.} [log-VD3D](log-VD3D): \code{\verb~|docs/extraction-coverage.md~} became [note-extraction-coverage](note-extraction-coverage) and its four parts; its observations about the tools became problems.}
+\li{\strong{Created.} The kind \code{\verb~|Note~} with its hub [notes](notes), and \code{\verb~|scripts/md2tree.py~}.}
+\li{\strong{Left open.} [prob-IW37](prob-IW37), [prob-ZWH4](prob-ZWH4), [prob-HVD8](prob-HVD8), [prob-JYU7](prob-JYU7). The branch of \pr{13} still carries \code{\verb~|docs/extraction-coverage.md~}; delete it there when merging.}
+}

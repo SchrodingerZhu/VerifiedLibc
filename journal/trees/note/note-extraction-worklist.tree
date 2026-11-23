@@ -1,0 +1,170 @@
+\title{Extraction: what is missing, by group of constructs}
+\taxon{Note}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{extraction}
+\tag{survey}
+\meta{pr}{6}
+\import{base-macros}
+
+\p{Part of [the survey of extraction](note-extraction-coverage). The open problem that this list serves is [prob-IW37](prob-IW37).}
+
+\p{Each group below could be one unit of work. The first table repeats the generated table \em{Groups, in the order that makes entrypoints exportable soonest} in shortened form. "Needed by" counts the entrypoints whose body or called functions use the group; "only missing group" names the entrypoints that need nothing else. An entrypoint becomes exportable only when all its groups are done, so the last column of the generated table, which accumulates in that order, is the better guide for planning. In that order the first seven groups bring the count from 27 to 82 of 193, mostly functions that are exact IEEE 754 operations; the single-precision approximations of real functions mostly become exportable with the groups after that (\code{\verb~|switch~}, volatile locals, tables of other shapes, \code{\verb~|fdiv~}, loops).}
+
+\table{
+\tr{\th{Group}\th{Needed by: single (of 96)}\th{half (of 88)}\th{double (of 9)}\th{Only missing group for}}
+\tr{\td{binary16 type}\td{6}\td{87}\td{0}\td{23 half-precision entrypoints, the counterparts of the functions that export today except \code{\verb~|fmaf16~}}}
+\tr{\td{Local memory and aggregates}\td{33}\td{53}\td{7}\td{\code{\verb~|canonicalizef~}, \code{\verb~|modff~}, \code{\verb~|setpayloadf~}, \code{\verb~|setpayloadsigf~}, \code{\verb~|totalorderf~}, \code{\verb~|totalordermagf~}, \code{\verb~|totalorderf16~}}}
+\tr{\td{Calls of other functions}\td{36}\td{52}\td{8}\td{none}}
+\tr{\td{\code{\verb~|switch~}}\td{35}\td{51}\td{2}\td{\code{\verb~|expm1f~}}}
+\tr{\td{Integer intrinsics}\td{21}\td{48}\td{8}\td{\code{\verb~|ilogbf~}, \code{\verb~|llogbf~}}}
+\tr{\td{\code{\verb~|unreachable~}, \code{\verb~|llvm.assume~}, \code{\verb~|freeze~}, \code{\verb~|poison~}}\td{10}\td{46}\td{2}\td{none}}
+\tr{\td{\code{\verb~|sitofp~}, \code{\verb~|uitofp~}, \code{\verb~|fptoui~}}\td{19}\td{16}\td{7}\td{\code{\verb~|coshf~}, \code{\verb~|log2f~}}}
+\tr{\td{\code{\verb~|llvm.copysign~}, \code{\verb~|llvm.is.fpclass~}}\td{19}\td{17}\td{0}\td{\code{\verb~|roundf~}, \code{\verb~|lroundf~}, \code{\verb~|llroundf~}}}
+\tr{\td{Volatile local variables}\td{17}\td{11}\td{7}\td{none}}
+\tr{\td{Tables of other shapes}\td{7}\td{18}\td{7}\td{none}}
+\tr{\td{\code{\verb~|llvm.sqrt~}}\td{10}\td{10}\td{3}\td{\code{\verb~|sqrtf~}, \code{\verb~|asinf~}, \code{\verb~|hypotf~}, \code{\verb~|sqrt~}}}
+\tr{\td{\code{\verb~|fdiv~}}\td{9}\td{10}\td{1}\td{none}}
+\tr{\td{Loops}\td{10}\td{6}\td{3}\td{none}}
+\tr{\td{Integer division}\td{3}\td{3}\td{1}\td{none}}
+\tr{\td{Floating-point environment access}\td{1}\td{2}\td{0}\td{none}}
+\tr{\td{Vectors}\td{0}\td{0}\td{2}\td{none}}
+\tr{\td{Other floating-point types (\code{\verb~|x86_fp80~})}\td{1}\td{1}\td{0}\td{none}}
+}
+
+\p{The FloatLib references are to v4.1.0, namespace \code{\verb~|FloatLib.Floats.Formats.BinaryInterchange~}. Every operation named exists there with a rounding-direction argument unless stated otherwise.}
+
+\subtree[note-extraction-worklist-binary16-type]{
+\title{binary16 type}
+
+\p{The exporter rejects the type \code{\verb~|half~}. The half-precision functions use \code{\verb~|half~} in parameters, results, \code{\verb~|bitcast~}, \code{\verb~|select~}, \code{\verb~|phi~}, \code{\verb~|fcmp~}, \code{\verb~|fpext~}, \code{\verb~|fptrunc~}, \code{\verb~|fptosi~}, \code{\verb~|llvm.fabs~} and a few \code{\verb~|fadd~}, \code{\verb~|fsub~}, \code{\verb~|fmul~}. \code{\verb~|Instr~} is already indexed by a \code{\verb~|FloatFormat~}, so the Lean side needs the \code{\verb~|half~} keyword in the notation and nothing new in the semantics. FloatLib has \code{\verb~|FloatFormat.binary16~}. One point needs a decision: x86-64 without AVX512-FP16 has no half-precision arithmetic, and the code generator implements \code{\verb~|fadd half~} and the conversions through \code{\verb~|float~} with calls to compiler runtime routines, so the assumption stated in \code{\verb~|Semantics.lean~}, that the processor performs each instruction in the dynamic rounding direction, has to be re-examined for \code{\verb~|half~}.}
+}
+
+\subtree[note-extraction-worklist-local-memory-and-aggregates]{
+\title{Local memory and aggregates}
+
+\p{Three different situations, all rejected today as \code{\verb~|alloca~}, non-table \code{\verb~|load~} and \code{\verb~|store~}, the type \code{\verb~|ptr~}, \code{\verb~|extractvalue~} and \code{\verb~|insertvalue~}, \code{\verb~|llvm.memcpy~}, \code{\verb~|llvm.memset~}, \code{\verb~|llvm.lifetime.*~} and \code{\verb~|ret void~}:}
+
+\ol{
+\li{Entrypoints with pointer parameters: \code{\verb~|modff~}, \code{\verb~|frexpf~}, \code{\verb~|remquof~}, \code{\verb~|sincosf~}, \code{\verb~|canonicalizef~}, \code{\verb~|setpayloadf~}, \code{\verb~|setpayloadsigf~}, \code{\verb~|getpayloadf~}, \code{\verb~|totalorderf~}, \code{\verb~|totalordermagf~}, \code{\verb~|nanf~} and their half-precision counterparts.}
+\li{Functions that return results through reference parameters, for example \code{\verb~|large_range_reduction(double, int, double&)~} used by \code{\verb~|sinf~}, \code{\verb~|cosf~}, \code{\verb~|tanf~} and \code{\verb~|sincosf~}, and everything that takes a \code{\verb~|DyadicFloat~} or \code{\verb~|NumberPair~} by reference in double precision.}
+\li{Local structures that the optimizer does not turn into registers: \code{\verb~|DyadicFloat<N>~} (a sign, an exponent and an \code{\verb~|N~}-bit integer), \code{\verb~|ExceptValues~} tables copied to the stack, and arrays of 128-bit and 256-bit integer limbs in the accurate passes of double precision.}
+}
+
+\p{The Lean semantics would need a memory: a map from allocations to byte or word arrays, pointers as values (allocation and offset), and \code{\verb~|load~}, \code{\verb~|store~}, \code{\verb~|getelementptr~} on them; \code{\verb~|Returns~} would relate arguments and initial memory to a result and final memory. A smaller first step that covers situation 2 for scalars and many cases of 3 is to let the exporter run LLVM's argument-promotion and scalar-replacement passes on functions it is about to export, or to require callees to be inlined (see the next group), and only model what remains. FloatLib is not involved.}
+}
+
+\subtree[note-extraction-worklist-calls-of-other-functions]{
+\title{Calls of other functions}
+
+\p{The surveyed functions call 84 distinct functions that are not core operations; the generated table \em{Entrypoints calling each function} lists them. The most frequent are \code{\verb~|fputil::DyadicFloat<N>::generic_as<T>()~} and \code{\verb~|fast_as<T>()~} (conversion of a \code{\verb~|DyadicFloat~} to a floating-point number), \code{\verb~|fputil::cast<_Float16>(float)~}, \code{\verb~|fputil::ExceptValues<T, N>::lookup~}, \code{\verb~|fputil::round_using_specific_rounding_mode<T>(T, int)~} and \code{\verb~|math::trigonometric_func_utils_internal::large_range_reduction~}.}
+
+\p{There are three ways to deal with a call, and they suit different callees:}
+
+\ul{
+\li{\p{\em{Make it a core operation}, as for the rounding-mode queries. This fits small functions with a mathematical specification. Candidates with their signatures:}
+\ul{
+\li{\code{\verb~|T fputil::round_result_slightly_up<T>(T)~} and \code{\verb~|T fputil::round_result_slightly_down<T>(T)~}: add or subtract the smallest normal number in the dynamic rounding direction (see \em{Volatile local variables}).}
+\li{\code{\verb~|int fputil::clear_except_if_required(int)~}: no effect on values (see \em{Floating-point environment access}).}
+\li{\code{\verb~|double fputil::nearest_integer(double)~}: \code{\verb~|Model.roundToIntegral~} to nearest.}
+\li{\code{\verb~|T fputil::round_using_current_rounding_mode<T>(T)~} and \code{\verb~|T fputil::round_using_specific_rounding_mode<T>(T, int)~}: \code{\verb~|Model.roundToIntegral~}.}
+\li{\code{\verb~|_Float16 fputil::cast<_Float16, float>(float)~}, \code{\verb~|_Float16 fputil::cast<_Float16, double>(double)~}, \code{\verb~|float fputil::cast<float, _Float16>(_Float16)~}: \code{\verb~|Model.cast~}.}
+\li{\code{\verb~|float fputil::sqrt<float, double>(double)~}: \code{\verb~|Model.sqrt~} followed by \code{\verb~|Model.cast~} is not the same as one rounding, so this one needs its own specification. Each new core operation needs a proof or an argument that libc's implementation meets the specification given to it; that is extra work that exporting the callee avoids.}
+}}
+\li{\em{Export the callee too.} \code{\verb~|Func~} would become a set of functions and \code{\verb~|Instr.call~} would refer to one of them; \code{\verb~|Run~} needs a rule that runs the callee to its \code{\verb~|ret~}. This is needed for the accurate passes (\code{\verb~|sin_accurate~}, \code{\verb~|exp_f128~}, \code{\verb~|log_accurate~}, \code{\verb~|pow_accurate~}, …), which are too large to inline and are shared between entrypoints.}
+\li{\em{Inline the callee before exporting.} No change on the Lean side. Compiling with \code{\verb~|-mllvm -inline-threshold=1000000~} was tried: the number of entrypoints with a remaining call drops from 36 to 20 (single), 52 to 26 (half) and 8 to 6 (double), but no additional entrypoint exports, because the inlined bodies bring their own memory operations and loops with them.}
+}
+}
+
+\subtree[note-extraction-worklist-switch]{
+\title{\code{\verb~|switch~}}
+
+\p{Almost every \code{\verb~|switch~} dispatches on the result of \code{\verb~|quick_get_round~} (cases \code{\verb~|0x400~}, \code{\verb~|0x800~}, \code{\verb~|0xc00~}) or on a small integer. Two options: add \code{\verb~|Terminator.switch (a : Operand) (cases : List (ℕ × ℕ)) (default : ℕ)~} with one more rule in \code{\verb~|Run~}, or have the exporter rewrite switches into conditional branches with LLVM's \code{\verb~|lower-switch~} pass, which needs no change in Lean. The second was tried on \code{\verb~|expm1f~}: after \code{\verb~|opt -passes=lower-switch~}, \code{\verb~|ir2lean~} exports \code{\verb~|math::expm1f~} unchanged. FloatLib is not involved.}
+}
+
+\subtree[note-extraction-worklist-integer-intrinsics]{
+\title{Integer intrinsics}
+
+\p{By number of entrypoints: \code{\verb~|llvm.ctlz~} (65), \code{\verb~|llvm.fshl~} (57), \code{\verb~|llvm.fshr~} (17), \code{\verb~|llvm.cttz~}, \code{\verb~|llvm.umin~}, \code{\verb~|llvm.umax~}, \code{\verb~|llvm.smin~}, \code{\verb~|llvm.abs~}, \code{\verb~|llvm.ctpop~}, and in the multi-word integer arithmetic of the accurate passes \code{\verb~|llvm.uadd.with.overflow~}, \code{\verb~|llvm.usub.with.overflow~} and \code{\verb~|llvm.umul.with.overflow~}. Each is one \code{\verb~|Instr~} constructor evaluated on \code{\verb~|BitVec~}; Lean's standard library has count-leading-zeros, rotations and the overflow predicates. \code{\verb~|ctlz~} and \code{\verb~|cttz~} take a flag that makes a zero argument poison, which matters for the stated treatment of poison. The \code{\verb~|with.overflow~} intrinsics return a pair that is taken apart with \code{\verb~|extractvalue~}; the exporter can emit them as two instructions, the wrapped result and the overflow bit, so that pairs need not become values. FloatLib is not involved.}
+
+\p{Integer types wider than 64 bits are not an obstacle: the exporter accepts \code{\verb~|iN~} for every \code{\verb~|N~} and \code{\verb~|Val~} is a bit vector of any width, so a 64-by-64-bit multiplication through \code{\verb~|i128~} exports as it is.}
+}
+
+\subtree[note-extraction-worklist-unreachable-llvm-assume-freeze-poison]{
+\title{\code{\verb~|unreachable~}, \code{\verb~|llvm.assume~}, \code{\verb~|freeze~}, \code{\verb~|poison~}}
+
+\p{\code{\verb~|unreachable~} ends the default case of a switch over the rounding directions, for example in \code{\verb~|fputil::round_using_current_rounding_mode~}; \code{\verb~|freeze~} appears in \code{\verb~|DyadicFloat::generic_as~} and \code{\verb~|sqrtf16~}; \code{\verb~|poison~} appears as a vector operand in \code{\verb~|pow~} and \code{\verb~|exp2~}. \code{\verb~|Semantics.lean~} does not represent poison, so \code{\verb~|freeze~} is the identity and \code{\verb~|llvm.assume~} can be dropped by the exporter. \code{\verb~|unreachable~} can be a terminator with no rule in \code{\verb~|Run~}; then a function "has a result" only if the block is never reached, which is the obligation one wants. FloatLib is not involved.}
+}
+
+\subtree[note-extraction-worklist-sitofp-uitofp-fptoui]{
+\title{\code{\verb~|sitofp~}, \code{\verb~|uitofp~}, \code{\verb~|fptoui~}}
+
+\p{\code{\verb~|sitofp~} is in 29 entrypoints (mostly the exponent of the argument converted to \code{\verb~|double~} in logarithms and hyperbolic functions), \code{\verb~|uitofp~} in 22, \code{\verb~|fptoui~} in 2. FloatLib has \code{\verb~|ExecDType.convertFromInt fmt (x : FixedInt width) mode~} for signed integers, and \code{\verb~|ExecDType.convertToInteger~}, which \code{\verb~|fptosi~} already uses. \code{\verb~|FixedInt~} is signed, so the unsigned conversions go through an integer one bit wider. \code{\verb~|sitofp~} and \code{\verb~|uitofp~} round in the dynamic direction when the integer has more bits than the significand.}
+}
+
+\subtree[note-extraction-worklist-llvm-copysign-llvm-is-fpclass]{
+\title{\code{\verb~|llvm.copysign~}, \code{\verb~|llvm.is.fpclass~}}
+
+\p{\code{\verb~|llvm.copysign~} is in 34 entrypoints (\code{\verb~|roundf~}, \code{\verb~|lroundf~}, the hyperbolic functions, \code{\verb~|atanhf~}, \code{\verb~|rsqrtf~}, …), \code{\verb~|llvm.is.fpclass~} in 2. Both are exact operations on the bit pattern, like \code{\verb~|fneg~} and \code{\verb~|fabs~}. FloatLib has \code{\verb~|Model.copySign~} and \code{\verb~|Model.classify~}.}
+}
+
+\subtree[note-extraction-worklist-volatile-local-variables]{
+\title{Volatile local variables}
+
+\p{libc writes a value to a \code{\verb~|volatile~} local and reads it back to keep the compiler from evaluating a floating-point operation at compile time: in \code{\verb~|fputil::round_result_slightly_up~} and \code{\verb~|round_result_slightly_down~} (56 uses in \code{\verb~|src/__support~}), in the exceptional cases of \code{\verb~|atanf~}, \code{\verb~|tanf~}, \code{\verb~|powf~} and \code{\verb~|pow~}, and in \code{\verb~|DyadicFloat~}. In the IR this is an \code{\verb~|alloca~} whose only uses are volatile loads and stores. Since the variable does not escape, a load returns the last value stored; the exporter can replace each load by that value and emit ordinary instructions (\code{\verb~|fadd~}, \code{\verb~|fsub~}), which needs no change in Lean. The alternative is to make the two \code{\verb~|round_result_slightly_*~} functions core operations. FloatLib is not involved.}
+}
+
+\subtree[note-extraction-worklist-tables-of-other-shapes]{
+\title{Tables of other shapes}
+
+\p{\code{\verb~|ir2lean~} accepts a \code{\verb~|load~} only through a \code{\verb~|getelementptr~} with one index into a constant array of numbers. The other constants libc reads are two- and three-dimensional arrays (\code{\verb~|[N x [M x double]]~}), arrays of structures (\code{\verb~|NumberPair<double>~}, \code{\verb~|TripleDouble~}, \code{\verb~|DyadicFloat<128>~}), \code{\verb~|cpp::array~} wrapped in a structure, \code{\verb~|ExceptValues~} (pairs of input bit pattern and four results), and single elements read at a constant address without a \code{\verb~|getelementptr~}. All of these can be handled in the exporter by flattening the initializer to an array of numbers of one width and turning the address computation into an index; \code{\verb~|Table~} in Lean can stay as it is as long as every read of a table has the same width, and otherwise needs a byte-addressed variant. FloatLib is not involved.}
+}
+
+\subtree[note-extraction-worklist-llvm-sqrt]{
+\title{\code{\verb~|llvm.sqrt~}}
+
+\p{On x86-64 \code{\verb~|sqrtf~} and \code{\verb~|sqrt~} are the processor's instruction, and \code{\verb~|asinf~}, \code{\verb~|acosf~}, \code{\verb~|asinpif~}, \code{\verb~|acospif~}, \code{\verb~|asinhf~}, \code{\verb~|acoshf~}, \code{\verb~|hypotf~}, \code{\verb~|rsqrtf~}, \code{\verb~|powf~}, \code{\verb~|hypot~} and \code{\verb~|pow~} use it. The semantics is \code{\verb~|Model.sqrt~} in the dynamic rounding direction, under the same assumption as for \code{\verb~|fadd~}. \code{\verb~|llvm.fma~} does not occur: without \code{\verb~|-mfma~} libc uses \code{\verb~|llvm.fmuladd~}, which is in the fragment, or its software implementation. FloatLib has \code{\verb~|Model.fma~} should a target with FMA be surveyed.}
+}
+
+\subtree[note-extraction-worklist-fdiv]{
+\title{\code{\verb~|fdiv~}}
+
+\p{In 20 entrypoints (\code{\verb~|atanf~}, \code{\verb~|atan2f~}, \code{\verb~|atanhf~}, \code{\verb~|tanf~}, \code{\verb~|tanhf~}, \code{\verb~|tanpif~}, \code{\verb~|acoshf~}, \code{\verb~|rsqrtf~}, \code{\verb~|lgammaf~}, \code{\verb~|hypot~}, …). One more case of \code{\verb~|FBinOp~}, evaluated with \code{\verb~|Model.div~}. \code{\verb~|frem~} does not occur.}
+}
+
+\subtree[note-extraction-worklist-loops]{
+\title{Loops}
+
+\p{19 entrypoints have a loop in the body or in a called function: \code{\verb~|sinf~}, \code{\verb~|cosf~}, \code{\verb~|tanf~} and \code{\verb~|sincosf~} (in \code{\verb~|large_range_reduction~}, the reduction of large arguments), \code{\verb~|frexpf~}, \code{\verb~|fmodf~}, \code{\verb~|remquof~}, \code{\verb~|remainderf~}, \code{\verb~|nanf~}, \code{\verb~|powf~}, \code{\verb~|hypot~} (in \code{\verb~|fputil::hypot~}), \code{\verb~|exp2~}, \code{\verb~|pow~}, and six half-precision entrypoints. \code{\verb~|ir2lean~} does not reject loops, and \code{\verb~|Run~} is an inductive relation that already gives them a meaning. What depends on the absence of loops is the comment in \code{\verb~|Syntax.lean~} and whatever evaluates a \code{\verb~|Func~} on an input: it needs a bound on the number of blocks executed.}
+}
+
+\subtree[note-extraction-worklist-integer-division]{
+\title{Integer division}
+
+\p{\code{\verb~|udiv~} and \code{\verb~|urem~} in \code{\verb~|cbrtf~}, \code{\verb~|fmodf~}, \code{\verb~|powf~}, \code{\verb~|pow~}, \code{\verb~|cbrtf16~}, \code{\verb~|fmodf16~} and \code{\verb~|nanf16~}. Two more cases of \code{\verb~|IntBinOp~} with no result when the divisor is zero. FloatLib is not involved.}
+}
+
+\subtree[note-extraction-worklist-floating-point-environment-access]{
+\title{Floating-point environment access}
+
+\p{\code{\verb~|cbrtf~}, \code{\verb~|cbrtf16~} and \code{\verb~|hypotf16~} call \code{\verb~|fputil::clear_except_if_required(FE_INEXACT)~}, which is inlined into the \code{\verb~|stmxcsr~} and \code{\verb~|ldmxcsr~} intrinsics and inline assembly (\code{\verb~|fnstenv~}, \code{\verb~|fldenv~}). Adding the function to \code{\verb~|extract/CoreOps.cpp~} with the same meaning as \code{\verb~|raiseExcept~} removes all of it.}
+}
+
+\subtree[note-extraction-worklist-vectors]{
+\title{Vectors}
+
+\p{\code{\verb~|pow~} and \code{\verb~|exp2~} contain \code{\verb~|<2 x double>~} values (\code{\verb~|insertelement~}, \code{\verb~|extractelement~}) although both vectorizers are off. The pass that creates them was not identified; finding it and turning it off is likely cheaper than modelling vectors.}
+}
+
+\subtree[note-extraction-worklist-other-floating-point-types]{
+\title{Other floating-point types}
+
+\p{Only \code{\verb~|nexttowardf~} and \code{\verb~|nexttowardf16~}, whose second parameter is \code{\verb~|long double~}.}
+}
+
+\subtree[note-extraction-worklist-what-double-precision-needs]{
+\title{What double precision needs}
+
+\p{\code{\verb~|sqrt~} needs only \code{\verb~|llvm.sqrt~}. \code{\verb~|hypot~} needs calls, a loop, \code{\verb~|switch~}, \code{\verb~|fdiv~}, \code{\verb~|llvm.sqrt~} and integer intrinsics, and no memory. The other seven have the same structure: a fast pass of 86 to 239 instructions in the body function (707 for \code{\verb~|pow~}) and an accurate pass of 476 (\code{\verb~|exp2~}) to 8,842 (\code{\verb~|pow~}) instructions in called functions. For the fast pass alone the obstacles are tables of structures (\code{\verb~|NumberPair~}, \code{\verb~|TripleDouble~}, two-dimensional arrays), \code{\verb~|sitofp~}, the volatile local of the exceptional cases, and for \code{\verb~|sin~}, \code{\verb~|cos~} and \code{\verb~|exp~} local variables passed by reference to called functions (for example a \code{\verb~|NumberPair<double>~} to \code{\verb~|range_reduction_small~}). The accurate pass is \code{\verb~|DyadicFloat<128>~} arithmetic (\code{\verb~|quick_add~}, \code{\verb~|quick_mul~}, \code{\verb~|polyeval~}, \code{\verb~|fast_as~}): structures passed by reference and returned through memory, multi-word integers built from \code{\verb~|llvm.uadd.with.overflow~}, \code{\verb~|llvm.usub.with.overflow~} and \code{\verb~|llvm.ctlz~}, \code{\verb~|memcpy~} and \code{\verb~|memset~}. So double precision needs, in this order, tables of other shapes, \code{\verb~|sitofp~}/\code{\verb~|uitofp~}, volatile locals, calls between exported functions, local memory and aggregates, and the integer intrinsics; \code{\verb~|pow~} and \code{\verb~|exp2~} additionally need loops and the vector issue resolved.}
+}

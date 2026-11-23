@@ -5,6 +5,7 @@
 \scope{
 \put\transclude/expanded{false}
 \transclude{changelog}
+\transclude{notes}
 \transclude{insights}
 \transclude{open-problems}
 \transclude{decisions}
