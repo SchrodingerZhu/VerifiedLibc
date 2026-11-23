@@ -25,7 +25,8 @@ Execution of a `Func` under a rounding direction, as a relation between argument
   flags has no effect on the values computed.
 * An instruction that LLVM leaves undefined, or whose result would be poison, has no result:
   an out-of-range `fptosi` or table index, a shift by the width or more, and an instruction with
-  a flag (`Flags`) whose condition fails. The conditions are those of the LLVM Language Reference.
+  a flag (`Flags`, `FastMathFlags`) whose condition fails. The conditions are those of the LLVM
+  Language Reference.
   There are therefore no poison or undefined values: an execution that returns a result has
   produced none. This also covers the `inbounds`, `nuw` and `nusw` flags of the address of a
   table access and `noundef` on the arguments of a call.
@@ -33,8 +34,9 @@ Execution of a `Func` under a rounding direction, as a relation between argument
   reaches an ill-formed operation: an operand of the wrong width or an unassigned register, a
   branch to a block that does not exist, a phi node without a value for the block it is entered
   from. An execution that runs forever neither returns nor goes wrong.
-* Not represented, and rejected by `ir2lean` instead: fast-math flags, and metadata and
-  attributes of an instruction under which its result is poison (`range`, `nofpclass`, …).
+* Not represented, and rejected by `ir2lean` instead: fast-math flags other than `nnan` and
+  `ninf`, and metadata and attributes of an instruction under which its result is poison
+  (`range`, `nofpclass`, …).
   Attributes of the function itself and of its parameters are not examined.
 -/
 
@@ -155,6 +157,11 @@ def FCmp.eval : FCmp → Option Ordering → Bool
   | .une, o => o != some .eq
   | .uno, o => o.isNone
 
+/-- The flags admit `x` as an argument or result: it is not a NaN under `nnan`, and not an
+infinity under `ninf`. -/
+def FastMathFlags.admits {fmt : FloatFormat} (fmf : FastMathFlags) (x : Model fmt) : Bool :=
+  !(fmf.nnan && x.isNaN) && !(fmf.ninf && x.isInfinite)
+
 def FBinOp.eval {fmt : FloatFormat} (mode : IEEERoundingMode) (x y : Model fmt) :
     FBinOp → Model fmt
   | .fadd => Model.add x y mode
@@ -196,21 +203,30 @@ def Instr.Eval (mode : IEEERoundingMode) (f : Func) (env : Env) : Instr → Val 
       r = ⟨width, v.bits.setWidth width⟩
   | .select cond a b, r =>
     ∃ c, cond.eval env = some (.ofBool c) ∧ (if c then a.eval env else b.eval env) = some r
-  | .fBin fmt op a b, r =>
+  | .fBin fmt op a b fmf, r =>
     ∃ x y, (a.eval env).bind (·.toModel? fmt) = some x ∧
-      (b.eval env).bind (·.toModel? fmt) = some y ∧ r.Encodes (op.eval mode x y)
-  | .fneg fmt a, r => ∃ x, (a.eval env).bind (·.toModel? fmt) = some x ∧ r = .ofModel x.neg
-  | .fabs fmt a, r => ∃ x, (a.eval env).bind (·.toModel? fmt) = some x ∧ r = .ofModel x.abs
-  | .fmuladd fmt a b c, r =>
+      (b.eval env).bind (·.toModel? fmt) = some y ∧
+      (fmf.admits x && fmf.admits y && fmf.admits (op.eval mode x y)) = true ∧
+      r.Encodes (op.eval mode x y)
+  | .fneg fmt a fmf, r =>
+    ∃ x, (a.eval env).bind (·.toModel? fmt) = some x ∧ fmf.admits x = true ∧ r = .ofModel x.neg
+  | .fabs fmt a fmf, r =>
+    ∃ x, (a.eval env).bind (·.toModel? fmt) = some x ∧ fmf.admits x = true ∧ r = .ofModel x.abs
+  | .fmuladd fmt a b c fmf, r =>
     ∃ x y z, (a.eval env).bind (·.toModel? fmt) = some x ∧
       (b.eval env).bind (·.toModel? fmt) = some y ∧
       (c.eval env).bind (·.toModel? fmt) = some z ∧
+      (fmf.admits x && fmf.admits y && fmf.admits z &&
+        fmf.admits (Model.add (Model.mul x y mode) z mode)) = true ∧
       r.Encodes (Model.add (Model.mul x y mode) z mode)
-  | .fcmp fmt pred a b, r =>
+  | .fcmp fmt pred a b fmf, r =>
     ∃ x y, (a.eval env).bind (·.toModel? fmt) = some x ∧
-      (b.eval env).bind (·.toModel? fmt) = some y ∧ r = .ofBool (pred.eval (Model.compare x y))
-  | .fpConvert src dst a, r =>
-    ∃ x, (a.eval env).bind (·.toModel? src) = some x ∧ r.Encodes (Model.cast src dst x mode)
+      (b.eval env).bind (·.toModel? fmt) = some y ∧ (fmf.admits x && fmf.admits y) = true ∧
+      r = .ofBool (pred.eval (Model.compare x y))
+  | .fpConvert src dst a fmf, r =>
+    ∃ x, (a.eval env).bind (·.toModel? src) = some x ∧
+      (fmf.admits x && fmf.admits (Model.cast src dst x mode)) = true ∧
+      r.Encodes (Model.cast src dst x mode)
   | .fptosi src width a, r =>
     ∃ x n status, (a.eval env).bind (·.toModel? src) = some x ∧
       ExecDType.convertToInteger (width := width) x .towardZero = .success n status ∧

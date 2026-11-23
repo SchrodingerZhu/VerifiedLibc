@@ -14,4 +14,6 @@ import LibcMath.Exhaustive.Reduction
 import LibcMath.Exhaustive.Modes
 import LibcMath.Exhaustive.Expf
 import LibcMath.Extracted.Statements
+import LibcMath.Extracted.Cospif
+import LibcMath.Extracted.Sinpif
 import LibcMath.Exhaustive.ExpfInterp

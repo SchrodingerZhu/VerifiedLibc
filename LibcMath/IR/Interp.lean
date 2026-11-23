@@ -311,28 +311,37 @@ def Instr.exec (mode : IEEERoundingMode) (f : Func) (s : Store) : Instr → Opti
   | select cond a b => do
     let c ← cond.execBool s
     if c then a.exec s else b.exec s
-  | fBin fmt op a b => do
+  | fBin fmt op a b fmf => do
     let x ← a.execFloat fmt s
     let y ← b.execFloat fmt s
-    some (.ofFloat (op.eval mode x y))
-  | fneg fmt a => do
+    if fmf.admits x && fmf.admits y && fmf.admits (op.eval mode x y) then
+      some (.ofFloat (op.eval mode x y))
+    else none
+  | fneg fmt a fmf => do
     let x ← a.execFloat fmt s
-    some (.exact (.ofModel x.neg))
-  | fabs fmt a => do
+    if fmf.admits x then some (.exact (.ofModel x.neg)) else none
+  | fabs fmt a fmf => do
     let x ← a.execFloat fmt s
-    some (.exact (.ofModel x.abs))
-  | fmuladd fmt a b c => do
+    if fmf.admits x then some (.exact (.ofModel x.abs)) else none
+  | fmuladd fmt a b c fmf => do
     let x ← a.execFloat fmt s
     let y ← b.execFloat fmt s
     let z ← c.execFloat fmt s
-    some (.ofFloat (Model.add (Model.mul x y mode) z mode))
-  | fcmp fmt pred a b => do
+    if fmf.admits x && fmf.admits y && fmf.admits z &&
+        fmf.admits (Model.add (Model.mul x y mode) z mode) then
+      some (.ofFloat (Model.add (Model.mul x y mode) z mode))
+    else none
+  | fcmp fmt pred a b fmf => do
     let x ← a.execFloat fmt s
     let y ← b.execFloat fmt s
-    some (.exact (.ofBool (pred.eval (Model.compare x y))))
-  | fpConvert src dst a => do
+    if fmf.admits x && fmf.admits y then
+      some (.exact (.ofBool (pred.eval (Model.compare x y))))
+    else none
+  | fpConvert src dst a fmf => do
     let x ← a.execFloat src s
-    some (.ofFloat (Model.cast src dst x mode))
+    if fmf.admits x && fmf.admits (Model.cast src dst x mode) then
+      some (.ofFloat (Model.cast src dst x mode))
+    else none
   | fptosi src width a => do
     let x ← a.execFloat src s
     match ExecDType.convertToInteger (width := width) x .towardZero with
@@ -444,39 +453,43 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     rw [hsel, hv] at hr
     cases hr
     exact hadm
-  | fBin fmt op a b =>
+  | fBin fmt op a b fmf =>
     simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
     obtain ⟨u, hu, v, hv, hx⟩ := hx
-    cases hx
+    split at hx <;> cases hx
+    rename_i hdef
     have ha := Operand.eval_of_execFloat h hu
     have hb := Operand.eval_of_execFloat h hv
-    refine ⟨⟨_, ⟨u, v, ha, hb, (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩, fun _ => rfl⟩, ?_⟩
-    rintro r ⟨u₂, v₂, ha₂, hb₂, hr⟩
+    refine ⟨⟨_, ⟨u, v, ha, hb, hdef,
+      (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩, fun _ => rfl⟩, ?_⟩
+    rintro r ⟨u₂, v₂, ha₂, hb₂, -, hr⟩
     rw [ha] at ha₂
     cases ha₂
     rw [hb] at hb₂
     cases hb₂
     exact (AbsVal.ofFloat_admits_iff _ _).2 hr
-  | fneg fmt a | fabs fmt a =>
+  | fneg fmt a fmf | fabs fmt a fmf =>
     simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
     obtain ⟨u, hu, hx⟩ := hx
-    cases hx
+    split at hx <;> cases hx
+    rename_i hdef
     have ha := Operand.eval_of_execFloat h hu
-    refine ⟨⟨_, ⟨u, ha, rfl⟩, fun _ => rfl⟩, ?_⟩
-    rintro r ⟨u₂, ha₂, rfl⟩
+    refine ⟨⟨_, ⟨u, ha, hdef, rfl⟩, fun _ => rfl⟩, ?_⟩
+    rintro r ⟨u₂, ha₂, -, rfl⟩
     rw [ha] at ha₂
     cases ha₂
     rfl
-  | fmuladd fmt a b c =>
+  | fmuladd fmt a b c fmf =>
     simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
     obtain ⟨u, hu, v, hv, w, hw, hx⟩ := hx
-    cases hx
+    split at hx <;> cases hx
+    rename_i hdef
     have ha := Operand.eval_of_execFloat h hu
     have hb := Operand.eval_of_execFloat h hv
     have hc := Operand.eval_of_execFloat h hw
-    refine ⟨⟨_, ⟨u, v, w, ha, hb, hc,
+    refine ⟨⟨_, ⟨u, v, w, ha, hb, hc, hdef,
       (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩, fun _ => rfl⟩, ?_⟩
-    rintro r ⟨u₂, v₂, w₂, ha₂, hb₂, hc₂, hr⟩
+    rintro r ⟨u₂, v₂, w₂, ha₂, hb₂, hc₂, -, hr⟩
     rw [ha] at ha₂
     cases ha₂
     rw [hb] at hb₂
@@ -484,26 +497,29 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     rw [hc] at hc₂
     cases hc₂
     exact (AbsVal.ofFloat_admits_iff _ _).2 hr
-  | fcmp fmt pred a b =>
+  | fcmp fmt pred a b fmf =>
     simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
     obtain ⟨u, hu, v, hv, hx⟩ := hx
-    cases hx
+    split at hx <;> cases hx
+    rename_i hdef
     have ha := Operand.eval_of_execFloat h hu
     have hb := Operand.eval_of_execFloat h hv
-    refine ⟨⟨_, ⟨u, v, ha, hb, rfl⟩, fun _ => rfl⟩, ?_⟩
-    rintro r ⟨u₂, v₂, ha₂, hb₂, rfl⟩
+    refine ⟨⟨_, ⟨u, v, ha, hb, hdef, rfl⟩, fun _ => rfl⟩, ?_⟩
+    rintro r ⟨u₂, v₂, ha₂, hb₂, -, rfl⟩
     rw [ha] at ha₂
     cases ha₂
     rw [hb] at hb₂
     cases hb₂
     rfl
-  | fpConvert src dst a =>
+  | fpConvert src dst a fmf =>
     simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
     obtain ⟨u, hu, hx⟩ := hx
-    cases hx
+    split at hx <;> cases hx
+    rename_i hdef
     have ha := Operand.eval_of_execFloat h hu
-    refine ⟨⟨_, ⟨u, ha, (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩, fun _ => rfl⟩, ?_⟩
-    rintro r ⟨u₂, ha₂, hr⟩
+    refine ⟨⟨_, ⟨u, ha, hdef,
+      (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩, fun _ => rfl⟩, ?_⟩
+    rintro r ⟨u₂, ha₂, -, hr⟩
     rw [ha] at ha₂
     cases ha₂
     exact (AbsVal.ofFloat_admits_iff _ _).2 hr

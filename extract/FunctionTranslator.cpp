@@ -38,7 +38,7 @@ private:
   void translateBinary(const BinaryOperator &I, ArrayRef<StringRef> Flags);
   void translateCast(const CastInst &I, ArrayRef<StringRef> Flags);
   void translateLoad(const LoadInst &I);
-  void translateCall(const CallInst &I);
+  void translateCall(const CallInst &I, ArrayRef<StringRef> Flags);
   void translateTerminator(const Instruction &I);
 
   std::string type(const Type *Ty, const Value &Context) const;
@@ -49,9 +49,10 @@ private:
   unsigned reg(const Value &V) const { return Registers.lookup(&V); }
 
   /// The flags of an instruction under which its result can be poison, in
-  /// LLVM's spelling and order. These are the flags `LibcMath.IR.Flags`
-  /// represents; an instruction whose result can be poison for any other
-  /// reason is rejected.
+  /// LLVM's spelling and order. These are the flags `LibcMath.IR.Flags` and
+  /// `LibcMath.IR.FastMathFlags` represent; an instruction whose result can be
+  /// poison for any other reason, or that carries another fast-math flag, is
+  /// rejected.
   SmallVector<StringRef, 2> poisonFlags(const Instruction &I) const;
 
   /// The constant table a load reads and the index it reads at. The address
@@ -150,9 +151,6 @@ void Translator::collectTables() {
 }
 
 SmallVector<StringRef, 2> Translator::poisonFlags(const Instruction &I) const {
-  if (const auto *FP = dyn_cast<FPMathOperator>(&I);
-      FP && FP->getFastMathFlags().any())
-    unsupported("fast-math flags", I);
   if (I.hasPoisonGeneratingMetadata() || I.hasPoisonGeneratingAttributes())
     unsupported("metadata or attribute", I);
 
@@ -160,7 +158,19 @@ SmallVector<StringRef, 2> Translator::poisonFlags(const Instruction &I) const {
   // whatever remains is known not to be.
   SmallVector<StringRef, 2> Flags;
   Instruction *Rest = I.clone();
-  if (isa<OverflowingBinaryOperator>(I) || isa<TruncInst>(I)) {
+  if (isa<FPMathOperator>(I)) {
+    FastMathFlags FMF = I.getFastMathFlags();
+    if (FMF.noNaNs())
+      Flags.push_back("nnan");
+    if (FMF.noInfs())
+      Flags.push_back("ninf");
+    FMF.setNoNaNs(false);
+    FMF.setNoInfs(false);
+    // The remaining flags permit results other than the IEEE 754 one.
+    if (FMF.any())
+      unsupported("fast-math flags", I);
+    Rest->copyFastMathFlags(FMF);
+  } else if (isa<OverflowingBinaryOperator>(I) || isa<TruncInst>(I)) {
     if (I.hasNoUnsignedWrap())
       Flags.push_back("nuw");
     if (I.hasNoSignedWrap())
@@ -239,7 +249,8 @@ void Translator::translateLoad(const LoadInst &I) {
   Emitter.load(reg(I), GV->getName(), typedOperand(Index), type(I.getType(), I));
 }
 
-void Translator::translateCall(const CallInst &I) {
+void Translator::translateCall(const CallInst &I,
+                               ArrayRef<StringRef> Flags) {
   if (const auto *II = dyn_cast<IntrinsicInst>(&I)) {
     StringRef Opcode;
     switch (II->getIntrinsicID()) {
@@ -255,9 +266,11 @@ void Translator::translateCall(const CallInst &I) {
     SmallVector<Operand> Args;
     for (const Use &Arg : II->args())
       Args.push_back(operand(Arg));
-    Emitter.operation(reg(I), Opcode, {}, Args, type(I.getType(), I));
+    Emitter.operation(reg(I), Opcode, Flags, Args, type(I.getType(), I));
     return;
   }
+  if (!Flags.empty())
+    unsupported("flag", I);
 
   const Function *Callee = I.getCalledFunction();
   auto Core = Callee ? lookupCoreOp(*Callee) : std::nullopt;
@@ -270,8 +283,11 @@ void Translator::translateCall(const CallInst &I) {
 }
 
 void Translator::translate(const Instruction &I) {
-  // Only the instructions that pass their flags on can have any.
   SmallVector<StringRef, 2> Flags = poisonFlags(I);
+  // Integer flags occur only on instructions that pass them on below; fast-math
+  // flags can also be carried by `phi` and `select`.
+  if ((isa<PHINode>(I) || isa<SelectInst>(I)) && !Flags.empty())
+    unsupported("flag", I);
   if (const auto *Phi = dyn_cast<PHINode>(&I)) {
     SmallVector<std::pair<unsigned, Operand>> Incoming;
     for (unsigned N = 0; N != Phi->getNumIncomingValues(); ++N)
@@ -293,12 +309,12 @@ void Translator::translate(const Instruction &I) {
                        operand(I.getOperand(2))},
                       type(I.getType(), I));
   } else if (I.getOpcode() == Instruction::FNeg) {
-    Emitter.operation(reg(I), "fneg", {}, {operand(I.getOperand(0))},
+    Emitter.operation(reg(I), "fneg", Flags, {operand(I.getOperand(0))},
                       type(I.getType(), I));
   } else if (const auto *Load = dyn_cast<LoadInst>(&I)) {
     translateLoad(*Load);
   } else if (const auto *Call = dyn_cast<CallInst>(&I)) {
-    translateCall(*Call);
+    translateCall(*Call, Flags);
   } else {
     unsupported("instruction", I);
   }

@@ -47,6 +47,17 @@ structure Flags where
   nneg : Bool := false
   deriving DecidableEq
 
+/-- The fast-math flags that restrict the values of a floating-point instruction. An instruction
+whose flag is set has a result only when none of its floating-point arguments, and not its
+floating-point result, is a value the flag excludes. The other fast-math flags of LLVM (`nsz`,
+`arcp`, `contract`, `afn`, `reassoc`) license different results and are not represented. -/
+structure FastMathFlags where
+  /-- No NaNs. -/
+  nnan : Bool := false
+  /-- No infinities. -/
+  ninf : Bool := false
+  deriving DecidableEq
+
 inductive IntBinOp where
   | add | sub | mul | and | or | xor | shl | lshr | ashr
   deriving DecidableEq
@@ -86,14 +97,14 @@ inductive Instr where
   | sext (width : ℕ) (a : Operand)
   | trunc (width : ℕ) (a : Operand) (flags : Flags := {})
   | select (cond a b : Operand)
-  | fBin (fmt : FloatFormat) (op : FBinOp) (a b : Operand)
-  | fneg (fmt : FloatFormat) (a : Operand)
-  | fabs (fmt : FloatFormat) (a : Operand)
+  | fBin (fmt : FloatFormat) (op : FBinOp) (a b : Operand) (fmf : FastMathFlags := {})
+  | fneg (fmt : FloatFormat) (a : Operand) (fmf : FastMathFlags := {})
+  | fabs (fmt : FloatFormat) (a : Operand) (fmf : FastMathFlags := {})
   /-- `llvm.fmuladd`: `a * b + c`, fused or not at the discretion of the target. -/
-  | fmuladd (fmt : FloatFormat) (a b c : Operand)
-  | fcmp (fmt : FloatFormat) (pred : FCmp) (a b : Operand)
+  | fmuladd (fmt : FloatFormat) (a b c : Operand) (fmf : FastMathFlags := {})
+  | fcmp (fmt : FloatFormat) (pred : FCmp) (a b : Operand) (fmf : FastMathFlags := {})
   /-- `fpext` and `fptrunc`. -/
-  | fpConvert (src dst : FloatFormat) (a : Operand)
+  | fpConvert (src dst : FloatFormat) (a : Operand) (fmf : FastMathFlags := {})
   | fptosi (src : FloatFormat) (width : ℕ) (a : Operand)
   /-- A bit cast between an integer and a floating-point type; the bits are unchanged. -/
   | bitcast (a : Operand)

@@ -21,7 +21,8 @@ Registers are numbered: parameters first, then instructions in program order. Bl
 `^bb0, ^bb1, …` in order. Every instruction states the type of its operands, so constants are
 written as bare bit patterns, including floating-point ones. Types are `iN`, `float` and `double`.
 The instructions are those of `Instr`, under their LLVM names; `call` names a `CoreOp`. The flags
-of `Flags` follow the opcode, as in LLVM, on the instructions that carry them there.
+of `Flags` and `FastMathFlags` follow the opcode, as in LLVM, on the instructions that carry them
+there.
 -/
 
 namespace LibcMath.IR.DSL
@@ -49,6 +50,8 @@ syntax &"exact" : llvm_flag
 syntax &"disjoint" : llvm_flag
 syntax &"samesign" : llvm_flag
 syntax &"nneg" : llvm_flag
+syntax &"nnan" : llvm_flag
+syntax &"ninf" : llvm_flag
 
 declare_syntax_cat llvm_instr
 /-- `%3 = add nsw %1, %2 : i32`, and likewise every instruction whose operands share one type. -/
@@ -126,53 +129,58 @@ def allowedFlags : String → List String
   | "or" => ["disjoint"]
   | "icmp" => ["samesign"]
   | "zext" => ["nneg"]
+  | "fadd" | "fsub" | "fmul" | "fneg" | "fabs" | "fmuladd" | "fcmp" | "fpext" | "fptrunc" =>
+    ["nnan", "ninf"]
   | _ => []
 
-/-- The `Flags` written after the opcode `op`. -/
-def expandFlags (op : Ident) (flags : Array (TSyntax `llvm_flag)) : MacroM Term := do
+/-- The `Flags` and the `FastMathFlags` written after the opcode `op`. -/
+def expandFlags (op : Ident) (flags : Array (TSyntax `llvm_flag)) : MacroM (Term × Term) := do
   let names ← flags.mapM fun (flag : TSyntax `llvm_flag) => do
     let name := flag.raw[0].getAtomVal
     unless (allowedFlags op.getId.toString).contains name do
       Macro.throwErrorAt flag s!"{op.getId} does not take the flag {name}"
     pure name
   let has (name : String) : Term := quote (names.contains name)
-  `({ nuw := $(has "nuw"), nsw := $(has "nsw"), exact := $(has "exact"),
-      disjoint := $(has "disjoint"), samesign := $(has "samesign"), nneg := $(has "nneg") : Flags })
+  let flags ← `({ nuw := $(has "nuw"), nsw := $(has "nsw"), exact := $(has "exact"),
+                  disjoint := $(has "disjoint"), samesign := $(has "samesign"),
+                  nneg := $(has "nneg") : Flags })
+  let fmf ← `({ nnan := $(has "nnan"), ninf := $(has "ninf") : FastMathFlags })
+  return (flags, fmf)
 
 /-- An instruction, as its register and either its phi node or its `Instr`. -/
 def expandInstr (tables : Array Name) :
     TSyntax `llvm_instr → MacroM (TSyntax `num × (Term ⊕ Term))
   | `(llvm_instr| %$r:num = $op:ident $flags:llvm_flag* $[$args],* : $ty) => do
-    let flags ← expandFlags op flags
+    let (flags, fmf) ← expandFlags op flags
     let instr ← match op.getId.toString, ← args.mapM (expandOperand ty) with
-      | "fneg", #[a] => do `(Instr.fneg $(← typeFormat ty) $a)
-      | "fabs", #[a] => do `(Instr.fabs $(← typeFormat ty) $a)
-      | "fmuladd", #[a, b, c] => do `(Instr.fmuladd $(← typeFormat ty) $a $b $c)
+      | "fneg", #[a] => do `(Instr.fneg $(← typeFormat ty) $a $fmf)
+      | "fabs", #[a] => do `(Instr.fabs $(← typeFormat ty) $a $fmf)
+      | "fmuladd", #[a, b, c] => do `(Instr.fmuladd $(← typeFormat ty) $a $b $c $fmf)
       | "fadd", #[a, b] | "fsub", #[a, b] | "fmul", #[a, b] => do
-        `(Instr.fBin $(← typeFormat ty) $(enumCtor ``FBinOp op) $a $b)
+        `(Instr.fBin $(← typeFormat ty) $(enumCtor ``FBinOp op) $a $b $fmf)
       | "select", #[_, a, b] => do `(Instr.select $(← expandOperand (mkIdent `i1) args[0]!) $a $b)
       | _, #[a, b] => `(Instr.intBin $(enumCtor ``IntBinOp op) $a $b $flags)
       | _, _ => Macro.throwErrorAt op "unsupported instruction"
     return (r, .inr instr)
   | `(llvm_instr| %$r:num = $op:ident $flags:llvm_flag* $pred:ident $a:llvm_operand,
       $b:llvm_operand : $ty) => do
-    let flags ← expandFlags op flags
+    let (flags, fmf) ← expandFlags op flags
     let a ← expandOperand ty a
     let b ← expandOperand ty b
     let instr ← match op.getId.toString with
       | "icmp" => `(Instr.icmp $(enumCtor ``ICmp pred) $a $b $flags)
-      | "fcmp" => do `(Instr.fcmp $(← typeFormat ty) $(enumCtor ``FCmp pred) $a $b)
+      | "fcmp" => do `(Instr.fcmp $(← typeFormat ty) $(enumCtor ``FCmp pred) $a $b $fmf)
       | _ => Macro.throwErrorAt op "unsupported instruction"
     return (r, .inr instr)
   | `(llvm_instr| %$r:num = $op:ident $flags:llvm_flag* $a:llvm_operand : $src -> $dst) => do
-    let flags ← expandFlags op flags
+    let (flags, fmf) ← expandFlags op flags
     let a ← expandOperand src a
     let instr ← match op.getId.toString with
       | "zext" => do `(Instr.zext $(quote (← typeWidth dst)) $a $flags)
       | "sext" => do `(Instr.sext $(quote (← typeWidth dst)) $a)
       | "trunc" => do `(Instr.trunc $(quote (← typeWidth dst)) $a $flags)
       | "bitcast" => `(Instr.bitcast $a)
-      | "fpext" | "fptrunc" => do `(Instr.fpConvert $(← typeFormat src) $(← typeFormat dst) $a)
+      | "fpext" | "fptrunc" => do `(Instr.fpConvert $(← typeFormat src) $(← typeFormat dst) $a $fmf)
       | "fptosi" => do `(Instr.fptosi $(← typeFormat src) $(quote (← typeWidth dst)) $a)
       | _ => Macro.throwErrorAt op "unsupported cast"
     return (r, .inr instr)
