@@ -69,8 +69,9 @@ scripts/difftest-expf.sh <llvm-project>/libc dense 51                   # 10^7 i
 scripts/difftest-expf.sh <llvm-project>/libc range 3F800000 3FFFFFFF    # all of [1, 2)
 ```
 
-Each suite runs in the four rounding modes and fails on the first inputs where the results differ
-other than by the choice of a NaN, or where the interpreter gives no answer.
+Each suite runs in the four rounding modes. It reports the number of inputs compared and the
+first inputs where the results differ other than by the choice of a NaN, or where the interpreter
+gives no answer, and fails if there are any.
 
 The test is evidence, not proof. It covers the inputs it ran, on the processor it ran on, with
 the compiler it was built with; a different processor, compiler version or set of flags (FMA in
