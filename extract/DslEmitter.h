@@ -79,6 +79,7 @@ public:
   void ret(const TypedOperand &Value);
   void br(unsigned Target);
   void condBr(const Operand &Condition, unsigned IfTrue, unsigned IfFalse);
+  void unreachable();
 
 private:
   llvm::raw_ostream &define(unsigned Result);

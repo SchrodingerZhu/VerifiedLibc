@@ -118,4 +118,6 @@ void DslEmitter::condBr(const Operand &Condition, unsigned IfTrue,
      << "\n";
 }
 
+void DslEmitter::unreachable() { OS << "    unreachable\n"; }
+
 } // namespace extract

@@ -164,6 +164,12 @@ theorem Flags.icmpDefined_default {w : ℕ} (a b : BitVec w) :
     Flags.icmpDefined { } a b = true :=
   rfl
 
+/-- An instruction without fast-math flags accepts every value. -/
+@[simp]
+theorem FastMathFlags.admits_default {fmt : FloatFormat} (x : Model fmt) :
+    FastMathFlags.admits { } x = true :=
+  rfl
+
 /-- Execution of the block `cur`, when it is known which block that is. -/
 theorem Func.execFrom_of_block {mode : IEEERoundingMode} {f : Func} {cur : ℕ} {b : Block}
     (hb : f.blocks[cur]? = some b) (fuel pred : ℕ) (s : Store) :
@@ -174,7 +180,8 @@ theorem Func.execFrom_of_block {mode : IEEERoundingMode} {f : Func} {cur : ℕ} 
         | .br target => f.execFrom mode fuel cur target s₂
         | .condBr cond ifTrue ifFalse =>
           (cond.execBool s₂).bind fun c =>
-            f.execFrom mode fuel cur (if c then ifTrue else ifFalse) s₂) := by
+            f.execFrom mode fuel cur (if c then ifTrue else ifFalse) s₂
+        | .unreachable => none) := by
   simp only [Func.execFrom, hb, Option.bind_eq_bind, Option.bind_some]
   rfl
 
@@ -200,7 +207,7 @@ macro "exec_blocks" "[" lemmas:Lean.Parser.Tactic.simpLemma,* "]" : tactic =>
     IntBinOp.eval, Bool.not_false, Operand.exec, Operand.execExact, Operand.execBool, Operand.execFloat, Store.get_set,
     Store.get_ofArgs, Val.ofModel_binary32, Val.toModel?_binary32, Val.toBits_ofBits_binary32,
     Val.toBits_abs_binary32, Val.ofNat, Val.toBool?_ofBool,
-    Flags.icmpDefined_default, IntBinOp.defined_and, Option.bind_some, Option.bind_eq_bind, Option.pure_def,
+    Flags.icmpDefined_default, IntBinOp.defined_and, FastMathFlags.admits_default, Bool.and_self, Option.bind_some, Option.bind_eq_bind, Option.pure_def,
     Option.map_some, List.getElem?_cons_zero, List.lookup, BitVec.cast_eq, ↓reduceDIte, ↓reduceIte,
     Nat.reduceEqDiff, Nat.reduceBEq, reduceCtorEq, decide_true, decide_false, Bool.false_eq_true,
     or_self, or_true, true_or,

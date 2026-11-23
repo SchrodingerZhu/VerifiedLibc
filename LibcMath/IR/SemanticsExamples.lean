@@ -4,9 +4,9 @@ import LibcMath.IR.Semantics
 /-!
 # Executions that go wrong
 
-Two small functions with undefined behavior. The second has it on some executions only, and
-shows why `Func.CorrectlyRounded` asks that no execution goes wrong in addition to constraining
-the executions that return.
+Small functions with undefined behavior. The second has it on some executions only, and shows
+why `Func.CorrectlyRounded` asks that no execution goes wrong in addition to constraining the
+executions that return.
 -/
 
 namespace LibcMath.IR.Examples
@@ -70,5 +70,14 @@ example (mode : IEEERoundingMode) (x : Model .binary32) :
   cases hb
   revert hdefined
   decide
+
+/- A function whose only block ends in `unreachable`. -/
+llvm_func reachesUnreachable() {
+  ^bb0:
+    unreachable
+}
+
+example (mode : IEEERoundingMode) : reachesUnreachable.GoesWrong mode [] :=
+  .unreachable (b := reachesUnreachable.blocks[0]) rfl (.nil _) (.nil _) rfl
 
 end LibcMath.IR.Examples

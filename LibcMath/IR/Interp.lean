@@ -10,10 +10,10 @@ floating-point function. Both are computable and are meant to be run on every in
 any NaN where FloatLib returns one, and `raiseExcept` returns an unspecified integer. The
 interpreter therefore computes with an `AbsVal` per register, which is either the exact value of
 the register or a description of the values it may hold. Instructions that copy a value (`phi`,
-`select`, `bitcast`, `ret`) accept any `AbsVal`; every other instruction needs exact operands, and
-the interpreter gives up (`none`) otherwise. In particular it gives up when a NaN produced by
-arithmetic is the operand of further arithmetic. It also answers `none` where an instruction has
-no result, such as one whose flag condition fails.
+`select`, `bitcast`, `freeze`, `ret`) accept any `AbsVal`; every other instruction needs exact
+operands, and the interpreter gives up (`none`) otherwise. In particular it gives up when a NaN
+produced by arithmetic is the operand of further arithmetic. It also answers `none` where an
+instruction has no result, such as one whose flag condition fails.
 
 The soundness theorems are `Func.exec_sound`, `Func.run_sound`, `Func.runFloat_sound` and
 `Func.runUnary_sound`: when the interpreter answers, the function can return the answer, and
@@ -290,6 +290,16 @@ def Instr.exec (mode : IEEERoundingMode) (f : Func) (s : Store) : Instr → Opti
         some (.exact ⟨x.width, op.eval x.bits (y.bits.cast h)⟩)
       else none
     else none
+  | intUn op a poison => do
+    let v ← a.execExact s
+    if op.defined poison v.bits then some (.exact ⟨v.width, op.eval v.bits⟩) else none
+  | funnelShift op a b c => do
+    let x ← a.execExact s
+    let y ← b.execExact s
+    let z ← c.execExact s
+    if h : y.width = x.width ∧ z.width = x.width then
+      some (.exact ⟨x.width, op.eval x.bits (y.bits.cast h.1) (z.bits.cast h.2)⟩)
+    else none
   | icmp pred a b flags => do
     let x ← a.execExact s
     let y ← b.execExact s
@@ -311,34 +321,73 @@ def Instr.exec (mode : IEEERoundingMode) (f : Func) (s : Store) : Instr → Opti
   | select cond a b => do
     let c ← cond.execBool s
     if c then a.exec s else b.exec s
-  | fBin fmt op a b => do
+  | fBin fmt op a b fmf => do
     let x ← a.execFloat fmt s
     let y ← b.execFloat fmt s
-    some (.ofFloat (op.eval mode x y))
-  | fneg fmt a => do
+    if fmf.admits x && fmf.admits y && fmf.admits (op.eval mode x y) then
+      some (.ofFloat (op.eval mode x y))
+    else none
+  | fneg fmt a fmf => do
     let x ← a.execFloat fmt s
-    some (.exact (.ofModel x.neg))
-  | fabs fmt a => do
+    if fmf.admits x then some (.exact (.ofModel x.neg)) else none
+  | fabs fmt a fmf => do
     let x ← a.execFloat fmt s
-    some (.exact (.ofModel x.abs))
-  | fmuladd fmt a b c => do
+    if fmf.admits x then some (.exact (.ofModel x.abs)) else none
+  | fmuladd fmt a b c fmf => do
     let x ← a.execFloat fmt s
     let y ← b.execFloat fmt s
     let z ← c.execFloat fmt s
-    some (.ofFloat (Model.add (Model.mul x y mode) z mode))
-  | fcmp fmt pred a b => do
+    if fmf.admits x && fmf.admits y && fmf.admits z &&
+        fmf.admits (Model.add (Model.mul x y mode) z mode) then
+      some (.ofFloat (Model.add (Model.mul x y mode) z mode))
+    else none
+  | fcmp fmt pred a b fmf => do
     let x ← a.execFloat fmt s
     let y ← b.execFloat fmt s
-    some (.exact (.ofBool (pred.eval (Model.compare x y))))
-  | fpConvert src dst a => do
+    if fmf.admits x && fmf.admits y then
+      some (.exact (.ofBool (pred.eval (Model.compare x y))))
+    else none
+  | fpConvert src dst a fmf => do
     let x ← a.execFloat src s
-    some (.ofFloat (Model.cast src dst x mode))
+    if fmf.admits x && fmf.admits (Model.cast src dst x mode) then
+      some (.ofFloat (Model.cast src dst x mode))
+    else none
   | fptosi src width a => do
     let x ← a.execFloat src s
     match ExecDType.convertToInteger (width := width) x .towardZero with
     | .success n _ => some (.exact ⟨width, n.bits⟩)
     | .failure _ => none
+  | fptoui src width a => do
+    let x ← a.execFloat src s
+    match ExecDType.convertToInteger (width := width + 1) x .towardZero with
+    | .success n _ =>
+      if n.bits.msb = false then some (.exact ⟨width, n.bits.setWidth width⟩) else none
+    | .failure _ => none
+  | sitofp dst a => do
+    let v ← a.execExact s
+    some (.ofFloat (ExecDType.convertFromInt dst ⟨v.bits⟩ mode : Model dst))
+  | uitofp dst a flags => do
+    let v ← a.execExact s
+    if flags.zextDefined v.bits then
+      some (.ofFloat
+        (ExecDType.convertFromInt dst ⟨v.bits.setWidth (v.width + 1)⟩ mode : Model dst))
+    else none
+  | sqrt fmt a fmf => do
+    let x ← a.execFloat fmt s
+    if fmf.admits x && fmf.admits (Model.sqrt x mode) then some (.ofFloat (Model.sqrt x mode))
+    else none
+  | copysign fmt a b fmf => do
+    let x ← a.execFloat fmt s
+    let y ← b.execFloat fmt s
+    if fmf.admits x && fmf.admits y then some (.exact (.ofModel (Model.copySign x y))) else none
+  | isFpClass fmt a mask => do
+    let x ← a.execFloat fmt s
+    some (.exact (.ofBool (mask.testBit (fpClassBit (Model.classify x)))))
   | bitcast a => a.exec s
+  | freeze a => a.exec s
+  | assume cond => do
+    let c ← cond.execBool s
+    if c then some (.exact (.ofNat 0 0)) else none
   | load table index => do
     let t ← f.tables[table]?
     let i ← index.execExact s
@@ -388,6 +437,38 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     cases ha₂
     rw [hb] at hb₂
     cases hb₂
+    rfl
+  | intUn op a poison =>
+    simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
+    obtain ⟨v, hv, hx⟩ := hx
+    split at hx <;> cases hx
+    rename_i hdef
+    have ha := Operand.eval_of_execExact h hv
+    refine ⟨⟨_, ⟨v, ha, hdef, rfl⟩, fun _ => rfl⟩, ?_⟩
+    rintro r ⟨v₂, ha₂, -, rfl⟩
+    rw [ha] at ha₂
+    cases ha₂
+    rfl
+  | funnelShift op a b c =>
+    simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
+    obtain ⟨⟨w, u⟩, hu, ⟨w', v⟩, hv, ⟨w'', z⟩, hz, hx⟩ := hx
+    split at hx <;> cases hx
+    rename_i hw
+    obtain ⟨hw', hw''⟩ := hw
+    change w' = w at hw'
+    change w'' = w at hw''
+    subst hw' hw''
+    have ha := Operand.eval_of_execExact h hu
+    have hb := Operand.eval_of_execExact h hv
+    have hc := Operand.eval_of_execExact h hz
+    refine ⟨⟨_, ⟨_, u, v, z, ha, hb, hc, rfl⟩, fun _ => rfl⟩, ?_⟩
+    rintro r ⟨w₂, u₂, v₂, z₂, ha₂, hb₂, hc₂, rfl⟩
+    rw [ha] at ha₂
+    cases ha₂
+    rw [hb] at hb₂
+    cases hb₂
+    rw [hc] at hc₂
+    cases hc₂
     rfl
   | icmp pred a b flags =>
     simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
@@ -444,39 +525,43 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     rw [hsel, hv] at hr
     cases hr
     exact hadm
-  | fBin fmt op a b =>
+  | fBin fmt op a b fmf =>
     simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
     obtain ⟨u, hu, v, hv, hx⟩ := hx
-    cases hx
+    split at hx <;> cases hx
+    rename_i hdef
     have ha := Operand.eval_of_execFloat h hu
     have hb := Operand.eval_of_execFloat h hv
-    refine ⟨⟨_, ⟨u, v, ha, hb, (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩, fun _ => rfl⟩, ?_⟩
-    rintro r ⟨u₂, v₂, ha₂, hb₂, hr⟩
+    refine ⟨⟨_, ⟨u, v, ha, hb, hdef,
+      (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩, fun _ => rfl⟩, ?_⟩
+    rintro r ⟨u₂, v₂, ha₂, hb₂, -, hr⟩
     rw [ha] at ha₂
     cases ha₂
     rw [hb] at hb₂
     cases hb₂
     exact (AbsVal.ofFloat_admits_iff _ _).2 hr
-  | fneg fmt a | fabs fmt a =>
+  | fneg fmt a fmf | fabs fmt a fmf =>
     simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
     obtain ⟨u, hu, hx⟩ := hx
-    cases hx
+    split at hx <;> cases hx
+    rename_i hdef
     have ha := Operand.eval_of_execFloat h hu
-    refine ⟨⟨_, ⟨u, ha, rfl⟩, fun _ => rfl⟩, ?_⟩
-    rintro r ⟨u₂, ha₂, rfl⟩
+    refine ⟨⟨_, ⟨u, ha, hdef, rfl⟩, fun _ => rfl⟩, ?_⟩
+    rintro r ⟨u₂, ha₂, -, rfl⟩
     rw [ha] at ha₂
     cases ha₂
     rfl
-  | fmuladd fmt a b c =>
+  | fmuladd fmt a b c fmf =>
     simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
     obtain ⟨u, hu, v, hv, w, hw, hx⟩ := hx
-    cases hx
+    split at hx <;> cases hx
+    rename_i hdef
     have ha := Operand.eval_of_execFloat h hu
     have hb := Operand.eval_of_execFloat h hv
     have hc := Operand.eval_of_execFloat h hw
-    refine ⟨⟨_, ⟨u, v, w, ha, hb, hc,
+    refine ⟨⟨_, ⟨u, v, w, ha, hb, hc, hdef,
       (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩, fun _ => rfl⟩, ?_⟩
-    rintro r ⟨u₂, v₂, w₂, ha₂, hb₂, hc₂, hr⟩
+    rintro r ⟨u₂, v₂, w₂, ha₂, hb₂, hc₂, -, hr⟩
     rw [ha] at ha₂
     cases ha₂
     rw [hb] at hb₂
@@ -484,26 +569,29 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     rw [hc] at hc₂
     cases hc₂
     exact (AbsVal.ofFloat_admits_iff _ _).2 hr
-  | fcmp fmt pred a b =>
+  | fcmp fmt pred a b fmf =>
     simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
     obtain ⟨u, hu, v, hv, hx⟩ := hx
-    cases hx
+    split at hx <;> cases hx
+    rename_i hdef
     have ha := Operand.eval_of_execFloat h hu
     have hb := Operand.eval_of_execFloat h hv
-    refine ⟨⟨_, ⟨u, v, ha, hb, rfl⟩, fun _ => rfl⟩, ?_⟩
-    rintro r ⟨u₂, v₂, ha₂, hb₂, rfl⟩
+    refine ⟨⟨_, ⟨u, v, ha, hb, hdef, rfl⟩, fun _ => rfl⟩, ?_⟩
+    rintro r ⟨u₂, v₂, ha₂, hb₂, -, rfl⟩
     rw [ha] at ha₂
     cases ha₂
     rw [hb] at hb₂
     cases hb₂
     rfl
-  | fpConvert src dst a =>
+  | fpConvert src dst a fmf =>
     simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
     obtain ⟨u, hu, hx⟩ := hx
-    cases hx
+    split at hx <;> cases hx
+    rename_i hdef
     have ha := Operand.eval_of_execFloat h hu
-    refine ⟨⟨_, ⟨u, ha, (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩, fun _ => rfl⟩, ?_⟩
-    rintro r ⟨u₂, ha₂, hr⟩
+    refine ⟨⟨_, ⟨u, ha, hdef,
+      (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩, fun _ => rfl⟩, ?_⟩
+    rintro r ⟨u₂, ha₂, -, hr⟩
     rw [ha] at ha₂
     cases ha₂
     exact (AbsVal.ofFloat_admits_iff _ _).2 hr
@@ -520,7 +608,88 @@ theorem Instr.exec_sound {mode : IEEERoundingMode} {f : Func} {s : Store} {env :
     rw [hn] at hn₂
     cases hn₂
     rfl
-  | bitcast a =>
+  | fptoui src width a =>
+    simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
+    obtain ⟨u, hu, hx⟩ := hx
+    have ha := Operand.eval_of_execFloat h hu
+    split at hx <;> [skip; cases hx]
+    rename_i n status hn
+    split at hx <;> cases hx
+    rename_i hmsb
+    refine ⟨⟨_, ⟨u, n, status, ha, hn, hmsb, rfl⟩, fun _ => rfl⟩, ?_⟩
+    rintro r ⟨u₂, n₂, status₂, ha₂, hn₂, -, rfl⟩
+    rw [ha] at ha₂
+    cases ha₂
+    rw [hn] at hn₂
+    cases hn₂
+    rfl
+  | sitofp dst a =>
+    simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
+    obtain ⟨v, hv, hx⟩ := hx
+    cases hx
+    have ha := Operand.eval_of_execExact h hv
+    refine ⟨⟨_, ⟨v, ha, (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩,
+      fun _ => rfl⟩, ?_⟩
+    rintro r ⟨v₂, ha₂, hr⟩
+    rw [ha] at ha₂
+    cases ha₂
+    exact (AbsVal.ofFloat_admits_iff _ _).2 hr
+  | uitofp dst a flags =>
+    simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
+    obtain ⟨v, hv, hx⟩ := hx
+    split at hx <;> cases hx
+    rename_i hdef
+    have ha := Operand.eval_of_execExact h hv
+    refine ⟨⟨_, ⟨v, ha, hdef, (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩,
+      fun _ => rfl⟩, ?_⟩
+    rintro r ⟨v₂, ha₂, -, hr⟩
+    rw [ha] at ha₂
+    cases ha₂
+    exact (AbsVal.ofFloat_admits_iff _ _).2 hr
+  | sqrt fmt a fmf =>
+    simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
+    obtain ⟨u, hu, hx⟩ := hx
+    split at hx <;> cases hx
+    rename_i hdef
+    have ha := Operand.eval_of_execFloat h hu
+    refine ⟨⟨_, ⟨u, ha, hdef,
+      (AbsVal.ofFloat_admits_iff _ _).1 (AbsVal.admits_toVal _)⟩, fun _ => rfl⟩, ?_⟩
+    rintro r ⟨u₂, ha₂, -, hr⟩
+    rw [ha] at ha₂
+    cases ha₂
+    exact (AbsVal.ofFloat_admits_iff _ _).2 hr
+  | copysign fmt a b fmf =>
+    simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
+    obtain ⟨u, hu, v, hv, hx⟩ := hx
+    split at hx <;> cases hx
+    rename_i hdef
+    have ha := Operand.eval_of_execFloat h hu
+    have hb := Operand.eval_of_execFloat h hv
+    refine ⟨⟨_, ⟨u, v, ha, hb, hdef, rfl⟩, fun _ => rfl⟩, ?_⟩
+    rintro r ⟨u₂, v₂, ha₂, hb₂, -, rfl⟩
+    rw [ha] at ha₂
+    cases ha₂
+    rw [hb] at hb₂
+    cases hb₂
+    rfl
+  | isFpClass fmt a mask =>
+    simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
+    obtain ⟨u, hu, hx⟩ := hx
+    cases hx
+    have ha := Operand.eval_of_execFloat h hu
+    refine ⟨⟨_, ⟨u, ha, rfl⟩, fun _ => rfl⟩, ?_⟩
+    rintro r ⟨u₂, ha₂, rfl⟩
+    rw [ha] at ha₂
+    cases ha₂
+    rfl
+  | assume cond =>
+    simp only [Instr.exec, Option.bind_eq_bind, Option.bind_eq_some_iff] at hx
+    obtain ⟨c, hc, hx⟩ := hx
+    split at hx <;> cases hx
+    rename_i hc'
+    subst hc'
+    exact ⟨⟨_, ⟨Operand.eval_of_execBool h hc, rfl⟩, fun _ => rfl⟩, fun r hr => hr.2⟩
+  | bitcast a | freeze a =>
     obtain ⟨v, hv, hadm⟩ := Operand.exec_sound h hx
     refine ⟨⟨v, hv, fun ht => Option.some.inj (hv.symm.trans (Operand.exec_tight ht hx))⟩,
       fun r hr => ?_⟩
@@ -572,6 +741,7 @@ def Func.execFrom (mode : IEEERoundingMode) (f : Func) : (fuel pred cur : ℕ) �
     | .condBr cond ifTrue ifFalse => do
       let c ← cond.execBool s₂
       f.execFrom mode fuel cur (if c then ifTrue else ifFalse) s₂
+    | .unreachable => none
 
 /-- Execute `f` on `args`. Each block is entered at most once, which is enough for the loop-free
 code this development is about; `none` means that the interpreter gave up, not that `f` has no
@@ -744,6 +914,7 @@ theorem Func.execFrom_sound {mode : IEEERoundingMode} {f : Func} {fuel pred cur 
           cases hb'
           rw [hterm] at hterm'
           cases hterm'
+    · cases ha
 
 /-- Where the interpreter answers, no execution goes wrong: every execution follows the blocks
 the interpreter visits, and the interpreter has found each of their operations to have a result
@@ -781,6 +952,10 @@ theorem Func.not_goesWrong_of_execFrom {mode : IEEERoundingMode} {f : Func} {fue
       simp only [hterm, Option.bind_eq_some_iff] at ha
       obtain ⟨c, hc, -⟩ := ha
       exact hnone c (Operand.eval_of_execBool (hsim₂ h₁ h₂) hc)
+    | unreachable hb' h₁ h₂ hterm =>
+      cases hb.symm.trans hb'
+      simp only [hterm] at ha
+      cases ha
     | br hb' h₁ h₂ hterm hrest =>
       cases hb.symm.trans hb'
       simp only [hterm] at ha
