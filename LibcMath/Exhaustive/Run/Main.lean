@@ -1,10 +1,11 @@
 import LibcMath.Exhaustive.Run.Block
 import LibcMath.Exhaustive.Run.Target
+import LibcMath.Extracted.ExpfStructured
 
 /-!
 # `checkrange`: compiled evaluation of `checkRange`
 
-    checkrange <mode> <first> <count> [<block>]
+    checkrange [--structured] <mode> <first> <count> [<block>]
 
 evaluates `checkRange Run.oracle Run.run mode b block` (through `checkBlock`) for the consecutive
 blocks `b = first, first + block, …` that cover `count` bit patterns (one block when `block` is
@@ -13,6 +14,9 @@ omitted), and prints one tab-separated line per block:
     <mode> <first> <count> <ok|fail> <milliseconds>
 
 `mode` is `nearest`, `towardZero`, `up` or `down`. The exit status is 0 when every block is `ok`.
+With `--structured` the blocks are checked on `Extracted.expfStructured` instead of the
+interpreter (`Extracted.checkBlockMain`); this is meant for blocks inside the two ranges on which
+`expf` evaluates its polynomial.
 
 A line `ok` is the compiled program's answer and proves nothing by itself. It tells which
 certificates are worth generating (see `scripts/exhaustive.py`) and what they will cost.
@@ -28,9 +32,13 @@ def parseMode : String → Option IEEERoundingMode
   | "down" => some .down
   | _ => none
 
-def usage : String := "usage: checkrange <nearest|towardZero|up|down> <first> <count> [<block>]"
+def usage : String :=
+  "usage: checkrange [--structured] <nearest|towardZero|up|down> <first> <count> [<block>]"
 
 def main (args : List String) : IO UInt32 := do
+  let (run, args) := match args with
+    | "--structured" :: rest => (Extracted.expfStructured, rest)
+    | _ => (Run.run, args)
   let parsed : Option (String × IEEERoundingMode × Nat × Nat × Nat) := do
     let name :: first :: count :: rest := args | none
     let mode ← parseMode name
@@ -50,7 +58,7 @@ def main (args : List String) : IO UInt32 := do
   while start < first + count do
     let size := min block (first + count - start)
     let t0 ← IO.monoMsNow
-    let ok := checkBlock Run.oracle.check Run.run mode start size
+    let ok := checkBlock Run.oracle.check run mode start size
     let t1 ← IO.monoMsNow
     allOk := allOk && ok
     stdout.putStrLn s!"{name}\t{start}\t{size}\t{if ok then "ok" else "fail"}\t{t1 - t0}"
