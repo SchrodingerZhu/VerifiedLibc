@@ -61,17 +61,44 @@ definition that takes an `Oracle S` as an argument cannot be compiled at a concr
 `#eval` on it fails with "depends on 'Spec.exp', which is 'noncomputable'". Evaluation in the
 kernel (`decide +kernel`) is not affected.
 
-## Tools that were tried
+## The journal
 
-Record here what was tried and how it went, with the version, so that it is not tried again
-blindly. Add to this list; remove an entry when it no longer holds.
+`journal/` is a [Forester](https://www.forester-notes.org/) forest: small notes ("trees") with
+permanent addresses that link to each other. Changes, lessons, open problems, decisions and
+sessions are recorded there, in the same branch as the change they describe. Write there as part
+of the work, without asking first. Before starting, read `journal/trees/insights.tree` and
+`journal/trees/open-problems.tree` and the trees they list (`rg -l 'taxon{Insight}' journal/trees`),
+so that a tool or an approach that already failed is not tried again blindly.
 
-- `grind` (Lean 4.36.0): closes the lemmas about `SameValue`, `Encodes` and `HoldsOnBits`,
-  including overlapping and out-of-order ranges with numeric ends. Does not close
-  `roundReal_towardZero_of_pos`.
-- Canonical (`chasenorman/CanonicalLean` v4.36.0, tried 2026-11-23 on x86_64 Linux with the Lean
-  of this flake): not usable. Its native library aborts the Lean process ("failed to initiate
-  panic, error 3") on every goal it solves, including a propositional one; preloading
-  `libgcc_s.so.1` turns the abort into a segmentation fault. On goals that mention a concrete
-  format or an extracted function it timed out before reaching that point. It is therefore not a
-  dependency. Try again with a later release.
+```sh
+journal-new <log|insight|problem|decision|session>   # allocate an address, create the file
+journal-build                                        # must report no diagnostics
+journal-serve                                        # browse at http://localhost:1313/
+```
+
+Outside the flake shell: `nix run .#new -- <kind>`, `nix run .#build`, `nix run .#serve`.
+
+| Kind | Address | Directory | `\taxon` | Write one when |
+|---|---|---|---|---|
+| Change | `log-XXXX` | `journal/trees/log/` | `Change` | a change is made; one tree per change |
+| Insight | `ins-XXXX` | `journal/trees/insight/` | `Insight` or `Hypothesis` | a lesson would spare a later session a dead end, including a tool that was tried |
+| Problem | `prob-XXXX` | `journal/trees/problem/` | `Problem` | something is left out or unresolved |
+| Decision | `dec-XXXX` | `journal/trees/decision/` | `Decision` | a maintainer chooses between alternatives |
+| Session | `ses-XXXX` | `journal/trees/session/` | `Session` | once per working session |
+
+- Every tree starts with `\title`, `\taxon`, `\date` (creation), `\author` (the identity tree of
+  your exact model version in `journal/trees/people/`; create one and add it to `agents.tree` if
+  it is missing), `\contributor` (who directed the session), `\tag`s and `\import{base-macros}`.
+  Copy an existing tree of the same kind.
+- Addresses are permanent; never rename one. Keep a tree to one idea and link the others.
+- A change is also added by hand, newest first, to its month tree
+  `journal/trees/log/log-YYYY-MM.tree` (new months go at the top of `changelog.tree`). The other
+  hubs list trees by taxon and need no edit.
+- Problems and decisions carry `\meta{status}{open}` (or `closed`, `superseded`) and repeat it as
+  the first paragraph. Do not delete a closed problem or a decision; mark it and link what
+  replaced it. Use `Hypothesis` for a lesson that was not verified.
+- Write for a reader with no access to any conversation: cite pull requests (`\pr{1}`) and session
+  trees, never a chat. Say what was verified and how.
+- Markup: wrap every paragraph in `\p{...}`, one paragraph per line; `%` starts a comment, write
+  `\%`; put code, and any of `{ } [ ] \ #`, in `\code{\verb~|...~}`; lists are
+  `\ul{\li{...}}`; a link to a tree is `[text](address)`.

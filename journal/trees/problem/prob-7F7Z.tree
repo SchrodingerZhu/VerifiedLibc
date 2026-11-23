@@ -1,0 +1,17 @@
+\title{Much of the reduction is not used by the later work}
+\taxon{Problem}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{exhaustive}
+\meta{status}{open}
+\meta{created}{2026-11-23}
+\import{base-macros}
+
+\p{\strong{Status:} open.}
+\p{On 2026-11-23 the branch of \pr{13}, which builds the whole route for \code{\verb~|expf~}, used from \pr{1} only \code{\verb~|HoldsOnBits~} with \code{\verb~|append~}, \code{\verb~|holdsOnBits_of_checkRange~}, \code{\verb~|IsComputedBy~} and the \code{\verb~|expfCorrectlyRounded_of_…~} theorems. Nothing outside the files of \pr{1} referred to \code{\verb~|checkBlocks~}, \code{\verb~|checkRangeResult~}, \code{\verb~|checkModesAgree~}, \code{\verb~|correctAt_of_map~}, \code{\verb~|HoldsOnBits.of_isChain~}, \code{\verb~|checkRange_add~}, \code{\verb~|HoldsOnBits.subrange~}, \code{\verb~|HoldsOnBits.singleton~}, \code{\verb~|Spec.exp_eval_towardZero~}, \code{\verb~|sameValue_equivalence~} or \code{\verb~|CorrectlyRounded.mono~}.}
+\ul{
+\li{The saving for rounding toward zero, \code{\verb~|expf_holdsOnBits_towardZero_of_down~}, is among the unused parts: the blocks for that direction are checked against the oracle like the others. Either use it or state why not.}
+\li{\code{\verb~|checkBlocks~} equals \code{\verb~|decide~} of \code{\verb~|List.IsChain~} over \code{\verb~|checkRange~}; this was checked by a proof by induction that was not kept. If it stays, define it that way or record why the recursion by hand reduces better in the kernel.}
+\li{Removing a definition is for the maintainer to decide.}
+}

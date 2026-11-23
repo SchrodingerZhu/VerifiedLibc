@@ -1,0 +1,18 @@
+\title{The review changes to the reduction have to be reconciled with the branches built on it}
+\taxon{Problem}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{exhaustive}
+\tag{integration}
+\meta{status}{open}
+\meta{created}{2026-11-23}
+\import{base-macros}
+
+\p{\strong{Status:} open.}
+\p{The changes in [log-Y5JW](log-Y5JW) were pushed to the branch of \pr{1} after other branches had been built on its first version. Nothing was rebased.}
+\ul{
+\li{The branch of \pr{13} adds a clause that no execution goes wrong to \code{\verb~|IR.Func.IsComputedBy~} and \code{\verb~|IR.Func.CorrectAt~} in \code{\verb~|LibcMath/Exhaustive/Reduction.lean~}. The review changed other parts of that file; a merge has to be made and built.}
+\li{\code{\verb~|checkBlock~} of \pr{7}, in \code{\verb~|LibcMath/Exhaustive/Run/Block.lean~}, is the same computation as \code{\verb~|checkBits~} applied to \code{\verb~|checkRange.test O.check run mode~}. Keep one, and let the runner report \code{\verb~|checkRange.firstFailure~} when a block fails. See [ins-TZVS](ins-TZVS).}
+\li{The journal and \code{\verb~|CLAUDE.md~} exist only on the branch of \pr{1} until it is merged. A review of another pull request that writes journal trees before then has to carry the same scaffold.}
+}
