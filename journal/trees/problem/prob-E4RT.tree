@@ -1,0 +1,12 @@
+\title{\code{\verb~|roundReal_towardZero_of_pos~} belongs in FloatLib}
+\taxon{Problem}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{floatlib}
+\meta{status}{open}
+\meta{created}{2026-11-23}
+\import{base-macros}
+
+\p{\strong{Status:} open.}
+\p{\code{\verb~|LibcMath/Exhaustive/Modes.lean~} proves that rounding a positive real toward zero is rounding it down. No such lemma was found in FloatLib 4.1.0 by searching its sources for statements about \code{\verb~|towardZero~}. It is a fact about rounding, not about libc, and its proof ends in \code{\verb~|rfl~} after \code{\verb~|simp only~}, so it depends on how \code{\verb~|Model.AlgebraicRounding.roundSigned~} unfolds. Propose it upstream, with the companion for negative reals and rounding up, and delete the local copy once a release has it.}

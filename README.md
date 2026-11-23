@@ -48,3 +48,9 @@ extract/extract.sh <llvm-project>/libc expf math::double_eval::expf expf
 
 writes `LibcMath/Extracted/Expf.lean`. `LibcMath/IR/Semantics.lean` defines what extracted code
 means and lists the assumptions that meaning rests on.
+
+## Conventions and journal
+
+`CLAUDE.md` has the conventions for changing proofs. `journal/` is a
+[Forester](https://www.forester-notes.org/) forest of dated changes, lessons, open problems and
+sessions; build and browse it with `journal-serve` from the flake shell.

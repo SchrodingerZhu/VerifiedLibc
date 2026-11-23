@@ -1,0 +1,17 @@
+\title{Canonical 4.36.0 aborts Lean on every goal it solves}
+\taxon{Insight}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{tooling}
+\tag{automation}
+\import{base-macros}
+
+\p{Source: session [ses-9U0D](ses-9U0D), on \pr{1}. Tried on 2026-11-23 on x86_64 Linux with the Lean 4.36.0 of the flake and \code{\verb~|chasenorman/CanonicalLean~} at tag \code{\verb~|v4.36.0~}, which was two days old. Canonical is therefore not a dependency. Try again with a later release, and replace this tree's conclusion if it works.}
+\ul{
+\li{The package builds, and \code{\verb~|import Canonical~} works under \code{\verb~|lake lean~} or \code{\verb~|lake build~}. Plain \code{\verb~|lake env lean~} cannot use it, because it does not load the native library.}
+\li{On a goal it can solve, including \code{\verb~|p → r~} from \code{\verb~|p → q~} and \code{\verb~|q → r~}, the process aborts with \code{\verb~|fatal runtime error: failed to initiate panic, error 3~}. No panic message precedes it, which is what a Rust library prints when it unwinds on purpose and the unwinder fails.}
+\li{\code{\verb~|libleanshared.so~} exports the unwinder of LLVM, and the library of Canonical asks for the one of GCC. Preloading \code{\verb~|libgcc_s.so.1~} with \code{\verb~|LD_PRELOAD~} turns the abort into a segmentation fault with no output at all; see [ins-X6OK](ins-X6OK) for how that was first mistaken for success.}
+\li{On goals it does not solve it returns normally. With a concrete format such as \code{\verb~|.binary32~}, a numeral such as \code{\verb~|0x3F800000~} or a concrete extracted function in the goal, it warned \code{\verb~|Runaway definitions~} and timed out, or exceeded the recursion depth.}
+\li{Not tried: a Lean installed by elan instead of the flake, and building the native library from source.}
+}

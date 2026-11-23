@@ -1,0 +1,17 @@
+\title{What \code{\verb~|grind~} closes in the reduction, and where it stalls}
+\taxon{Insight}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{automation}
+\tag{exhaustive}
+\import{base-macros}
+
+\p{Source: session [ses-9U0D](ses-9U0D), on \pr{1}. Lean 4.36.0. Each item was compiled.}
+\ul{
+\li{A predicate that is a thin wrapper around a first-order statement should be tagged \code{\verb~|@[grind]~}, so that \code{\verb~|grind~} unfolds it. With \code{\verb~|SameValue~}, \code{\verb~|IR.Val.Encodes~} and \code{\verb~|HoldsOnBits~} tagged, \code{\verb~|grind~} alone proves symmetry and transitivity of \code{\verb~|SameValue~}, that a value encodes at most one result, and the lemmas \code{\verb~|append~}, \code{\verb~|subrange~} and \code{\verb~|of_le~} for ranges.}
+\li{It joins ranges with numeric ends, including overlapping ranges given out of order: from \code{\verb~|HoldsOnBits P 16 32~} and \code{\verb~|HoldsOnBits P 0 20~} it proves \code{\verb~|HoldsOnBits P 4 30~}. A proof that composes blocks need not build a tree of \code{\verb~|HoldsOnBits.append~} by hand.}
+\li{For a goal \code{\verb~|HoldsOnBits P lo (lo + 1)~} introduce the bit pattern and its bounds first with \code{\verb~|intro~}; \code{\verb~|grind~} then identifies it with \code{\verb~|lo~}.}
+\li{It does not prove \code{\verb~|roundReal_towardZero_of_pos~}. It unfolds \code{\verb~|Model.roundReal~} and stops at an equation between two \code{\verb~|fun~} expressions. The proof by \code{\verb~|simp only~} followed by \code{\verb~|rfl~} stays.}
+\li{\code{\verb~|simp~} does not prove \code{\verb~|Val.toModel?_ofModel~}: it stops at a \code{\verb~|BitVec.cast~}. The rewrite with \code{\verb~|dite_eq_left_of_eq_true~} in that proof is needed.}
+}
