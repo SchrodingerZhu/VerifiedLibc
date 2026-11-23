@@ -19,3 +19,8 @@ rev = "v4.1.0"
 
 [[lean_lib]]
 name = "LibcMath"
+
+[[lean_exe]]
+name = "difftest-expf-model"
+srcDir = "test/difftest"
+root = "ExpfModel"
