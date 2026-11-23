@@ -31,6 +31,14 @@ raw_ostream &DslEmitter::define(unsigned Result) {
   return OS << "    %" << Result << " = ";
 }
 
+raw_ostream &DslEmitter::define(unsigned Result, StringRef Opcode,
+                                ArrayRef<StringRef> Flags) {
+  define(Result) << Opcode << " ";
+  for (StringRef Flag : Flags)
+    OS << Flag << " ";
+  return OS;
+}
+
 void DslEmitter::beginFunction(StringRef Name, ArrayRef<TypedOperand> Params) {
   OS << "llvm_func " << Name << "(";
   interleaveComma(Params, OS);
@@ -54,23 +62,26 @@ void DslEmitter::beginBlock(unsigned Index) {
 }
 
 void DslEmitter::operation(unsigned Result, StringRef Opcode,
-                           ArrayRef<Operand> Args, StringRef Type) {
-  define(Result) << Opcode << " ";
+                           ArrayRef<StringRef> Flags, ArrayRef<Operand> Args,
+                           StringRef Type) {
+  define(Result, Opcode, Flags);
   interleaveComma(Args, OS);
   OS << " : " << Type << "\n";
 }
 
 void DslEmitter::comparison(unsigned Result, StringRef Opcode,
-                            StringRef Predicate, const Operand &LHS,
-                            const Operand &RHS, StringRef Type) {
-  define(Result) << Opcode << " " << Predicate << " " << LHS << ", " << RHS
-                 << " : " << Type << "\n";
+                            ArrayRef<StringRef> Flags, StringRef Predicate,
+                            const Operand &LHS, const Operand &RHS,
+                            StringRef Type) {
+  define(Result, Opcode, Flags)
+      << Predicate << " " << LHS << ", " << RHS << " : " << Type << "\n";
 }
 
-void DslEmitter::cast(unsigned Result, StringRef Opcode, const Operand &Arg,
+void DslEmitter::cast(unsigned Result, StringRef Opcode,
+                      ArrayRef<StringRef> Flags, const Operand &Arg,
                       StringRef From, StringRef To) {
-  define(Result) << Opcode << " " << Arg << " : " << From << " -> " << To
-                 << "\n";
+  define(Result, Opcode, Flags)
+      << Arg << " : " << From << " -> " << To << "\n";
 }
 
 void DslEmitter::phi(unsigned Result,
@@ -106,5 +117,7 @@ void DslEmitter::condBr(const Operand &Condition, unsigned IfTrue,
   OS << "    br " << Condition << ", ^bb" << IfTrue << ", ^bb" << IfFalse
      << "\n";
 }
+
+void DslEmitter::unreachable() { OS << "    unreachable\n"; }
 
 } // namespace extract

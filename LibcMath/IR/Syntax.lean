@@ -25,8 +25,54 @@ inductive Operand where
   | const (width bits : ℕ)
   deriving DecidableEq
 
+/-- The flags of integer instructions under which LLVM produces poison. An instruction whose flag
+is set has a result only when the condition of the flag holds; `Semantics.lean` states the
+conditions. A flag is consulted only by the instructions that carry it in LLVM.
+
+`getelementptr` flags (`inbounds`, `nuw`, `nusw`) have no counterpart here: a table access is one
+`load` instruction, which has a result only when its index is within the table, and that implies
+the conditions of all three. -/
+structure Flags where
+  /-- No unsigned overflow: `add`, `sub`, `mul`, `shl`, `trunc`. -/
+  nuw : Bool := false
+  /-- No signed overflow: `add`, `sub`, `mul`, `shl`, `trunc`. -/
+  nsw : Bool := false
+  /-- No set bit is shifted out: `lshr`, `ashr`. The division has no remainder: `udiv`. -/
+  exact : Bool := false
+  /-- The operands have no set bit in common: `or`. -/
+  disjoint : Bool := false
+  /-- The operands have the same sign: `icmp`. -/
+  samesign : Bool := false
+  /-- The operand is non-negative: `zext`, `uitofp`. -/
+  nneg : Bool := false
+  deriving DecidableEq
+
+/-- The fast-math flags that restrict the values of a floating-point instruction. An instruction
+whose flag is set has a result only when none of its floating-point arguments, and not its
+floating-point result, is a value the flag excludes. The other fast-math flags of LLVM (`nsz`,
+`arcp`, `contract`, `afn`, `reassoc`) license different results and are not represented. -/
+structure FastMathFlags where
+  /-- No NaNs. -/
+  nnan : Bool := false
+  /-- No infinities. -/
+  ninf : Bool := false
+  deriving DecidableEq
+
+/-- Integer instructions of two operands, and the intrinsics `llvm.umin`, `llvm.umax`, `llvm.smin`
+and `llvm.smax`. -/
 inductive IntBinOp where
   | add | sub | mul | and | or | xor | shl | lshr | ashr
+  | udiv | urem | umin | umax | smin | smax
+  deriving DecidableEq
+
+/-- The integer intrinsics of one operand: `llvm.ctlz`, `llvm.cttz`, `llvm.ctpop` and `llvm.abs`. -/
+inductive IntUnOp where
+  | ctlz | cttz | ctpop | abs
+  deriving DecidableEq
+
+/-- The funnel shifts `llvm.fshl` and `llvm.fshr`. -/
+inductive FunnelShift where
+  | fshl | fshr
   deriving DecidableEq
 
 inductive ICmp where
@@ -34,7 +80,7 @@ inductive ICmp where
   deriving DecidableEq
 
 inductive FBinOp where
-  | fadd | fsub | fmul
+  | fadd | fsub | fmul | fdiv
   deriving DecidableEq
 
 /-- Ordered comparisons are false, and unordered ones true, when an operand is NaN. -/
@@ -58,23 +104,42 @@ inductive CoreOp where
   deriving DecidableEq
 
 inductive Instr where
-  | intBin (op : IntBinOp) (a b : Operand)
-  | icmp (pred : ICmp) (a b : Operand)
-  | zext (width : ℕ) (a : Operand)
+  | intBin (op : IntBinOp) (a b : Operand) (flags : Flags := {})
+  /-- An integer intrinsic of one operand. `poison` is the constant second argument of `llvm.ctlz`
+  and `llvm.cttz` (`is_zero_poison`) and of `llvm.abs` (`is_int_min_poison`). -/
+  | intUn (op : IntUnOp) (a : Operand) (poison : Bool := false)
+  /-- `a` and `b` concatenated, shifted by `c` modulo the width. -/
+  | funnelShift (op : FunnelShift) (a b c : Operand)
+  | icmp (pred : ICmp) (a b : Operand) (flags : Flags := {})
+  | zext (width : ℕ) (a : Operand) (flags : Flags := {})
   | sext (width : ℕ) (a : Operand)
-  | trunc (width : ℕ) (a : Operand)
+  | trunc (width : ℕ) (a : Operand) (flags : Flags := {})
   | select (cond a b : Operand)
-  | fBin (fmt : FloatFormat) (op : FBinOp) (a b : Operand)
-  | fneg (fmt : FloatFormat) (a : Operand)
-  | fabs (fmt : FloatFormat) (a : Operand)
+  | fBin (fmt : FloatFormat) (op : FBinOp) (a b : Operand) (fmf : FastMathFlags := {})
+  | fneg (fmt : FloatFormat) (a : Operand) (fmf : FastMathFlags := {})
+  | fabs (fmt : FloatFormat) (a : Operand) (fmf : FastMathFlags := {})
   /-- `llvm.fmuladd`: `a * b + c`, fused or not at the discretion of the target. -/
-  | fmuladd (fmt : FloatFormat) (a b c : Operand)
-  | fcmp (fmt : FloatFormat) (pred : FCmp) (a b : Operand)
+  | fmuladd (fmt : FloatFormat) (a b c : Operand) (fmf : FastMathFlags := {})
+  | fcmp (fmt : FloatFormat) (pred : FCmp) (a b : Operand) (fmf : FastMathFlags := {})
   /-- `fpext` and `fptrunc`. -/
-  | fpConvert (src dst : FloatFormat) (a : Operand)
+  | fpConvert (src dst : FloatFormat) (a : Operand) (fmf : FastMathFlags := {})
   | fptosi (src : FloatFormat) (width : ℕ) (a : Operand)
+  | fptoui (src : FloatFormat) (width : ℕ) (a : Operand)
+  | sitofp (dst : FloatFormat) (a : Operand)
+  | uitofp (dst : FloatFormat) (a : Operand) (flags : Flags := {})
+  /-- `llvm.sqrt`. -/
+  | sqrt (fmt : FloatFormat) (a : Operand) (fmf : FastMathFlags := {})
+  /-- `llvm.copysign`: `a` with the sign of `b`. -/
+  | copysign (fmt : FloatFormat) (a b : Operand) (fmf : FastMathFlags := {})
+  /-- `llvm.is.fpclass`: whether `a` belongs to one of the classes that the bits of `mask`
+  select. -/
+  | isFpClass (fmt : FloatFormat) (a : Operand) (mask : ℕ)
   /-- A bit cast between an integer and a floating-point type; the bits are unchanged. -/
   | bitcast (a : Operand)
+  /-- `freeze`: the operand itself, as there are no poison or undefined values. -/
+  | freeze (a : Operand)
+  /-- `llvm.assume`: has a result, of width zero, only when the condition holds. -/
+  | assume (cond : Operand)
   /-- Read element `index` of constant table `table`. -/
   | load (table : ℕ) (index : Operand)
   | call (op : CoreOp) (args : List Operand)
@@ -83,6 +148,8 @@ inductive Terminator where
   | ret (a : Operand)
   | br (target : ℕ)
   | condBr (cond : Operand) (ifTrue ifFalse : ℕ)
+  /-- Reaching this terminator is undefined. -/
+  | unreachable
 
 structure Block where
   /-- Phi nodes: the register defined, and its value for each predecessor block. -/
