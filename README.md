@@ -38,8 +38,9 @@ Proofs are about the code the compiler produces, not about a transcription by ha
 
 - `MarkCoreOps` is a clang plugin that keeps a fixed list of libc operations (`extract/CoreOps.cpp`)
   as calls. It changes no code.
-- `ir2lean` exports one function as a `LibcMath.IR.Func` and rejects anything outside the
-  supported fragment.
+- `ir2lean` exports one function and rejects anything outside the supported fragment. Its output
+  is a Lean file in the `llvm_func` notation of `LibcMath/IR/DSL.lean`, which follows LLVM's
+  assembly language and defines a `LibcMath.IR.Func`.
 
 ```bash
 extract/extract.sh <llvm-project>/libc expf math::double_eval::expf expf
