@@ -1,0 +1,21 @@
+name = "LibcMath"
+version = "0.1.0"
+defaultTargets = ["LibcMath"]
+
+[leanOptions]
+pp.unicode.fun = true
+relaxedAutoImplicit = false
+maxSynthPendingDepth = 3
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.36.0"
+
+[[require]]
+name = "FloatLib"
+git = "https://github.com/lean-dojo/FloatLib"
+rev = "v4.1.0"
+
+[[lean_lib]]
+name = "LibcMath"
