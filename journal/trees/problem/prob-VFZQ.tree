@@ -7,6 +7,7 @@
 \tag{integration}
 \meta{status}{open}
 \meta{created}{2026-11-23}
+\meta{updated}{2026-11-23}
 \import{base-macros}
 
 \p{\strong{Status:} open.}
@@ -16,3 +17,4 @@
 \li{\code{\verb~|LibcMath/IR/InterpDiag.lean~} follows \code{\verb~|Func.execFrom~}. If the interpreter there gains a way to give up that the diagnostic does not follow, \code{\verb~|Func.explain~} says so in its answer; extend \code{\verb~|explainFrom~} then. The examples in \code{\verb~|LibcMath/IR/InterpExamples.lean~} will show whether the messages changed.}
 \li{The cases of \code{\verb~|Instr.exec_sound~} repeat one pattern for uniqueness, about fifteen times. \code{\verb~|grind~} closes it in the case that was tried ([ins-AJCO](ins-AJCO)). Apply it to the version of that branch, where the proofs are final, and measure the time of the file before and after: it took about four seconds before.}
 }
+\p{\strong{After the merge of \pr{13}} ([ses-UZN9](ses-UZN9)): the copy of the lemma is deleted and the diagnostic knows the new instructions; its reports for them were not tried on an example. Still to do: the cases of \code{\verb~|Instr.exec_sound~} with \code{\verb~|grind~}.}
