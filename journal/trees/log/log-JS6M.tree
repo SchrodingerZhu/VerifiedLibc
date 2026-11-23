@@ -1,0 +1,18 @@
+\title{An interpreter for extracted code, proved sound}
+\taxon{Change}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{ir}
+\meta{pr}{2}
+\import{base-macros}
+
+\p{\code{\verb~|LibcMath/IR/Interp.lean~} adds a computable interpreter for \code{\verb~|IR.Func~} and its soundness against the relational semantics \code{\verb~|Func.Returns~}. \pr{2}.}
+\ul{
+\li{\code{\verb~|Func.Returns~} does not determine a result: an arithmetic instruction may return any NaN where FloatLib returns one, and \code{\verb~|raiseExcept~} returns an unspecified integer. The interpreter therefore keeps an \code{\verb~|AbsVal~} per register: an exact value, some NaN of a format, or any value of a width. \code{\verb~|phi~}, \code{\verb~|select~}, \code{\verb~|bitcast~} and \code{\verb~|ret~} copy any of them; every other instruction needs exact operands, and the interpreter answers \code{\verb~|none~} otherwise.}
+\li{\code{\verb~|Func.exec_sound~}: when the interpreter answers, the function can return the answer, and the answer describes every result it can return. \code{\verb~|Func.runUnary_sound~} is the statement \code{\verb~|IR.Func.IsComputedBy f f.runUnary~} of the reduction ([log-SIDE](log-SIDE)), and \code{\verb~|Extracted.expf_isComputedBy~} in \code{\verb~|LibcMath/Exhaustive/ExpfInterp.lean~} states it for \code{\verb~|expf~}.}
+\li{\code{\verb~|none~} means that the interpreter gave up, not that the function has no result. Each block is entered at most once.}
+\li{The description of the pull request reports about 150 to 240 thousand inputs per second for \code{\verb~|expf~} to nearest in a compiled executable on one thread, and 3.8 thousand under \code{\verb~|#eval~}. The review did not repeat these measurements.}
+}
+\p{Left open: [prob-HIMH](prob-HIMH).}

@@ -7,6 +7,7 @@
 \tag{integration}
 \meta{status}{open}
 \meta{created}{2026-11-23}
+\meta{updated}{2026-11-23}
 \import{base-macros}
 
 \p{\strong{Status:} open.}
@@ -14,5 +15,6 @@
 \ul{
 \li{The branch of \pr{13} adds a clause that no execution goes wrong to \code{\verb~|IR.Func.IsComputedBy~} and \code{\verb~|IR.Func.CorrectAt~} in \code{\verb~|LibcMath/Exhaustive/Reduction.lean~}. The review changed other parts of that file; a merge has to be made and built.}
 \li{\code{\verb~|checkBlock~} of \pr{7}, in \code{\verb~|LibcMath/Exhaustive/Run/Block.lean~}, is the same computation as \code{\verb~|checkBits~} applied to \code{\verb~|checkRange.test O.check run mode~}. Keep one, and let the runner report \code{\verb~|checkRange.firstFailure~} when a block fails. See [ins-TZVS](ins-TZVS).}
-\li{The journal and \code{\verb~|CLAUDE.md~} exist only on the branch of \pr{1} until it is merged. A review of another pull request that writes journal trees before then has to carry the same scaffold.}
+\li{Resolved on 2026-11-23: \pr{1} was merged, so the journal and \code{\verb~|CLAUDE.md~} are on the main branch, and a branch gets them by merging it.}
+\li{For the interpreter, see [prob-VFZQ](prob-VFZQ).}
 }

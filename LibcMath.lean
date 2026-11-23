@@ -3,6 +3,7 @@ import LibcMath.Functions
 import LibcMath.SpecExamples
 import LibcMath.IR.Semantics
 import LibcMath.IR.Interp
+import LibcMath.IR.InterpDiag
 import LibcMath.SpecLemmas
 import LibcMath.Exhaustive.Interface
 import LibcMath.Exhaustive.Range
@@ -10,4 +11,6 @@ import LibcMath.Exhaustive.Reduction
 import LibcMath.Exhaustive.Modes
 import LibcMath.Exhaustive.Expf
 import LibcMath.Exhaustive.ReductionExamples
+import LibcMath.Exhaustive.ExpfInterp
+import LibcMath.IR.InterpExamples
 import LibcMath.Extracted.Statements

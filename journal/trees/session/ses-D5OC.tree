@@ -1,0 +1,21 @@
+\title{Review of the interpreter for extracted code}
+\taxon{Session}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{ir}
+\tag{review}
+\meta{harness}{Claude Code}
+\meta{model-id}{claude-fable-5-2}
+\meta{pr}{2}
+\import{base-macros}
+
+\p{Second review of the series described in [ses-9U0D](ses-9U0D), on \pr{2}, branch \code{\verb~|swarm/interp~}, after \pr{1} was merged. The main branch was merged into the branch first; the only conflict was the list of imports.}
+\ul{
+\li{\strong{Verified.} The branch builds with the main branch merged. \code{\verb~|expf_isComputedBy~} depends on \code{\verb~|propext~}, \code{\verb~|Classical.choice~} and \code{\verb~|Quot.sound~} only. The values of \code{\verb~|expf~} at \code{\verb~|1~} stated in the pull request are reproduced by the examples. The measurements of speed were not repeated.}
+\li{\strong{Changed.} [log-BRI0](log-BRI0), on top of [log-JS6M](log-JS6M).}
+\li{\strong{Lessons.} [ins-AJCO](ins-AJCO).}
+\li{\strong{Left open.} [prob-HIMH](prob-HIMH), [prob-VFZQ](prob-VFZQ); [prob-F4A8](prob-F4A8) was updated.}
+}
+\p{\strong{Reuse.} Nothing in the file repeats Mathlib or FloatLib. The store is an array that grows on assignment; the core library has no such assignment, and the one lemma about it is now one line.}
+\p{\strong{Scope.} The proofs after \code{\verb~|Instr.exec~} were not shortened although a shorter form was found, because the branch of \pr{13} rewrites them and would conflict line by line.}
