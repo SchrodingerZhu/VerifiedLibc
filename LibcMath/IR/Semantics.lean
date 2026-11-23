@@ -14,9 +14,9 @@ Execution of a `Func` under a rounding direction, as a relation between argument
   rounding direction in effect. LLVM itself only defines these instructions under the default
   floating-point environment; libc relies on the processor rounding them dynamically, and this
   file states that behavior.
-* The result of a floating-point instruction is any bit pattern with the same value as FloatLib's
-  result (`SameValue`), so nothing can be concluded about the sign or payload of a NaN it
-  produces.
+* The result of an arithmetic instruction or conversion is any bit pattern with the same value as
+  FloatLib's result (`SameValue`), so nothing can be concluded about the sign or payload of a NaN
+  it produces. `fneg` and `fabs` only change the sign bit, and their results are exact.
 * `llvm.fmuladd` is a multiplication followed by an addition, and `quickGetRound` returns the
   `FE_*` constants of x86-64. Both describe x86-64 without FMA instructions.
 * Core operations are given their intended behavior. Reporting through `errno` and the status
@@ -145,8 +145,8 @@ def Instr.Eval (mode : IEEERoundingMode) (f : Func) (env : Env) : Instr → Val 
   | .fBin fmt op a b, r =>
     ∃ x y, (a.eval env).bind (·.toModel? fmt) = some x ∧
       (b.eval env).bind (·.toModel? fmt) = some y ∧ r.Encodes (op.eval mode x y)
-  | .fneg fmt a, r => ∃ x, (a.eval env).bind (·.toModel? fmt) = some x ∧ r.Encodes x.neg
-  | .fabs fmt a, r => ∃ x, (a.eval env).bind (·.toModel? fmt) = some x ∧ r.Encodes x.abs
+  | .fneg fmt a, r => ∃ x, (a.eval env).bind (·.toModel? fmt) = some x ∧ r = .ofModel x.neg
+  | .fabs fmt a, r => ∃ x, (a.eval env).bind (·.toModel? fmt) = some x ∧ r = .ofModel x.abs
   | .fmuladd fmt a b c, r =>
     ∃ x y z, (a.eval env).bind (·.toModel? fmt) = some x ∧
       (b.eval env).bind (·.toModel? fmt) = some y ∧
