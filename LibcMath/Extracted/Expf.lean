@@ -3,8 +3,18 @@ import LibcMath.Extracted.Expf.Examples
 import LibcMath.Extracted.Expf.Statements
 import LibcMath.Extracted.Expf.Paths.Exec
 import LibcMath.Extracted.Expf.Paths.Ranges
-import LibcMath.Extracted.Expf.Main
 import LibcMath.Extracted.Expf.Polynomial
+import LibcMath.Extracted.Expf.HornerError
+import LibcMath.Extracted.Expf.TableBounds
+import LibcMath.Extracted.Expf.RangeReduction
+import LibcMath.Extracted.Expf.RoundingTransfer
+import LibcMath.Extracted.Expf.ProductError
+import LibcMath.Extracted.Expf.PointwiseExceptions
+import LibcMath.Extracted.Expf.Tmd.ChebCert
+import LibcMath.Extracted.Expf.Tmd.ExpApprox
+import LibcMath.Extracted.Expf.Tmd.Verify
+import LibcMath.Extracted.Expf.Tmd.Main
+import LibcMath.Extracted.Expf.Main
 
 /-!
 # `expf`

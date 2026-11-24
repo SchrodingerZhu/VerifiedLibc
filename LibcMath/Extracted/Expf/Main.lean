@@ -1,53 +1,48 @@
 import LibcMath.Extracted.Expf.Paths.Ranges
+import LibcMath.Extracted.Expf.PointwiseExceptions
 import LibcMath.Extracted.Expf.Polynomial
+import LibcMath.Extracted.Expf.ProductError
 import LibcMath.Extracted.Expf.Statements
+import LibcMath.Extracted.Expf.Tmd.Main
 
 /-!
-# `expf` is correctly rounded, with what is open stated as `sorry`
+# `expf` is correctly rounded
 
-`expf_correctlyRounded` is the theorem `ExpfCorrectlyRounded` for the plan `double_eval`. Its
-proof is complete except for two lemmas, which are stated here and end in `sorry`:
+`expf_correctlyRounded` proves `ExpfCorrectlyRounded` for the default plan `double_eval` across all
+`2³²` binary32 inputs and all four C rounding directions (`cModes`), with no `sorry` and only the
+three standard Lean axioms (`[propext, Classical.choice, Quot.sound]`):
 
-* `correctAt_main_pos`, the bit patterns `[0x32800001, 0x42B17218)`: `2⁻²⁶ < x < 88.72…`;
-* `correctAt_main_neg`, the bit patterns `[0xB2800001, 0xC2CFF1B5)`: `-103.97… < x < -2⁻²⁶`.
+* `Paths/Ranges.lean` proves the short paths (`3 749 616 693` bit patterns, `87.30 %`).
+* `correctAt_main_pos` closes `[0x32800001, 0x42B17218)` (`271 675 927` bit patterns, `6.33 %`)
+  by combining `ProductError.holdsOnBits_tiny_pos_main` (`[0x32800001, 0x33800000)`) with
+  `Tmd.Main.holdsOnBits_tmd_pos` (`[0x33800000, 0x42B17218)`).
+* `correctAt_main_neg` closes `[0xB2800001, 0xC2CFF1B5)` (`273 674 676` bit patterns, `6.37 %`)
+  by combining `ProductError.holdsOnBits_tiny_neg_main` (`[0xB2800001, 0xB3000000)`),
+  `PointwiseExceptions.correctAt_0xB3000000` (`0xB3000000`),
+  `Tmd.Main.holdsOnBits_tmd_neg` (`[0xB3000001, 0xC2CE8ED0)`), and
+  `ProductError.holdsOnBits_near_underflow_main` (`[0xC2CE8ED0, 0xC2CFF1B5)`).
 
-These are the inputs for which the function reads its tables and evaluates its polynomial:
-271 675 927 and 273 674 676 bit patterns, 12.70 % of all. Everything else, 87.30 %, is proved in
-`Paths/Ranges.lean`.
+## Analytical decomposition of the main path
+
+1. **UB-freedom & exact range reduction (`RangeReduction.lean`)**: `k = nearestInt (128 * x)` is an
+   exact integer, `r = submul(x, kf, 1/128) = x - k / 128` has zero rounding error with
+   `|r| ≤ 1 / 256` outside the two isolated directed-rounding boundary inputs `0x3B7FFFFF` and
+   `0xBB7FFFFF`, `fptosi?`, `sadd?`, and both table indices stay in bounds, and `r` widens to
+   binary64 exactly.
+2. **Value error (`Polynomial.lean`, `HornerError.lean`, `TableBounds.lean`, `ProductError.lean`)**:
+   the binary64 result `v = (EXP_M1[hi] * EXP_M2[mid]) * horner(xd)` is finite, positive, below
+   `posMaxFinite .binary32`, and satisfies `|v - exp x| ≤ (2 / 10¹⁵) * exp x` across all four C
+   rounding modes.
+3. **Rounding transfer & TMD (`RoundingTransfer.lean`, `PointwiseExceptions.lean`, `Tmd/`)**:
+   `25 256 675` tiny and near-underflow inputs are closed analytically; the remaining `520 093 927`
+   inputs are certified by `278 619` always-odd Chebyshev-L1 SLZ certificates checked in Lean's
+   kernel (`decide +kernel`) together with `103` pointwise inputs (including `0xC236BD8C`,
+   `0x3B7FFFFF`, `0xBB7FFFFF`, `0xB3000000`, and all hard-to-round points).
 
 The file also retains the conditional reductions of the other extracted evaluation plans
-(`DoubleEvalFma`, `StaticRounding`, `IntegerEval`) from their proved short paths (87.30 % and
-87.69 % of bit patterns) to their main polynomial ranges, together with
+(`DoubleEvalFma`, `StaticRounding`, `IntegerEval`) from their proved short paths (`87.30 %` and
+`87.69 %` of bit patterns) to their main polynomial ranges, together with
 `expfIntegerEvalCorrectlyRounded_of_staticRounding`.
-
-`#print axioms expf_correctlyRounded` lists `sorryAx` for as long as either lemma is open; the
-check at the end of this file records it. Do not replace a `sorry` here by a hypothesis of the
-theorem: an open obligation is to stay visible.
-
-## What a proof of the two lemmas has to show
-
-For an input `x` of these ranges and a rounding direction `mode`, with
-`k = nearestInt (128 * x)`, `r = x - k / 128`, `hi = ⌊k / 128⌋` and `mid = k mod 128`:
-
-1. **No undefined operation.** `k` converts to a 32-bit integer, `k + 13312` does not overflow,
-   and both table indices are in bounds, so that the function returns `some y`. This needs
-   `|k| ≤ 128 * 104`, from the bounds on `x`.
-2. **The reduction is exact.** `r` is computed without error and `|r| ≤ 1 / 256`.
-3. **The error of the value.** `y` is the rounding to binary32 of a binary64 number `v` with
-   `|v - exp x| ≤ ε * exp x`. The parts of `ε` are the error of the polynomial against `exp r`
-   (proved: `Poly.abs_poly_sub_exp_le`, at most `10⁻¹⁵`), the rounding of the eight binary64
-   operations of the polynomial and of the two multiplications, and the error of the two table
-   entries.
-4. **The rounding.** Rounding `v` to binary32 in direction `mode` gives the same result as
-   rounding `exp x`, because no rounding boundary of binary32 lies within `ε * exp x` of `exp x`.
-
-Steps 1 to 3 are numerical analysis of the expression that `Expf.DoubleEval.expf` is. Step 4 is a
-statement about how close `exp x` comes to a rounding boundary for a binary32 `x`; it does not
-follow from an error bound alone. The journal tree `prob-48KJ` tracks all four.
-
-The input `0xC236BD8C` is in `[0xB2800001, 0xC2CFF1B5)`. The function returns a constant
-expression for it without reading a table, so the four steps above do not describe it;
-`correctAt_main_neg` covers it as stated, and a proof will treat it by evaluation.
 -/
 
 namespace LibcMath.Extracted
@@ -59,30 +54,30 @@ open Model (IEEERoundingMode)
 
 variable {mode : IEEERoundingMode}
 
-/-- **Open.** `Expf.DoubleEval.expf` is correct for `2⁻²⁶ < x < 88.72…`, the positive inputs that
-reach its tables and its polynomial. The module docstring says what a proof has to show. -/
+/-- `Expf.DoubleEval.expf` is correctly rounded on `[0x32800001, 0x42B17218)` (`2⁻²⁶ < x < 88.72…`)
+in every C rounding mode. -/
 theorem correctAt_main_pos (hmode : mode ∈ cModes) :
     HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEval.expf mode)
-      0x32800001 0x42B17218 := by
-  sorry
+      0x32800001 0x42B17218 :=
+  (ProductError.holdsOnBits_tiny_pos_main hmode).append (Tmd.Main.holdsOnBits_tmd_pos hmode)
 
-/-- **Open.** `Expf.DoubleEval.expf` is correct for `-103.97… < x < -2⁻²⁶`, the negative inputs
-that reach its tables and its polynomial, and the one input `0xC236BD8C` among them that has a
-branch of its own. The module docstring says what a proof has to show. -/
+/-- `Expf.DoubleEval.expf` is correctly rounded on `[0xB2800001, 0xC2CFF1B5)`
+(`-103.97… < x < -2⁻²⁶`, including the special input `0xC236BD8C`) in every C rounding mode. -/
 theorem correctAt_main_neg (hmode : mode ∈ cModes) :
     HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEval.expf mode)
-      0xB2800001 0xC2CFF1B5 := by
-  sorry
+      0xB2800001 0xC2CFF1B5 :=
+  (((ProductError.holdsOnBits_tiny_neg_main hmode).append
+    (HoldsOnBits.singleton (PointwiseExceptions.correctAt_0xB3000000 hmode))).append
+    (Tmd.Main.holdsOnBits_tmd_neg hmode)).append
+    (ProductError.holdsOnBits_near_underflow_main hmode)
 
 end Expf
 
 open FloatLib.Floats.Formats.BinaryInterchange
 open Model (IEEERoundingMode)
 
-/-- `math::double_eval::expf` is correctly rounded in the four rounding directions of C.
-
-**The proof is not complete.** It uses `Expf.correctAt_main_pos` and `Expf.correctAt_main_neg`,
-which end in `sorry`. -/
+/-- `math::double_eval::expf` is correctly rounded in all four rounding directions of C and never
+reaches an undefined operation. -/
 theorem expf_correctlyRounded : ExpfCorrectlyRounded := by
   refine correctlyRounded_of_holdsOnBits fun mode hmode => ?_
   obtain ⟨low, middle, high⟩ := Expf.Paths.holdsOnBits_short_paths hmode
@@ -150,11 +145,11 @@ theorem expfIntegerEvalCorrectlyRounded_of_staticRounding
 
 /-! ### Axioms
 
-`sorryAx` is listed for as long as the two lemmas above are open. When they are proved, this
-check fails and has to be updated; that is intended. -/
+`expf_correctlyRounded` depends solely on the three standard Lean axioms (`propext`,
+`Classical.choice`, `Quot.sound`) — no `sorryAx`, no `Lean.ofReduceBool`, no oracle axioms. -/
 
 /--
-info: 'LibcMath.Extracted.expf_correctlyRounded' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]
+info: 'LibcMath.Extracted.expf_correctlyRounded' depends on axioms: [propext, Classical.choice, Quot.sound]
 -/
 #guard_msgs in
 #print axioms expf_correctlyRounded
