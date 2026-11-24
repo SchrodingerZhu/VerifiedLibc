@@ -25,4 +25,4 @@
 
 \p{\strong{What the statement rests on.} The translation by \code{\verb~|ast2lean~} and the definitions of \code{\verb~|LibcMath/Core/~}, which are tested against the compiled code and not proved; FloatLib's model of IEEE 754 arithmetic. \code{\verb~|errno~} and the exception flags are outside the statement: [prob-VR5Z](prob-VR5Z).}
 
-\p{\strong{Other plans.} \code{\verb~|double_eval_fma~}, \code{\verb~|integer_eval~}, \code{\verb~|static_rounding~}, \code{\verb~|float_eval~} and \code{\verb~|float_eval_cr_rn~} are extracted and tested. Nothing is stated or proved about them.}
+\p{\strong{Other plans.} \code{\verb~|double_eval_fma~}, \code{\verb~|static_rounding~}, \code{\verb~|integer_eval~}, and \code{\verb~|float_eval_cr_rn~} carry correctness statements in \code{\verb~|Statements.lean~}. The short paths of \code{\verb~|double_eval_fma~} (87.30 \%), \code{\verb~|static_rounding~} (87.69 \%), and \code{\verb~|integer_eval~} (87.69 \%, via \code{\verb~|integerEval_eq_staticRounding_nearest~}) are proved in \code{\verb~|Paths/~} with conditional reductions in \code{\verb~|Main.lean~}; their main polynomial ranges remain open.}
