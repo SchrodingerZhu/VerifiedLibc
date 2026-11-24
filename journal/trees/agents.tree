@@ -8,6 +8,7 @@
 \scope{
 \put\transclude/expanded{false}
 \transclude{claude-fable-5-2}
+\transclude{antigravity}
 }
 }
 

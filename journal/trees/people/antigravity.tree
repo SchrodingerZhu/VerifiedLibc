@@ -1,0 +1,28 @@
+\title{Antigravity}
+\taxon{Person}
+\meta{kind}{agent}
+\meta{vendor}{Google DeepMind}
+\meta{model-id}{antigravity}
+\p{Google DeepMind Antigravity coding agent.}
+
+\subtree[antigravity-written]{
+\title{Written}
+
+\scope{
+\put\transclude/expanded{false}
+\query\datalog{
+ ?X -: {\rel/has-author ?X @{antigravity}}
+}
+}
+}
+
+\subtree[antigravity-contributed]{
+\title{Contributed to}
+
+\scope{
+\put\transclude/expanded{false}
+\query\datalog{
+ ?X -: {\rel/has-direct-contributor ?X @{antigravity}}
+}
+}
+}
