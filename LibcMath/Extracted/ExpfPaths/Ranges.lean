@@ -145,11 +145,15 @@ theorem holdsOnBits_short_paths (hmode : mode ∈ cModes) :
 /-! ## `Expf.DoubleEvalFma.expf` short-path ranges -/
 
 theorem holdsOnBits_short_paths_fma (hmode : mode ∈ cModes) :
-    HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode) 0x00000000 0x32800001 ∧
-    HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode) 0x42B17218 0xB2800001 ∧
-    HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode) 0xC2CFF1B5 0x100000000 := by
+    HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode)
+        0x00000000 0x32800001 ∧
+    HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode)
+        0x42B17218 0xB2800001 ∧
+    HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode)
+        0xC2CFF1B5 0x100000000 := by
   have hsmall_pos :
-      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode) 0x00000000 0x32800001 :=
+      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode)
+          0x00000000 0x32800001 :=
     holdsOnBits_of_forall_bitVec fun b _ hhi => by
       refine .inl ?_
       rw [doubleEvalFma_of_small b (by omega)]
@@ -161,7 +165,8 @@ theorem holdsOnBits_short_paths_fma (hmode : mode ∈ cModes) :
         rw [one_add_of_tiny_pos_bits hmode hbits,
           ExpRanges.eval_of_tiny_pos_bits hmode ⟨hbits.1, by omega⟩]
   have hsmall_neg :
-      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode) 0x80000000 0xB2800001 :=
+      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode)
+          0x80000000 0xB2800001 :=
     holdsOnBits_of_forall_bitVec fun b hlo hhi => by
       refine .inl ?_
       rw [doubleEvalFma_of_small b (by omega)]
@@ -173,13 +178,15 @@ theorem holdsOnBits_short_paths_fma (hmode : mode ∈ cModes) :
         rw [one_add_of_tiny_neg_bits hmode hbits,
           ExpRanges.eval_of_tiny_neg_bits hmode ⟨hbits.1, by omega⟩]
   have hoverflow :
-      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode) 0x42B17218 0x7F800000 :=
+      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode)
+          0x42B17218 0x7F800000 :=
     holdsOnBits_of_forall_bitVec fun b hlo hhi => .inl (by
       rw [doubleEvalFma_of_overflow b hmode hlo (by omega),
         ExpRanges.eval_of_overflow_bits (x := f32(b)) hmode
           ⟨by rw [toNatBits_ofBits]; omega, by rw [toNatBits_ofBits]; omega⟩])
   have hposInf :
-      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode) 0x7F800000 0x7F800001 :=
+      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode)
+          0x7F800000 0x7F800001 :=
     holdsOnBits_of_forall_bitVec fun b hlo hhi => by
       obtain rfl : b = 0x7F800000#32 := BitVec.eq_of_toNat_eq (show b.toNat = 0x7F800000 by omega)
       refine .inl ?_
@@ -187,7 +194,8 @@ theorem holdsOnBits_short_paths_fma (hmode : mode ∈ cModes) :
         ExpRanges.eval_of_posInf_bits (x := f32(0x7F800000#32)) rfl]
       rcases hmode with rfl | rfl | rfl | rfl <;> decide +kernel
   have hposNan :
-      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode) 0x7F800001 0x80000000 :=
+      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode)
+          0x7F800001 0x80000000 :=
     holdsOnBits_of_forall_bitVec fun b hlo hhi => by
       have hnan : f32(b).isNaN = true :=
         Binary32.isNaN_iff.mpr (.inl (by rw [toNatBits_ofBits]; omega))
@@ -196,13 +204,15 @@ theorem holdsOnBits_short_paths_fma (hmode : mode ∈ cModes) :
         exact isNaN_add_of_isNaN_left mode hnan
       · rw [ExpRanges.eval_of_isNaN hnan]; decide +kernel
   have hunderflow :
-      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode) 0xC2CFF1B5 0xFF800000 :=
+      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode)
+          0xC2CFF1B5 0xFF800000 :=
     holdsOnBits_of_forall_bitVec fun b hlo hhi => .inl (by
       rw [doubleEvalFma_of_underflow b hmode hlo (by omega),
         ExpRanges.eval_of_underflow_bits (x := f32(b)) hmode
           ⟨by rw [toNatBits_ofBits]; omega, by rw [toNatBits_ofBits]; omega⟩])
   have hnegInf :
-      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode) 0xFF800000 0xFF800001 :=
+      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode)
+          0xFF800000 0xFF800001 :=
     holdsOnBits_of_forall_bitVec fun b hlo hhi => by
       obtain rfl : b = 0xFF800000#32 := BitVec.eq_of_toNat_eq (show b.toNat = 0xFF800000 by omega)
       refine .inl ?_
@@ -210,7 +220,8 @@ theorem holdsOnBits_short_paths_fma (hmode : mode ∈ cModes) :
         (Spec.exp .binary32).eval mode (Model.negInf .binary32)
       rw [doubleEvalFma_of_negInf, ExpRanges.eval_of_negInf_bits (x := Model.negInf .binary32) rfl]
   have hnegNan :
-      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode) 0xFF800001 0x100000000 :=
+      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode)
+          0xFF800001 0x100000000 :=
     holdsOnBits_of_forall_bitVec fun b hlo hhi => by
       have hnan : f32(b).isNaN = true :=
         Binary32.isNaN_iff.mpr (.inr (by rw [toNatBits_ofBits]; omega))
@@ -241,11 +252,15 @@ private theorem isNaN_or_quiet (b : BitVec 32)
 /-- All short-path ranges of the integer-only 4-mode kernel `Expf.StaticRounding.kernel`, covering
 3 766 393 907 of 2³² bit patterns (87.69 %) in every C rounding mode. -/
 theorem holdsOnBits_short_paths_staticRounding (hmode : mode ∈ cModes) :
-    HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode) 0x00000000 0x33000000 ∧
-    HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode) 0x42B17218 0xB3000000 ∧
-    HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode) 0xC2CFF1B5 0x100000000 := by
+    HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode)
+        0x00000000 0x33000000 ∧
+    HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode)
+        0x42B17218 0xB3000000 ∧
+    HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode)
+        0xC2CFF1B5 0x100000000 := by
   have hsmall_pos :
-      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode) 0x00000000 0x33000000 :=
+      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode)
+          0x00000000 0x33000000 :=
     holdsOnBits_of_forall_bitVec fun b _ hhi => .inl (by
       by_cases hzero : b.toNat = 0
       · rw [staticRounding_of_zero b (.inl hzero),
@@ -254,7 +269,8 @@ theorem holdsOnBits_short_paths_staticRounding (hmode : mode ∈ cModes) :
           ExpRanges.eval_of_tiny_pos_bits (x := f32(b)) hmode
             ⟨by rw [toNatBits_ofBits]; omega, by rw [toNatBits_ofBits]; omega⟩])
   have hsmall_neg :
-      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode) 0x80000000 0xB3000000 :=
+      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode)
+          0x80000000 0xB3000000 :=
     holdsOnBits_of_forall_bitVec fun b hlo hhi => .inl (by
       by_cases hzero : b.toNat = 0x80000000
       · rw [staticRounding_of_zero b (.inr hzero),
@@ -263,13 +279,15 @@ theorem holdsOnBits_short_paths_staticRounding (hmode : mode ∈ cModes) :
           ExpRanges.eval_of_tiny_neg_bits (x := f32(b)) hmode
             ⟨by rw [toNatBits_ofBits]; omega, by rw [toNatBits_ofBits]; omega⟩])
   have hoverflow :
-      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode) 0x42B17218 0x7F800000 :=
+      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode)
+          0x42B17218 0x7F800000 :=
     holdsOnBits_of_forall_bitVec fun b hlo hhi => .inl (by
       rw [staticRounding_of_overflow b hmode hlo (by omega),
         ExpRanges.eval_of_overflow_bits (x := f32(b)) hmode
           ⟨by rw [toNatBits_ofBits]; omega, by rw [toNatBits_ofBits]; omega⟩])
   have hposInf :
-      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode) 0x7F800000 0x7F800001 :=
+      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode)
+          0x7F800000 0x7F800001 :=
     holdsOnBits_of_forall_bitVec fun b hlo hhi => by
       obtain rfl : b = 0x7F800000#32 := BitVec.eq_of_toNat_eq (show b.toNat = 0x7F800000 by omega)
       refine .inl ?_
@@ -277,7 +295,8 @@ theorem holdsOnBits_short_paths_staticRounding (hmode : mode ∈ cModes) :
         (Spec.exp .binary32).eval mode (Model.posInf .binary32)
       rw [staticRounding_of_posInf, ExpRanges.eval_of_posInf_bits (x := Model.posInf .binary32) rfl]
   have hposNan :
-      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode) 0x7F800001 0x80000000 :=
+      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode)
+          0x7F800001 0x80000000 :=
     holdsOnBits_of_forall_bitVec fun b hlo hhi => by
       have hnan : f32(b).isNaN = true :=
         Binary32.isNaN_iff.mpr (.inl (by rw [toNatBits_ofBits]; omega))
@@ -286,13 +305,15 @@ theorem holdsOnBits_short_paths_staticRounding (hmode : mode ∈ cModes) :
         exact isNaN_or_quiet b (.inl ⟨by omega, by omega⟩)
       · rw [ExpRanges.eval_of_isNaN hnan]; decide +kernel
   have hunderflow :
-      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode) 0xC2CFF1B5 0xFF800000 :=
+      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode)
+          0xC2CFF1B5 0xFF800000 :=
     holdsOnBits_of_forall_bitVec fun b hlo hhi => .inl (by
       rw [staticRounding_of_underflow b hmode hlo (by omega),
         ExpRanges.eval_of_underflow_bits (x := f32(b)) hmode
           ⟨by rw [toNatBits_ofBits]; omega, by rw [toNatBits_ofBits]; omega⟩])
   have hnegInf :
-      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode) 0xFF800000 0xFF800001 :=
+      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode)
+          0xFF800000 0xFF800001 :=
     holdsOnBits_of_forall_bitVec fun b hlo hhi => by
       obtain rfl : b = 0xFF800000#32 := BitVec.eq_of_toNat_eq (show b.toNat = 0xFF800000 by omega)
       refine .inl ?_
@@ -300,7 +321,8 @@ theorem holdsOnBits_short_paths_staticRounding (hmode : mode ∈ cModes) :
         (Spec.exp .binary32).eval mode (Model.negInf .binary32)
       rw [staticRounding_of_negInf, ExpRanges.eval_of_negInf_bits (x := Model.negInf .binary32) rfl]
   have hnegNan :
-      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode) 0xFF800001 0x100000000 :=
+      HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode)
+          0xFF800001 0x100000000 :=
     holdsOnBits_of_forall_bitVec fun b hlo hhi => by
       have hnan : f32(b).isNaN = true :=
         Binary32.isNaN_iff.mpr (.inr (by rw [toNatBits_ofBits]; omega))
@@ -314,10 +336,14 @@ theorem holdsOnBits_short_paths_staticRounding (hmode : mode ∈ cModes) :
 /-- Short-path ranges of `Expf.IntegerEval.kernel` in `.nearest` mode, inherited directly from
 `Expf.StaticRounding.kernel` via `integerEval_eq_staticRounding_nearest`. -/
 theorem holdsOnBits_short_paths_integerEval :
-    HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.IntegerEval.kernel .nearest) 0x00000000 0x33000000 ∧
-    HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.IntegerEval.kernel .nearest) 0x42B17218 0xB3000000 ∧
-    HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.IntegerEval.kernel .nearest) 0xC2CFF1B5 0x100000000 := by
-  obtain ⟨h1, h2, h3⟩ := holdsOnBits_short_paths_staticRounding (mode := .nearest) (by simp [cModes])
+    HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.IntegerEval.kernel .nearest)
+        0x00000000 0x33000000 ∧
+    HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.IntegerEval.kernel .nearest)
+        0x42B17218 0xB3000000 ∧
+    HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.IntegerEval.kernel .nearest)
+        0xC2CFF1B5 0x100000000 := by
+  obtain ⟨h1, h2, h3⟩ :=
+    holdsOnBits_short_paths_staticRounding (mode := .nearest) (by simp [cModes])
   have tr : ∀ {lo hi},
       HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel .nearest) lo hi →
       HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.IntegerEval.kernel .nearest) lo hi :=

@@ -1,0 +1,19 @@
+\title{What a theorem about an extracted kernel does not say about the C++ code}
+\taxon{Problem}
+\date{2026-11-24}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{extraction}
+\tag{trust}
+\meta{status}{open}
+\meta{created}{2026-11-24}
+\import{base-macros}
+
+\p{\strong{Status:} open.}
+\p{Since [dec-03IY](dec-03IY) an extracted function is a total Lean function, and \code{\verb~|CorrectlyRounded~} is about its results. Three things that the earlier semantics of the IR stated, or that a reader may assume, are outside the statements. They were not listed anywhere before the review of [ses-L0FW](ses-L0FW).}
+\ul{
+\li{\strong{Undefined behaviour.} \code{\verb~|Core.fptosi~} and \code{\verb~|Core.fptoui~} return \code{\verb~|0~} where the conversion is out of range, a NaN or an infinity; C++ gives these no meaning. A table is read with \code{\verb~|[i]!~}, which returns a default when the index is out of bounds. The earlier semantics had executions that go wrong and required that there be none ([log-VH6E](log-VH6E)). To state it again, give these operations a result in \code{\verb~|Option~}, or prove for each kernel, on the ranges where it is used, that the argument is in range.}
+\li{\strong{Effects.} \code{\verb~|ast2lean --drop-effects~} removes \code{\verb~|errno~} and the floating-point exception flags. \code{\verb~|Core.setOverflow~} and \code{\verb~|Core.setUnderflow~} return the value only.}
+\li{\strong{The translation.} \code{\verb~|ast2lean~}, about 5 700 lines of C++, and \code{\verb~|LibcMath/Core/~} are trusted. The evidence is the differential test: on 2026-11-24, each of the five compiled plans agreed with its kernel on 10 199 702 inputs in each rounding direction it supports. For binary32 the test can cover all \code{\verb~|2³²~} inputs in each direction, at about the cost of one compiled exhaustive check; that was not run.}
+\li{\strong{NaNs.} A kernel returns the NaN that FloatLib computes. The statements compare results up to the identity of NaNs, so this matters only where code reads the bits of a NaN that an operation produced.}
+}

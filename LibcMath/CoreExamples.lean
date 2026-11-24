@@ -22,7 +22,8 @@ LLVM libc `multiply_add.h:189-190`:
 * without FMA + directed rounding (`x + ((-y) * z)`): `RU(2^-149 + RU(-2^-150)) = 2^-149`
 * without FMA + RN-only (`x - (y * z)`): `RU(2^-149 - RU(2^-150)) = 0` -/
 example :
-    submul[MathConfig.defaultX86_64, .up](f32(0x00000001#32), f32(0x00000001#32), f32(0x3F000000#32))
+    submul[MathConfig.defaultX86_64, .up](f32(0x00000001#32), f32(0x00000001#32),
+      f32(0x3F000000#32))
       = f32(0x00000001#32) := by
   decide +kernel
 
@@ -34,7 +35,8 @@ example :
 
 /-- With FMA, `sub_multiply(1 + 2^-23, 1 + 2^-23, 1)` computes the exact single-rounded residual. -/
 example :
-    submul[MathConfig.x86_64Fma, .nearest](f32(0x3F800001#32), f32(0x3F800001#32), f32(0x3F800000#32))
+    submul[MathConfig.x86_64Fma, .nearest](f32(0x3F800001#32), f32(0x3F800001#32),
+      f32(0x3F800000#32))
       = f32(0x00000000#32) := by
   decide +kernel
 
@@ -69,12 +71,14 @@ example :
 /-! ### `Frac64` exact vs 32-bit split multiplication -/
 
 example :
-    (Frac64.mul { hasInt128 := true } (frac64(0x8000000000000000#64)) (frac64(0x8000000000000000#64))).val
+    (Frac64.mul { hasInt128 := true } (frac64(0x8000000000000000#64))
+      (frac64(0x8000000000000000#64))).val
       = 0x4000000000000000#64 := by
   decide +kernel
 
 example :
-    (Frac64.mul { hasInt128 := false } (frac64(0x8000000000000000#64)) (frac64(0x8000000000000000#64))).val
+    (Frac64.mul { hasInt128 := false } (frac64(0x8000000000000000#64))
+      (frac64(0x8000000000000000#64))).val
       = 0x4000000000000000#64 := by
   decide +kernel
 
@@ -89,10 +93,13 @@ example (x : Model .binary32) : FPBits.getVal (FPBits.ofVal x) = x := by
   grind
 
 /-- Concrete width resolution via `FmtBitWidth` allows direct `BitVec 32` ops and `bitCast`. -/
-example : ((FPBits.uintval (FPBits.ofVal f32(0xBF800000#32))) &&& 0x7FFFFFFF#32) = 0x3F800000#32 := by
+example :
+    ((FPBits.uintval (FPBits.ofVal f32(0xBF800000#32))) &&& 0x7FFFFFFF#32) = 0x3F800000#32 := by
   decide +kernel
 
-example : (Core.bitCast (Core.bitCast f32(0x3F800000#32) : BitVec 32) : Model .binary32) = f32(0x3F800000#32) := by
+example :
+    (Core.bitCast (Core.bitCast f32(0x3F800000#32) : BitVec 32) : Model .binary32) =
+      f32(0x3F800000#32) := by
   decide +kernel
 
 /-! ### Agent-friendly diagnostics -/

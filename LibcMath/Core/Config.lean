@@ -59,7 +59,7 @@ structure MathConfig where
   hasFastFloat16 : Bool := false
   /-- `LIBC_TYPES_HAS_INT128` (selects native 64x64→128 vs 32-bit split `quick_mul_hi`). -/
   hasInt128 : Bool := true
-  /-- Clang target triple (e.g. `x86_64-pc-linux-gnu`). -/
+  /-- Clang target triple (e.g. `x86_64-unknown-linux-gnu`). -/
   targetTriple : String := "x86_64-unknown-linux-gnu"
   /-- Selected implementation plan / namespace (e.g. `double_eval`, `integer_eval`). -/
   implVariant : String := "default"
@@ -85,7 +85,8 @@ def hasFma (cfg : MathConfig) (fmt : FloatFormat) : Bool :=
   else if fmt == .binary64 then cfg.hasFmaDouble
   else false
 
-/-- Whether hardware FPU operations are assumed for `fmt`, matching `fputil::internal::HAS_HW_FPU`. -/
+/-- Whether hardware FPU operations are assumed for `fmt`, matching `fputil::internal::HAS_HW_FPU`.
+-/
 @[inline, grind]
 def hasHwFpu (cfg : MathConfig) (fmt : FloatFormat) : Bool :=
   if fmt == .binary16 then cfg.hasFastFloat16

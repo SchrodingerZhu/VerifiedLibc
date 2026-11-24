@@ -6,7 +6,8 @@ bin="$root/build/ast2lean"
 
 if [[ ! -x "$bin" ]]; then
   cmake -S "$root" -B "$root/build" -G Ninja \
-    -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release
+    -DCMAKE_C_COMPILER="${AST2LEAN_CC:-clang}" -DCMAKE_CXX_COMPILER="${AST2LEAN_CXX:-clang++}" \
+    -DCMAKE_BUILD_TYPE=Release
   ninja -C "$root/build"
 fi
 
@@ -37,7 +38,13 @@ check_contains "dyadic-except" "Core.ExceptValues.lookup config mode MY_EXCEPTS"
 check_contains "dyadic-match"  "match Core.quickGetRound mode with"     "$out_dyadic"
 
 out_horner=$("$bin" "$root/test/dyadic_sample.cpp" --function=manual_horner)
-check_contains "horner-fold"   "horner[config, mode] r [f64(0x3FF0000000000000#64), f64(0x3FE0000000000000#64), f64(0x3FC5555555555555#64), f64(0x3FA5555555555555#64)]" "$out_horner"
+# The coefficient list is longer than a line, so the emitter breaks it after a comma.
+check_contains "horner-fold"   "horner[config, mode] r [f64(0x3FF0000000000000#64), f64(0x3FE0000000000000#64)," "$out_horner"
+check_contains "horner-wrap"   "    f64(0x3FC5555555555555#64), f64(0x3FA5555555555555#64)]" "$out_horner"
+if awk 'length > 100' <<<"$out_expf" | grep -q "f64("; then
+  echo "FAIL [table-width]: a table row of the generated module is longer than 100 columns" >&2
+  exit 1
+fi
 
 out_loop=$("$bin" "$root/test/dyadic_sample.cpp" --function=loop_reduce)
 check_contains "loop-do"       "Id.run do"           "$out_loop"

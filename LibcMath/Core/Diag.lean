@@ -99,7 +99,8 @@ def diagnoseBlock {fmt : FloatFormat}
       let x : Model fmt := .ofNatBits (first + i)
       !check mode x (impl mode x) with
   | none =>
-      s!"[{label}] mode={modeName mode} range=[{hexBits (BitVec.ofNat fmt.bitWidth first)}, +{count}): ok"
+      let start := hexBits (BitVec.ofNat fmt.bitWidth first)
+      s!"[{label}] mode={modeName mode} range=[{start}, +{count}): ok"
   | some i =>
       let n := first + i
       let x : Model fmt := .ofNatBits n
@@ -114,7 +115,8 @@ def firstDiffBits {fmt : FloatFormat}
     let x : Model fmt := .ofNatBits (first + i)
     !sameValueBool (impl₁ mode x) (impl₂ mode x)).map (first + ·)
 
-/-- Short human-readable tag identifying a kernel and its evaluation variant (e.g. `expf/double_eval`). -/
+/-- Short human-readable tag identifying a kernel and its evaluation variant (e.g.
+`expf/double_eval`). -/
 def kernelTag {fmt : FloatFormat} (k : UnaryKernel fmt) : String :=
   s!"{k.info.name}/{k.info.config.implVariant}"
 

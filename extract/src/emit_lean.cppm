@@ -36,7 +36,7 @@ auto formatMathConfig(const ir::MathConfig &cfg) -> std::string;
 
 } // namespace libc_extract
 
-module :private;
+module : private;
 
 namespace libc_extract {
 namespace {
@@ -46,11 +46,15 @@ using namespace ir;
 auto joinWith(const std::vector<std::string> &items, std::string_view sep) -> std::string {
   std::string out;
   for (auto [idx, item] : std::views::enumerate(items)) {
-    if (idx > 0) out.append(sep);
+    if (idx > 0)
+      out.append(sep);
     out.append(item);
   }
   return out;
 }
+
+/// Lines of generated Lean are kept within this many columns where a break is possible.
+constexpr std::size_t kMaxColumns = 100;
 
 auto indentStr(int level) -> std::string {
   return std::string(static_cast<std::size_t>(level) * 2, ' ');
@@ -58,9 +62,8 @@ auto indentStr(int level) -> std::string {
 
 auto leanIdent(std::string_view name) -> std::string {
   constexpr std::string_view kKeywords[] = {
-    "in", "do", "let", "if", "then", "else", "match", "with", "where",
-    "def", "fun", "by", "have", "from", "import", "end", "open", "type",
-    "meta", "of",
+      "in",  "do", "let",  "if",   "then",   "else", "match", "with", "where", "def",
+      "fun", "by", "have", "from", "import", "end",  "open",  "type", "meta",  "of",
   };
   if (std::ranges::contains(kKeywords, name)) {
     return std::format("{}'", name);
@@ -74,136 +77,145 @@ auto emitType(const TypePtr &ty) -> std::string;
 
 auto emitTypeArg(const TypePtr &ty) -> std::string {
   auto s = emitType(ty);
-  if (s.find(' ') != std::string::npos) return std::format("({})", s);
+  if (s.find(' ') != std::string::npos)
+    return std::format("({})", s);
   return s;
 }
 
 auto emitType(const TypePtr &ty) -> std::string {
-  if (!ty) return "_";
-  return std::visit(Overloaded{
-    [](const VoidType &) { return std::string("Unit"); },
-    [](const BoolType &) { return std::string("Bool"); },
-    [](const IntType &i) {
-      return std::format("BitVec {}", i.width);
-    },
-    [](const FloatType &f) {
-      return std::format("Model {}", floatFmtLean(f.fmt));
-    },
-    [](const FPBitsType &f) {
-      return std::format("Core.FPBits {}", floatFmtLean(f.fmt));
-    },
-    [](const DyadicFloatType &d) {
-      return std::format("Core.DyadicFloat {}", d.bits);
-    },
-    [](const NumberPairType &np) {
-      if (np.fmt == FloatFmt::Binary32) return std::string("Core.FloatFloat");
-      if (np.fmt == FloatFmt::Binary64) return std::string("Core.DoubleDouble");
-      return std::format("Core.NumberPair (Model {})", floatFmtLean(np.fmt));
-    },
-    [](const TripleDoubleType &) { return std::string("Core.TripleDouble"); },
-    [](const Frac64Type &) { return std::string("Core.Frac64"); },
-    [](const ExceptValuesType &e) {
-      return std::format("Core.ExceptValues {}", floatFmtLean(e.fmt));
-    },
-    [](const SignType &) { return std::string("Core.Sign"); },
-    [](const OptionalType &o) {
-      return std::format("Option {}", emitTypeArg(o.elem));
-    },
-    [](const ArrayType &a) {
-      return std::format("Array {}", emitTypeArg(a.elem));
-    },
-    [](const StructType &s) { return s.name; },
-    [](const PtrType &p) { return emitType(p.pointee); },
-    [](const OpaqueType &o) { return std::format("Core.Opaque /- {} -/", o.cpp_name); },
-  }, ty->v);
+  if (!ty)
+    return "_";
+  return std::visit(
+      Overloaded{
+          [](const VoidType &) { return std::string("Unit"); },
+          [](const BoolType &) { return std::string("Bool"); },
+          [](const IntType &i) { return std::format("BitVec {}", i.width); },
+          [](const FloatType &f) { return std::format("Model {}", floatFmtLean(f.fmt)); },
+          [](const FPBitsType &f) { return std::format("Core.FPBits {}", floatFmtLean(f.fmt)); },
+          [](const DyadicFloatType &d) { return std::format("Core.DyadicFloat {}", d.bits); },
+          [](const NumberPairType &np) {
+            if (np.fmt == FloatFmt::Binary32)
+              return std::string("Core.FloatFloat");
+            if (np.fmt == FloatFmt::Binary64)
+              return std::string("Core.DoubleDouble");
+            return std::format("Core.NumberPair (Model {})", floatFmtLean(np.fmt));
+          },
+          [](const TripleDoubleType &) { return std::string("Core.TripleDouble"); },
+          [](const Frac64Type &) { return std::string("Core.Frac64"); },
+          [](const ExceptValuesType &e) {
+            return std::format("Core.ExceptValues {}", floatFmtLean(e.fmt));
+          },
+          [](const SignType &) { return std::string("Core.Sign"); },
+          [](const OptionalType &o) { return std::format("Option {}", emitTypeArg(o.elem)); },
+          [](const ArrayType &a) { return std::format("Array {}", emitTypeArg(a.elem)); },
+          [](const StructType &s) { return s.name; },
+          [](const PtrType &p) { return emitType(p.pointee); },
+          [](const OpaqueType &o) { return std::format("Core.Opaque /- {} -/", o.cpp_name); },
+      },
+      ty->v);
 }
 
 auto emitConst(const ConstVal &cv, bool float_comments, int ind = 0) -> std::string {
-  return std::visit(Overloaded{
-    [](const BoolConst &b) { return std::string(b.value ? "true" : "false"); },
-    [](const SignConst &s) { return std::string(s.is_neg ? "Core.Sign.neg" : "Core.Sign.pos"); },
-    [](const IntConst &i) {
-      return std::format("0x{}#{}", i.hex_bits, i.width);
-    },
-    [float_comments](const FloatConst &f) {
-      auto bits = floatFmtBits(f.fmt);
-      auto hex_w = bits / 4;
-      auto core = std::format("{}(0x{:0{}X}#{})", floatFmtShort(f.fmt), f.raw_bits, hex_w, bits);
-      if (float_comments && !f.repr.empty()) {
-        return std::format("{} /- {} -/", core, f.repr);
-      }
-      return core;
-    },
-    [](const Frac64Const &fc) {
-      return std::format("frac64(0x{}#64)", fc.hex_bits);
-    },
-    [](const DyadicConst &d) {
-      return std::format("{{ sign := {}, exponent := {}, mantissa := 0x{}#{} }}",
-                         d.sign_neg ? "Core.Sign.neg" : "Core.Sign.pos",
-                         d.exponent, d.mantissa_hex, d.bits);
-    },
-    [](const NumberPairConst &np) {
-      auto bits = floatFmtBits(np.fmt);
-      auto hex_w = bits / 4;
-      auto tag = floatFmtShort(np.fmt);
-      auto ty = (np.fmt == FloatFmt::Binary32) ? "Core.FloatFloat" : "Core.DoubleDouble";
-      return std::format("({{ lo := {}(0x{:0{}X}#{}), hi := {}(0x{:0{}X}#{}) }} : {})",
-                         tag, np.lo_bits, hex_w, bits, tag, np.hi_bits, hex_w, bits, ty);
-    },
-    [float_comments, ind](const ArrayConst &arr) {
-      if (arr.elems.empty()) return std::string("#[]");
-      bool nested = std::ranges::any_of(arr.elems, [](const ConstVal &el) {
-        return std::holds_alternative<ArrayConst>(el.v) ||
-               std::holds_alternative<StructConst>(el.v) ||
-               std::holds_alternative<DyadicConst>(el.v) ||
-               std::holds_alternative<NumberPairConst>(el.v);
-      });
-      std::size_t per_line = nested ? 1 : 4;
-      std::string out = "#[\n";
-      auto pad = indentStr(ind + 1);
-      auto chunks = arr.elems | std::views::chunk(per_line);
-      std::size_t emitted = 0;
-      for (auto chunk : chunks) {
-        out += pad;
-        for (auto [j, el] : std::views::enumerate(chunk)) {
-          if (j > 0) out += ", ";
-          out += emitConst(el, float_comments, ind + 1);
-          ++emitted;
-        }
-        if (emitted < arr.elems.size()) out += ",";
-        out += "\n";
-      }
-      out += indentStr(ind) + "]";
-      return out;
-    },
-    [float_comments, ind](const StructConst &sc) {
-      std::vector<std::string> parts;
-      parts.reserve(sc.fields.size());
-      for (const auto &[fname, fval] : sc.fields) {
-        parts.push_back(std::format("{} := {}", leanIdent(fname),
-                                    emitConst(fval, float_comments, ind + 1)));
-      }
-      return std::format("{{ {} }}", joinWith(parts, ", "));
-    },
-  }, cv.v);
+  return std::visit(
+      Overloaded{
+          [](const BoolConst &b) { return std::string(b.value ? "true" : "false"); },
+          [](const SignConst &s) {
+            return std::string(s.is_neg ? "Core.Sign.neg" : "Core.Sign.pos");
+          },
+          [](const IntConst &i) { return std::format("0x{}#{}", i.hex_bits, i.width); },
+          [float_comments](const FloatConst &f) {
+            auto bits = floatFmtBits(f.fmt);
+            auto hex_w = bits / 4;
+            auto core =
+                std::format("{}(0x{:0{}X}#{})", floatFmtShort(f.fmt), f.raw_bits, hex_w, bits);
+            if (float_comments && !f.repr.empty()) {
+              return std::format("{} /- {} -/", core, f.repr);
+            }
+            return core;
+          },
+          [](const Frac64Const &fc) { return std::format("frac64(0x{}#64)", fc.hex_bits); },
+          [](const DyadicConst &d) {
+            return std::format("{{ sign := {}, exponent := {}, mantissa := 0x{}#{} }}",
+                               d.sign_neg ? "Core.Sign.neg" : "Core.Sign.pos", d.exponent,
+                               d.mantissa_hex, d.bits);
+          },
+          [](const NumberPairConst &np) {
+            auto bits = floatFmtBits(np.fmt);
+            auto hex_w = bits / 4;
+            auto tag = floatFmtShort(np.fmt);
+            auto ty = (np.fmt == FloatFmt::Binary32) ? "Core.FloatFloat" : "Core.DoubleDouble";
+            return std::format("({{ lo := {}(0x{:0{}X}#{}), hi := {}(0x{:0{}X}#{}) }} : {})", tag,
+                               np.lo_bits, hex_w, bits, tag, np.hi_bits, hex_w, bits, ty);
+          },
+          [float_comments, ind](const ArrayConst &arr) {
+            if (arr.elems.empty())
+              return std::string("#[]");
+            bool nested = std::ranges::any_of(arr.elems, [](const ConstVal &el) {
+              return std::holds_alternative<ArrayConst>(el.v) ||
+                     std::holds_alternative<StructConst>(el.v) ||
+                     std::holds_alternative<DyadicConst>(el.v) ||
+                     std::holds_alternative<NumberPairConst>(el.v);
+            });
+            // Pack as many elements on a line as fit in `kMaxColumns`; an element that spans
+            // several lines, or a nested constant, gets a line of its own.
+            std::string out = "#[\n";
+            auto pad = indentStr(ind + 1);
+            std::string line;
+            auto flush = [&](bool more) {
+              if (line.empty())
+                return;
+              out += pad + line + (more ? "," : "") + "\n";
+              line.clear();
+            };
+            for (std::size_t j = 0; j < arr.elems.size(); ++j) {
+              std::string el = emitConst(arr.elems[j], float_comments, ind + 1);
+              bool alone = nested || el.contains('\n');
+              bool last = j + 1 == arr.elems.size();
+              if (alone) {
+                flush(true);
+                line = el;
+                flush(!last);
+                continue;
+              }
+              // The line also holds the indentation and a trailing comma.
+              if (!line.empty() && pad.size() + line.size() + 2 + el.size() + 1 > kMaxColumns)
+                flush(true);
+              line += (line.empty() ? "" : ", ") + el;
+              if (last)
+                flush(false);
+            }
+            out += indentStr(ind) + "]";
+            return out;
+          },
+          [float_comments, ind](const StructConst &sc) {
+            std::vector<std::string> parts;
+            parts.reserve(sc.fields.size());
+            for (const auto &[fname, fval] : sc.fields) {
+              parts.push_back(std::format("{} := {}", leanIdent(fname),
+                                          emitConst(fval, float_comments, ind + 1)));
+            }
+            return std::format("{{ {} }}", joinWith(parts, ", "));
+          },
+      },
+      cv.v);
 }
 
 auto isAtomicExpr(const ExprPtr &e) -> bool {
-  if (!e) return true;
+  if (!e)
+    return true;
   if (const auto *c = std::get_if<CastExpr>(&e->v)) {
-    if (c->kind == CastKind::NoOp) return isAtomicExpr(c->operand);
+    if (c->kind == CastKind::NoOp)
+      return isAtomicExpr(c->operand);
     if (c->kind == CastKind::IntToInt && e->type && c->operand && c->operand->type) {
       const auto *dst = std::get_if<IntType>(&e->type->v);
       const auto *src = std::get_if<IntType>(&c->operand->type->v);
-      if (dst && src && dst->width == src->width) return isAtomicExpr(c->operand);
+      if (dst && src && dst->width == src->width)
+        return isAtomicExpr(c->operand);
     }
   }
-  return std::holds_alternative<ConstExpr>(e->v) ||
-         std::holds_alternative<VarExpr>(e->v) ||
-         std::holds_alternative<TableRefExpr>(e->v) ||
-         std::holds_alternative<IndexExpr>(e->v) ||
-         std::holds_alternative<FieldExpr>(e->v) ||
-         std::holds_alternative<TupleExpr>(e->v) ||
+  return std::holds_alternative<ConstExpr>(e->v) || std::holds_alternative<VarExpr>(e->v) ||
+         std::holds_alternative<TableRefExpr>(e->v) || std::holds_alternative<IndexExpr>(e->v) ||
+         std::holds_alternative<FieldExpr>(e->v) || std::holds_alternative<TupleExpr>(e->v) ||
          std::holds_alternative<StructLitExpr>(e->v) ||
          std::holds_alternative<StructUpdateExpr>(e->v);
 }
@@ -229,8 +241,7 @@ public:
     // Constant tables.
     for (const auto &tbl : mod.tables) {
       out += std::format("/-- Constant table `{}`. -/\n", tbl.cpp_name);
-      out += std::format("def {} : {} :=\n  {}\n\n",
-                         tbl.lean_name, emitType(tbl.type),
+      out += std::format("def {} : {} :=\n  {}\n\n", tbl.lean_name, emitType(tbl.type),
                          emitConst(tbl.value, opts_.emit_float_comments, 1));
     }
 
@@ -252,7 +263,7 @@ public:
 private:
   auto emitMathConfigDef(const MathConfig &cfg) -> std::string {
     return std::format(
-R"(/-- Active LLVM libc `LIBC_MATH_*` and target CPU configuration captured by `ast2lean`. -/
+        R"(/-- Active LLVM libc `LIBC_MATH_*` and target CPU configuration captured by `ast2lean`. -/
 def config : Core.MathConfig :=
   {{ skipAccuratePass := {}
     smallTables := {}
@@ -272,22 +283,12 @@ def config : Core.MathConfig :=
     implVariant := "{}" }}
 
 )",
-        leanBool(cfg.skip_accurate_pass),
-        leanBool(cfg.small_tables),
-        leanBool(cfg.no_errno),
-        leanBool(cfg.no_except),
-        leanBool(cfg.intermediate_comp_in_float),
-        leanBool(cfg.assume_round_nearest_only),
-        leanBool(cfg.has_fma_half),
-        leanBool(cfg.has_fma_float),
-        leanBool(cfg.has_fma_double),
-        leanBool(cfg.has_nearest_int),
-        leanBool(cfg.has_fpu_float),
-        leanBool(cfg.has_fpu_double),
-        leanBool(cfg.has_fast_float16),
-        leanBool(cfg.has_int128),
-        cfg.target_triple,
-        cfg.impl_variant);
+        leanBool(cfg.skip_accurate_pass), leanBool(cfg.small_tables), leanBool(cfg.no_errno),
+        leanBool(cfg.no_except), leanBool(cfg.intermediate_comp_in_float),
+        leanBool(cfg.assume_round_nearest_only), leanBool(cfg.has_fma_half),
+        leanBool(cfg.has_fma_float), leanBool(cfg.has_fma_double), leanBool(cfg.has_nearest_int),
+        leanBool(cfg.has_fpu_float), leanBool(cfg.has_fpu_double), leanBool(cfg.has_fast_float16),
+        leanBool(cfg.has_int128), cfg.target_triple, cfg.impl_variant);
   }
 
   auto emitKernelBundle(const ir::Module &mod, const Function &main_fn) -> std::string {
@@ -298,7 +299,7 @@ def config : Core.MathConfig :=
     }
 
     std::string out = std::format(
-R"(/-- Machine-readable provenance and configuration metadata for `{}`. -/
+        R"(/-- Machine-readable provenance and configuration metadata for `{}`. -/
 def kernelMeta : Core.KernelMeta :=
   {{ name := "{}"
     cppFunction := "{}"
@@ -311,8 +312,7 @@ def kernelMeta : Core.KernelMeta :=
 
 )",
         main_fn.lean_name, main_fn.lean_name, main_fn.cpp_name, main_fn.mangled_name,
-        mod.source_file, mod.source_commit, mod.clang_version,
-        joinWith(tbl_names, ", "));
+        mod.source_file, mod.source_commit, mod.clang_version, joinWith(tbl_names, ", "));
 
     // Emit `UnaryKernel` bundle when main_fn is unary `Model fmt -> Model fmt`
     // or a static-rounding kernel `(x : Model fmt) (rounding : BitVec 32) -> Model fmt`.
@@ -325,7 +325,7 @@ def kernelMeta : Core.KernelMeta :=
                                     ? main_fn.lean_name
                                     : std::format("fun _ x => {} x", main_fn.lean_name);
         out += std::format(
-R"(/-- Extracted unary kernel bundle carrying metadata and executable implementation. -/
+            R"(/-- Extracted unary kernel bundle carrying metadata and executable implementation. -/
 def kernel : Core.UnaryKernel {} :=
   {{ info := kernelMeta
     eval := {} }}
@@ -333,19 +333,20 @@ def kernel : Core.UnaryKernel {} :=
 )",
             floatFmtLean(in_fmt), eval_expr);
       }
-    } else if (main_fn.params.size() == 2 &&
-               main_fn.params[0].type && main_fn.params[0].type->isFloat() &&
-               main_fn.params[1].name == "rounding" &&
-               main_fn.params[1].type && main_fn.params[1].type->isInt() &&
-               main_fn.return_type && main_fn.return_type->isFloat()) {
+    } else if (main_fn.params.size() == 2 && main_fn.params[0].type &&
+               main_fn.params[0].type->isFloat() && main_fn.params[1].name == "rounding" &&
+               main_fn.params[1].type && main_fn.params[1].type->isInt() && main_fn.return_type &&
+               main_fn.return_type->isFloat()) {
       auto in_fmt = std::get<FloatType>(main_fn.params[0].type->v).fmt;
       auto out_fmt = std::get<FloatType>(main_fn.return_type->v).fmt;
       if (in_fmt == out_fmt) {
-        std::string eval_expr = main_fn.uses_rounding_mode
-            ? std::format("fun mode x => {} mode x (Core.quickGetRound mode)", main_fn.lean_name)
-            : std::format("fun mode x => {} x (Core.quickGetRound mode)", main_fn.lean_name);
+        std::string eval_expr =
+            main_fn.uses_rounding_mode
+                ? std::format("fun mode x => {} mode x (Core.quickGetRound mode)",
+                              main_fn.lean_name)
+                : std::format("fun mode x => {} x (Core.quickGetRound mode)", main_fn.lean_name);
         out += std::format(
-R"(/-- Extracted unary kernel bundle adapting static `FE_*` rounding to `IEEERoundingMode`. -/
+            R"(/-- Extracted unary kernel bundle adapting static `FE_*` rounding to `IEEERoundingMode`. -/
 def kernel : Core.UnaryKernel {} :=
   {{ info := kernelMeta
     eval := {} }}
@@ -381,8 +382,8 @@ def kernel : Core.UnaryKernel {} :=
       sig_params.push_back(std::format("({} : {})", leanIdent(p.name), emitType(p.type)));
     }
 
-    out += std::format("def {} {} : {} :=\n",
-                       fn.lean_name, joinWith(sig_params, " "), emitType(fn.return_type));
+    out += std::format("def {} {} : {} :=\n", fn.lean_name, joinWith(sig_params, " "),
+                       emitType(fn.return_type));
     if (fn.lifted_expr) {
       out += emitExprBlock(*fn.lifted_expr, 1);
       out += "\n";
@@ -413,153 +414,156 @@ def kernel : Core.UnaryKernel {} :=
   }
 
   auto emitInlineExpr(const ExprPtr &e) -> std::string {
-    if (!e) return "()";
-    return std::visit(Overloaded{
-      [&](const ConstExpr &c) { return emitConst(c.value, opts_.emit_float_comments); },
-      [](const VarExpr &v) { return leanIdent(v.name); },
-      [](const TableRefExpr &t) { return t.table_name; },
-      [&](const UnaryExpr &u) {
-        switch (u.op) {
-        case UnaryOp::Neg:
-          if (e->type && e->type->isFloat()) {
-            return std::format("Core.fneg {}", emitArg(u.operand));
-          }
-          return std::format("-{}", emitArg(u.operand));
-        case UnaryOp::BitNot:
-          return std::format("~~~{}", emitArg(u.operand));
-        case UnaryOp::LogNot:
-          return std::format("!{}", emitArg(u.operand));
-        }
-        return emitArg(u.operand);
-      },
-      [&](const BinaryExpr &b) { return emitBinary(b, e->type); },
-      [&](const CastExpr &c) { return emitCast(c, e->type); },
-      [&](const SelectExpr &s) {
-        return std::format("if {} then {} else {}",
-                           emitInlineExpr(s.cond), emitInlineExpr(s.then_e),
-                           emitInlineExpr(s.else_e));
-      },
-      [&](const IndexExpr &ix) {
-        if (const auto *ce = std::get_if<ConstExpr>(&ix.index->v)) {
-          if (const auto *ic = std::get_if<IntConst>(&ce->value.v);
-              ic && ic->fits_i64 && ic->signed_val >= 0) {
-            return std::format("{}[{}]!", emitArg(ix.base), ic->signed_val);
-          }
-        }
-        return std::format("{}[{}.toNat]!", emitArg(ix.base), emitArg(ix.index));
-      },
-      [&](const FieldExpr &f) {
-        return std::format("{}.{}", emitArg(f.base), leanIdent(f.field));
-      },
-      [&](const StructLitExpr &sl) {
-        std::vector<std::string> parts;
-        parts.reserve(sl.fields.size());
-        for (const auto &[fname, fe] : sl.fields) {
-          parts.push_back(std::format("{} := {}", leanIdent(fname), emitInlineExpr(fe)));
-        }
-        if (sl.type_name.empty()) {
-          return std::format("{{ {} }}", joinWith(parts, ", "));
-        }
-        return std::format("({{ {} }} : {})", joinWith(parts, ", "), sl.type_name);
-      },
-      [&](const StructUpdateExpr &su) {
-        return std::format("{{ {} with {} := {} }}",
-                           emitInlineExpr(su.base), leanIdent(su.field),
-                           emitInlineExpr(su.value));
-      },
-      [&](const CoreCallExpr &cc) {
-        // Use clean Core.DSL syntax for multiply_add / multiply_sub / sub_multiply.
-        if (cc.op == CoreOpKind::MultiplyAdd && cc.args.size() == 3) {
-          return std::format("madd[config, {}]({}, {}, {})",
-                             currentModeArg(),
-                             emitInlineExpr(cc.args[0]),
-                             emitInlineExpr(cc.args[1]),
-                             emitInlineExpr(cc.args[2]));
-        }
-        if (cc.op == CoreOpKind::MultiplySub && cc.args.size() == 3) {
-          return std::format("msub[config, {}]({}, {}, {})",
-                             currentModeArg(),
-                             emitInlineExpr(cc.args[0]),
-                             emitInlineExpr(cc.args[1]),
-                             emitInlineExpr(cc.args[2]));
-        }
-        if (cc.op == CoreOpKind::SubMultiply && cc.args.size() == 3) {
-          return std::format("submul[config, {}]({}, {}, {})",
-                             currentModeArg(),
-                             emitInlineExpr(cc.args[0]),
-                             emitInlineExpr(cc.args[1]),
-                             emitInlineExpr(cc.args[2]));
-        }
-        if (cc.op == CoreOpKind::BitCast && cc.args.size() == 1) {
-          return std::format("(Core.bitCast {} : {})", emitArg(cc.args[0]), emitType(e->type));
-        }
-        if (cc.op == CoreOpKind::FPBitsOfBits && cc.args.size() == 1) {
-          if (e->type) {
-            if (const auto *ft = std::get_if<FPBitsType>(&e->type->v)) {
-              return std::format("Core.FPBits.ofBits (fmt := {}) {}",
-                                 floatFmtLean(ft->fmt), emitArg(cc.args[0]));
-            }
-          }
-        }
+    if (!e)
+      return "()";
+    return std::visit(
+        Overloaded{
+            [&](const ConstExpr &c) { return emitConst(c.value, opts_.emit_float_comments); },
+            [](const VarExpr &v) { return leanIdent(v.name); },
+            [](const TableRefExpr &t) { return t.table_name; },
+            [&](const UnaryExpr &u) {
+              switch (u.op) {
+              case UnaryOp::Neg:
+                if (e->type && e->type->isFloat()) {
+                  return std::format("Core.fneg {}", emitArg(u.operand));
+                }
+                return std::format("-{}", emitArg(u.operand));
+              case UnaryOp::BitNot:
+                return std::format("~~~{}", emitArg(u.operand));
+              case UnaryOp::LogNot:
+                return std::format("!{}", emitArg(u.operand));
+              }
+              return emitArg(u.operand);
+            },
+            [&](const BinaryExpr &b) { return emitBinary(b, e->type); },
+            [&](const CastExpr &c) { return emitCast(c, e->type); },
+            [&](const SelectExpr &s) {
+              return std::format("if {} then {} else {}", emitInlineExpr(s.cond),
+                                 emitInlineExpr(s.then_e), emitInlineExpr(s.else_e));
+            },
+            [&](const IndexExpr &ix) {
+              if (const auto *ce = std::get_if<ConstExpr>(&ix.index->v)) {
+                if (const auto *ic = std::get_if<IntConst>(&ce->value.v);
+                    ic && ic->fits_i64 && ic->signed_val >= 0) {
+                  return std::format("{}[{}]!", emitArg(ix.base), ic->signed_val);
+                }
+              }
+              return std::format("{}[{}.toNat]!", emitArg(ix.base), emitArg(ix.index));
+            },
+            [&](const FieldExpr &f) {
+              return std::format("{}.{}", emitArg(f.base), leanIdent(f.field));
+            },
+            [&](const StructLitExpr &sl) {
+              std::vector<std::string> parts;
+              parts.reserve(sl.fields.size());
+              for (const auto &[fname, fe] : sl.fields) {
+                parts.push_back(std::format("{} := {}", leanIdent(fname), emitInlineExpr(fe)));
+              }
+              if (sl.type_name.empty()) {
+                return std::format("{{ {} }}", joinWith(parts, ", "));
+              }
+              return std::format("({{ {} }} : {})", joinWith(parts, ", "), sl.type_name);
+            },
+            [&](const StructUpdateExpr &su) {
+              return std::format("{{ {} with {} := {} }}", emitInlineExpr(su.base),
+                                 leanIdent(su.field), emitInlineExpr(su.value));
+            },
+            [&](const CoreCallExpr &cc) {
+              // Use clean Core.DSL syntax for multiply_add / multiply_sub / sub_multiply.
+              if (cc.op == CoreOpKind::MultiplyAdd && cc.args.size() == 3) {
+                return std::format("madd[config, {}]({}, {}, {})", currentModeArg(),
+                                   emitInlineExpr(cc.args[0]), emitInlineExpr(cc.args[1]),
+                                   emitInlineExpr(cc.args[2]));
+              }
+              if (cc.op == CoreOpKind::MultiplySub && cc.args.size() == 3) {
+                return std::format("msub[config, {}]({}, {}, {})", currentModeArg(),
+                                   emitInlineExpr(cc.args[0]), emitInlineExpr(cc.args[1]),
+                                   emitInlineExpr(cc.args[2]));
+              }
+              if (cc.op == CoreOpKind::SubMultiply && cc.args.size() == 3) {
+                return std::format("submul[config, {}]({}, {}, {})", currentModeArg(),
+                                   emitInlineExpr(cc.args[0]), emitInlineExpr(cc.args[1]),
+                                   emitInlineExpr(cc.args[2]));
+              }
+              if (cc.op == CoreOpKind::BitCast && cc.args.size() == 1) {
+                return std::format("(Core.bitCast {} : {})", emitArg(cc.args[0]),
+                                   emitType(e->type));
+              }
+              if (cc.op == CoreOpKind::FPBitsOfBits && cc.args.size() == 1) {
+                if (e->type) {
+                  if (const auto *ft = std::get_if<FPBitsType>(&e->type->v)) {
+                    return std::format("Core.FPBits.ofBits (fmt := {}) {}", floatFmtLean(ft->fmt),
+                                       emitArg(cc.args[0]));
+                  }
+                }
+              }
 
-        std::vector<std::string> parts;
-        parts.push_back(cc.lean_name);
-        for (const auto &ta : cc.type_args) parts.push_back(ta);
-        if (cc.needs_config) parts.emplace_back("config");
-        if (cc.needs_mode) parts.emplace_back(currentModeArg());
-        for (const auto &a : cc.args) parts.push_back(emitArg(a));
-        return joinWith(parts, " ");
-      },
-      [&](const PolyevalExpr &pe) {
-        auto m = currentModeArg();
-        if (pe.scheme == PolyScheme::Estrin) {
-          if (pe.array_arg && pe.coeffs.size() == 1) {
-            if (pe.offset > 0) {
-              return std::format("estrin[config, {}, {}] {} {}",
-                                 m, pe.offset, emitArg(pe.var), emitArg(pe.coeffs[0]));
-            }
-            return std::format("estrin[config, {}] {} {}",
-                               m, emitArg(pe.var), emitArg(pe.coeffs[0]));
-          }
-          std::vector<std::string> cs;
-          for (const auto &c : pe.coeffs) cs.push_back(emitInlineExpr(c));
-          return std::format("Core.estrinList config {} {} [{}]",
-                             m, emitArg(pe.var), joinWith(cs, ", "));
-        }
-        if (pe.array_arg && pe.coeffs.size() == 1) {
-          auto fn_name = (pe.scheme == PolyScheme::AltHorner) ? "Core.altpolyeval" : "Core.polyeval";
-          return std::format("{} config {} {} {} {}",
-                             fn_name, m, emitArg(pe.var), emitArg(pe.coeffs[0]), pe.offset);
-        }
-        auto kw = (pe.scheme == PolyScheme::AltHorner) ? "althorner" : "horner";
-        std::vector<std::string> cs;
-        cs.reserve(pe.coeffs.size());
-        for (const auto &c : pe.coeffs) cs.push_back(emitInlineExpr(c));
-        return std::format("{}[config, {}] {} [{}]", kw, m, emitArg(pe.var), joinWith(cs, ", "));
-      },
-      [&](const FuncCallExpr &fc) {
-        std::vector<std::string> parts;
-        parts.push_back(fc.callee);
-        if (fc.needs_mode) parts.emplace_back(currentModeArg());
-        for (const auto &a : fc.args) parts.push_back(emitArg(a));
-        return joinWith(parts, " ");
-      },
-      [&](const TupleExpr &te) {
-        std::vector<std::string> parts;
-        parts.reserve(te.elems.size());
-        for (const auto &el : te.elems) parts.push_back(emitInlineExpr(el));
-        return std::format("({})", joinWith(parts, ", "));
-      },
-      [&](const CallJoinExpr &cj) {
-        return std::format("{} ()", leanIdent(cj.name));
-      },
-      [&](const UnsupportedExpr &u) {
-        return std::format("(Core.unsupported \"{}\")", u.reason);
-      },
-      [&](const auto &) {
-        return std::format("(\n{}\n)", emitExprBlock(e, 2));
-      },
-    }, e->v);
+              std::vector<std::string> parts;
+              parts.push_back(cc.lean_name);
+              for (const auto &ta : cc.type_args)
+                parts.push_back(ta);
+              if (cc.needs_config)
+                parts.emplace_back("config");
+              if (cc.needs_mode)
+                parts.emplace_back(currentModeArg());
+              for (const auto &a : cc.args)
+                parts.push_back(emitArg(a));
+              return joinWith(parts, " ");
+            },
+            [&](const PolyevalExpr &pe) {
+              auto m = currentModeArg();
+              if (pe.scheme == PolyScheme::Estrin) {
+                if (pe.array_arg && pe.coeffs.size() == 1) {
+                  if (pe.offset > 0) {
+                    return std::format("estrin[config, {}, {}] {} {}", m, pe.offset,
+                                       emitArg(pe.var), emitArg(pe.coeffs[0]));
+                  }
+                  return std::format("estrin[config, {}] {} {}", m, emitArg(pe.var),
+                                     emitArg(pe.coeffs[0]));
+                }
+                std::vector<std::string> cs;
+                for (const auto &c : pe.coeffs)
+                  cs.push_back(emitInlineExpr(c));
+                return std::format("Core.estrinList config {} {} [{}]", m, emitArg(pe.var),
+                                   joinWith(cs, ", "));
+              }
+              if (pe.array_arg && pe.coeffs.size() == 1) {
+                auto fn_name =
+                    (pe.scheme == PolyScheme::AltHorner) ? "Core.altpolyeval" : "Core.polyeval";
+                return std::format("{} config {} {} {} {}", fn_name, m, emitArg(pe.var),
+                                   emitArg(pe.coeffs[0]), pe.offset);
+              }
+              auto kw = (pe.scheme == PolyScheme::AltHorner) ? "althorner" : "horner";
+              std::vector<std::string> cs;
+              cs.reserve(pe.coeffs.size());
+              for (const auto &c : pe.coeffs)
+                cs.push_back(emitInlineExpr(c));
+              return std::format("{}[config, {}] {} [{}]", kw, m, emitArg(pe.var),
+                                 joinWith(cs, ", "));
+            },
+            [&](const FuncCallExpr &fc) {
+              std::vector<std::string> parts;
+              parts.push_back(fc.callee);
+              if (fc.needs_mode)
+                parts.emplace_back(currentModeArg());
+              for (const auto &a : fc.args)
+                parts.push_back(emitArg(a));
+              return joinWith(parts, " ");
+            },
+            [&](const TupleExpr &te) {
+              std::vector<std::string> parts;
+              parts.reserve(te.elems.size());
+              for (const auto &el : te.elems)
+                parts.push_back(emitInlineExpr(el));
+              return std::format("({})", joinWith(parts, ", "));
+            },
+            [&](const CallJoinExpr &cj) { return std::format("{} ()", leanIdent(cj.name)); },
+            [&](const UnsupportedExpr &u) {
+              return std::format("(Core.unsupported \"{}\")", u.reason);
+            },
+            [&](const auto &) { return std::format("(\n{}\n)", emitExprBlock(e, 2)); },
+        },
+        e->v);
   }
 
   auto emitBinary(const BinaryExpr &b, const TypePtr &res_ty) -> std::string {
@@ -568,17 +572,28 @@ def kernel : Core.UnaryKernel {} :=
     if (is_float_operands) {
       auto m = currentModeArg();
       switch (b.op) {
-      case BinaryOp::Add: return std::format("Core.fadd {} {} {}", m, emitArg(b.lhs), emitArg(b.rhs));
-      case BinaryOp::Sub: return std::format("Core.fsub {} {} {}", m, emitArg(b.lhs), emitArg(b.rhs));
-      case BinaryOp::Mul: return std::format("Core.fmul {} {} {}", m, emitArg(b.lhs), emitArg(b.rhs));
-      case BinaryOp::Div: return std::format("Core.fdiv {} {} {}", m, emitArg(b.lhs), emitArg(b.rhs));
-      case BinaryOp::Eq:  return std::format("Core.feq {} {}", emitArg(b.lhs), emitArg(b.rhs));
-      case BinaryOp::Ne:  return std::format("Core.fne {} {}", emitArg(b.lhs), emitArg(b.rhs));
-      case BinaryOp::Lt:  return std::format("Core.flt {} {}", emitArg(b.lhs), emitArg(b.rhs));
-      case BinaryOp::Le:  return std::format("Core.fle {} {}", emitArg(b.lhs), emitArg(b.rhs));
-      case BinaryOp::Gt:  return std::format("Core.fgt {} {}", emitArg(b.lhs), emitArg(b.rhs));
-      case BinaryOp::Ge:  return std::format("Core.fge {} {}", emitArg(b.lhs), emitArg(b.rhs));
-      default: break;
+      case BinaryOp::Add:
+        return std::format("Core.fadd {} {} {}", m, emitArg(b.lhs), emitArg(b.rhs));
+      case BinaryOp::Sub:
+        return std::format("Core.fsub {} {} {}", m, emitArg(b.lhs), emitArg(b.rhs));
+      case BinaryOp::Mul:
+        return std::format("Core.fmul {} {} {}", m, emitArg(b.lhs), emitArg(b.rhs));
+      case BinaryOp::Div:
+        return std::format("Core.fdiv {} {} {}", m, emitArg(b.lhs), emitArg(b.rhs));
+      case BinaryOp::Eq:
+        return std::format("Core.feq {} {}", emitArg(b.lhs), emitArg(b.rhs));
+      case BinaryOp::Ne:
+        return std::format("Core.fne {} {}", emitArg(b.lhs), emitArg(b.rhs));
+      case BinaryOp::Lt:
+        return std::format("Core.flt {} {}", emitArg(b.lhs), emitArg(b.rhs));
+      case BinaryOp::Le:
+        return std::format("Core.fle {} {}", emitArg(b.lhs), emitArg(b.rhs));
+      case BinaryOp::Gt:
+        return std::format("Core.fgt {} {}", emitArg(b.lhs), emitArg(b.rhs));
+      case BinaryOp::Ge:
+        return std::format("Core.fge {} {}", emitArg(b.lhs), emitArg(b.rhs));
+      default:
+        break;
       }
     }
 
@@ -587,8 +602,7 @@ def kernel : Core.UnaryKernel {} :=
       return std::format("{} <<< {}", emitArg(b.lhs), emitShiftAmountNat(b.rhs));
     }
     if (b.op == BinaryOp::Shr) {
-      bool signed_lhs = b.lhs && b.lhs->type &&
-                        std::holds_alternative<IntType>(b.lhs->type->v) &&
+      bool signed_lhs = b.lhs && b.lhs->type && std::holds_alternative<IntType>(b.lhs->type->v) &&
                         std::get<IntType>(b.lhs->type->v).is_signed;
       if (signed_lhs) {
         return std::format("BitVec.sshiftRight {} {}", emitArg(b.lhs), emitShiftAmountNat(b.rhs));
@@ -600,21 +614,33 @@ def kernel : Core.UnaryKernel {} :=
       if (const auto *it = std::get_if<IntType>(&b.lhs->type->v)) {
         if (it->is_signed) {
           switch (b.op) {
-          case BinaryOp::Lt:  return std::format("BitVec.slt {} {}", emitArg(b.lhs), emitArg(b.rhs));
-          case BinaryOp::Le:  return std::format("BitVec.sle {} {}", emitArg(b.lhs), emitArg(b.rhs));
-          case BinaryOp::Gt:  return std::format("BitVec.slt {} {}", emitArg(b.rhs), emitArg(b.lhs));
-          case BinaryOp::Ge:  return std::format("BitVec.sle {} {}", emitArg(b.rhs), emitArg(b.lhs));
-          case BinaryOp::Div: return std::format("BitVec.sdiv {} {}", emitArg(b.lhs), emitArg(b.rhs));
-          case BinaryOp::Rem: return std::format("BitVec.srem {} {}", emitArg(b.lhs), emitArg(b.rhs));
-          default: break;
+          case BinaryOp::Lt:
+            return std::format("BitVec.slt {} {}", emitArg(b.lhs), emitArg(b.rhs));
+          case BinaryOp::Le:
+            return std::format("BitVec.sle {} {}", emitArg(b.lhs), emitArg(b.rhs));
+          case BinaryOp::Gt:
+            return std::format("BitVec.slt {} {}", emitArg(b.rhs), emitArg(b.lhs));
+          case BinaryOp::Ge:
+            return std::format("BitVec.sle {} {}", emitArg(b.rhs), emitArg(b.lhs));
+          case BinaryOp::Div:
+            return std::format("BitVec.sdiv {} {}", emitArg(b.lhs), emitArg(b.rhs));
+          case BinaryOp::Rem:
+            return std::format("BitVec.srem {} {}", emitArg(b.lhs), emitArg(b.rhs));
+          default:
+            break;
           }
         } else {
           switch (b.op) {
-          case BinaryOp::Lt: return std::format("BitVec.ult {} {}", emitArg(b.lhs), emitArg(b.rhs));
-          case BinaryOp::Le: return std::format("BitVec.ule {} {}", emitArg(b.lhs), emitArg(b.rhs));
-          case BinaryOp::Gt: return std::format("BitVec.ult {} {}", emitArg(b.rhs), emitArg(b.lhs));
-          case BinaryOp::Ge: return std::format("BitVec.ule {} {}", emitArg(b.rhs), emitArg(b.lhs));
-          default: break;
+          case BinaryOp::Lt:
+            return std::format("BitVec.ult {} {}", emitArg(b.lhs), emitArg(b.rhs));
+          case BinaryOp::Le:
+            return std::format("BitVec.ule {} {}", emitArg(b.lhs), emitArg(b.rhs));
+          case BinaryOp::Gt:
+            return std::format("BitVec.ult {} {}", emitArg(b.rhs), emitArg(b.lhs));
+          case BinaryOp::Ge:
+            return std::format("BitVec.ule {} {}", emitArg(b.rhs), emitArg(b.lhs));
+          default:
+            break;
           }
         }
       }
@@ -622,24 +648,60 @@ def kernel : Core.UnaryKernel {} :=
 
     std::string_view sym = "+";
     switch (b.op) {
-    case BinaryOp::Add:    sym = "+";   break;
-    case BinaryOp::Sub:    sym = "-";   break;
-    case BinaryOp::Mul:    sym = "*";   break;
-    case BinaryOp::Div:    sym = "/";   break;
-    case BinaryOp::Rem:    sym = "%";   break;
-    case BinaryOp::BitAnd: sym = "&&&"; break;
-    case BinaryOp::BitOr:  sym = "|||"; break;
-    case BinaryOp::BitXor: sym = "^^^"; break;
-    case BinaryOp::Shl:    sym = "<<<"; break;
-    case BinaryOp::Shr:    sym = ">>>"; break;
-    case BinaryOp::Eq:     sym = "==";  break;
-    case BinaryOp::Ne:     sym = "!=";  break;
-    case BinaryOp::Lt:     sym = "<";   break;
-    case BinaryOp::Le:     sym = "≤";   break;
-    case BinaryOp::Gt:     sym = ">";   break;
-    case BinaryOp::Ge:     sym = "≥";   break;
-    case BinaryOp::LogAnd: sym = "&&";  break;
-    case BinaryOp::LogOr:  sym = "||";  break;
+    case BinaryOp::Add:
+      sym = "+";
+      break;
+    case BinaryOp::Sub:
+      sym = "-";
+      break;
+    case BinaryOp::Mul:
+      sym = "*";
+      break;
+    case BinaryOp::Div:
+      sym = "/";
+      break;
+    case BinaryOp::Rem:
+      sym = "%";
+      break;
+    case BinaryOp::BitAnd:
+      sym = "&&&";
+      break;
+    case BinaryOp::BitOr:
+      sym = "|||";
+      break;
+    case BinaryOp::BitXor:
+      sym = "^^^";
+      break;
+    case BinaryOp::Shl:
+      sym = "<<<";
+      break;
+    case BinaryOp::Shr:
+      sym = ">>>";
+      break;
+    case BinaryOp::Eq:
+      sym = "==";
+      break;
+    case BinaryOp::Ne:
+      sym = "!=";
+      break;
+    case BinaryOp::Lt:
+      sym = "<";
+      break;
+    case BinaryOp::Le:
+      sym = "≤";
+      break;
+    case BinaryOp::Gt:
+      sym = ">";
+      break;
+    case BinaryOp::Ge:
+      sym = "≥";
+      break;
+    case BinaryOp::LogAnd:
+      sym = "&&";
+      break;
+    case BinaryOp::LogOr:
+      sym = "||";
+      break;
     }
     (void)res_ty;
     return std::format("{} {} {}", emitArg(b.lhs), sym, emitArg(b.rhs));
@@ -657,8 +719,8 @@ def kernel : Core.UnaryKernel {} :=
       break;
     case CastKind::FloatToInt:
       if (const auto *it = std::get_if<IntType>(&dst_ty->v)) {
-        return std::format("{} {} {}", it->is_signed ? "Core.fptosi" : "Core.fptoui",
-                           it->width, emitArg(c.operand));
+        return std::format("{} {} {}", it->is_signed ? "Core.fptosi" : "Core.fptoui", it->width,
+                           emitArg(c.operand));
       }
       break;
     case CastKind::IntToFloat:
@@ -680,7 +742,8 @@ def kernel : Core.UnaryKernel {} :=
             src_w = src_i->width;
           }
         }
-        if (src_w == dst_i->width) return emitInlineExpr(c.operand);
+        if (src_w == dst_i->width)
+          return emitInlineExpr(c.operand);
         if (dst_i->width > src_w && src_signed) {
           return std::format("BitVec.signExtend {} {}", dst_i->width, emitArg(c.operand));
         }
@@ -693,8 +756,8 @@ def kernel : Core.UnaryKernel {} :=
       return std::format("({} != 0)", emitInlineExpr(c.operand));
     case CastKind::BoolToInt:
       if (const auto *dst_i = std::get_if<IntType>(&dst_ty->v)) {
-        return std::format("(if {} then 0x1#{} else 0x0#{})",
-                           emitInlineExpr(c.operand), dst_i->width, dst_i->width);
+        return std::format("(if {} then 0x1#{} else 0x0#{})", emitInlineExpr(c.operand),
+                           dst_i->width, dst_i->width);
       }
       break;
     }
@@ -702,7 +765,8 @@ def kernel : Core.UnaryKernel {} :=
   }
 
   auto emitExprBlock(const ExprPtr &e, int ind) -> std::string {
-    if (!e) return indentStr(ind) + "()";
+    if (!e)
+      return indentStr(ind) + "()";
     auto pad = indentStr(ind);
 
     if (const auto *le = std::get_if<LetExpr>(&e->v)) {
@@ -710,37 +774,35 @@ def kernel : Core.UnaryKernel {} :=
       if (std::holds_alternative<IfExpr>(le->value->v) ||
           std::holds_alternative<MatchExpr>(le->value->v) ||
           std::holds_alternative<LetExpr>(le->value->v)) {
-        out += std::format("{}let {} :=\n{}\n",
-                           pad, leanIdent(le->name), emitExprBlock(le->value, ind + 1));
+        out += std::format("{}let {} :=\n{}\n", pad, leanIdent(le->name),
+                           emitExprBlock(le->value, ind + 1));
       } else {
-        out += std::format("{}let {} := {}\n",
-                           pad, leanIdent(le->name), emitInlineExpr(le->value));
+        out += std::format("{}let {} := {}\n", pad, leanIdent(le->name), emitInlineExpr(le->value));
       }
       out += emitExprBlock(le->body, ind);
       return out;
     }
 
     if (const auto *lj = std::get_if<LetJoinExpr>(&e->v)) {
-      std::string out = std::format("{}let {} (_ : Unit) : {} :=\n{}\n",
-                                    pad, leanIdent(lj->name), emitType(lj->result_type),
-                                    emitExprBlock(lj->join_body, ind + 1));
+      std::string out =
+          std::format("{}let {} (_ : Unit) : {} :=\n{}\n", pad, leanIdent(lj->name),
+                      emitType(lj->result_type), emitExprBlock(lj->join_body, ind + 1));
       out += emitExprBlock(lj->body, ind);
       return out;
     }
 
     if (const auto *lt = std::get_if<LetTupleExpr>(&e->v)) {
       std::vector<std::string> names;
-      for (const auto &[n, _] : lt->bindings) names.push_back(leanIdent(n));
+      for (const auto &[n, _] : lt->bindings)
+        names.push_back(leanIdent(n));
       std::string out;
       if (std::holds_alternative<IfExpr>(lt->value->v) ||
           std::holds_alternative<MatchExpr>(lt->value->v) ||
           std::holds_alternative<LetExpr>(lt->value->v)) {
-        out += std::format("{}let ({}) :=\n{}\n",
-                           pad, joinWith(names, ", "),
+        out += std::format("{}let ({}) :=\n{}\n", pad, joinWith(names, ", "),
                            emitExprBlock(lt->value, ind + 1));
       } else {
-        out += std::format("{}let ({}) := {}\n",
-                           pad, joinWith(names, ", "),
+        out += std::format("{}let ({}) := {}\n", pad, joinWith(names, ", "),
                            emitInlineExpr(lt->value));
       }
       out += emitExprBlock(lt->body, ind);
@@ -748,14 +810,12 @@ def kernel : Core.UnaryKernel {} :=
     }
 
     if (const auto *ie = std::get_if<IfExpr>(&e->v)) {
-      std::string out = std::format("{}if {} then\n{}\n",
-                                    pad, emitInlineExpr(ie->cond),
+      std::string out = std::format("{}if {} then\n{}\n", pad, emitInlineExpr(ie->cond),
                                     emitExprBlock(ie->then_e, ind + 1));
       const ExprPtr *cur_else = &ie->else_e;
       while (*cur_else && std::holds_alternative<IfExpr>((*cur_else)->v)) {
         const auto &nested = std::get<IfExpr>((*cur_else)->v);
-        out += std::format("{}else if {} then\n{}\n",
-                           pad, emitInlineExpr(nested.cond),
+        out += std::format("{}else if {} then\n{}\n", pad, emitInlineExpr(nested.cond),
                            emitExprBlock(nested.then_e, ind + 1));
         cur_else = &nested.else_e;
       }
@@ -767,9 +827,10 @@ def kernel : Core.UnaryKernel {} :=
       std::string out = std::format("{}match {} with\n", pad, emitInlineExpr(me->scrutinee));
       for (const auto &arm : me->arms) {
         std::vector<std::string> pats;
-        for (const auto &p : arm.patterns) pats.push_back(emitConst(p, opts_.emit_float_comments));
-        out += std::format("{}| {} =>\n{}\n",
-                           pad, joinWith(pats, " | "), emitExprBlock(arm.body, ind + 1));
+        for (const auto &p : arm.patterns)
+          pats.push_back(emitConst(p, opts_.emit_float_comments));
+        out += std::format("{}| {} =>\n{}\n", pad, joinWith(pats, " | "),
+                           emitExprBlock(arm.body, ind + 1));
       }
       out += std::format("{}| _ =>\n{}", pad, emitExprBlock(me->default_arm, ind + 1));
       return out;
@@ -780,96 +841,109 @@ def kernel : Core.UnaryKernel {} :=
 
   auto emitDoStmt(const Stmt &st, int ind) -> std::string {
     auto pad = indentStr(ind);
-    return std::visit(Overloaded{
-      [&](const VarDeclStmt &v) {
-        std::string kw = v.is_const ? "let" : "let mut";
-        if (v.init) {
-          return std::format("{}{} {} : {} := {}\n",
-                             pad, kw, leanIdent(v.name), emitType(v.type),
-                             emitInlineExpr(*v.init));
-        }
-        return std::format("{}{} {} : {} := default\n",
-                           pad, kw, leanIdent(v.name), emitType(v.type));
-      },
-      [&](const TupleDeclStmt &td) {
-        std::vector<std::string> names;
-        for (const auto &[n, _] : td.bindings) names.push_back(leanIdent(n));
-        return std::format("{}let ({}) := {}\n",
-                           pad, joinWith(names, ", "), emitInlineExpr(td.init));
-      },
-      [&](const AssignStmt &a) {
-        if (a.compound_op) {
-          auto lhs = Expr::make(VarExpr{a.target}, a.value->type);
-          auto combined = Expr::make(BinaryExpr{*a.compound_op, lhs, a.value}, a.value->type);
-          return std::format("{}{} := {}\n", pad, leanIdent(a.target), emitInlineExpr(combined));
-        }
-        return std::format("{}{} := {}\n", pad, leanIdent(a.target), emitInlineExpr(a.value));
-      },
-      [&](const FieldAssignStmt &fa) {
-        ExprPtr rhs = fa.value;
-        if (fa.compound_op) {
-          auto cur = Expr::make(FieldExpr{fa.base, fa.field}, fa.value->type);
-          rhs = Expr::make(BinaryExpr{*fa.compound_op, std::move(cur), rhs}, fa.value->type);
-        }
-        return std::format("{}{}.{} := {}\n",
-                           pad, emitInlineExpr(fa.base), leanIdent(fa.field),
-                           emitInlineExpr(rhs));
-      },
-      [&](const ExprStmt &es) {
-        return std::format("{}let _ := {}\n", pad, emitInlineExpr(es.expr));
-      },
-      [&](const IfStmt &ifs) {
-        std::string out = std::format("{}if {} then\n", pad, emitInlineExpr(ifs.cond));
-        for (const auto &s : ifs.then_body) out += emitDoStmt(s, ind + 1);
-        if (!ifs.else_body.empty()) {
-          out += std::format("{}else\n", pad);
-          for (const auto &s : ifs.else_body) out += emitDoStmt(s, ind + 1);
-        }
-        return out;
-      },
-      [&](const SwitchStmt &sw) {
-        std::string out = std::format("{}match {} with\n", pad, emitInlineExpr(sw.scrutinee));
-        for (const auto &c : sw.cases) {
-          std::vector<std::string> pats;
-          for (const auto &v : c.values) pats.push_back(emitConst(v, opts_.emit_float_comments));
-          out += std::format("{}| {} =>\n", pad, joinWith(pats, " | "));
-          for (const auto &s : c.body) out += emitDoStmt(s, ind + 1);
-        }
-        if (!sw.default_body.empty()) {
-          out += std::format("{}| _ =>\n", pad);
-          for (const auto &s : sw.default_body) out += emitDoStmt(s, ind + 1);
-        }
-        return out;
-      },
-      [&](const WhileStmt &w) {
-        std::string out = std::format("{}while {} do\n", pad, emitInlineExpr(w.cond));
-        for (const auto &s : w.body) out += emitDoStmt(s, ind + 1);
-        return out;
-      },
-      [&](const ForStmt &f) {
-        std::string out;
-        if (f.init && *f.init) out += emitDoStmt(**f.init, ind);
-        std::string cond = f.cond ? emitInlineExpr(*f.cond) : "true";
-        out += std::format("{}while {} do\n", pad, cond);
-        for (const auto &s : f.body) out += emitDoStmt(s, ind + 1);
-        if (f.step && *f.step) out += emitDoStmt(**f.step, ind + 1);
-        return out;
-      },
-      [&](const ReturnStmt &r) {
-        if (r.value) return std::format("{}return {}\n", pad, emitInlineExpr(*r.value));
-        return std::format("{}return ()\n", pad);
-      },
-      [&](const BlockStmt &b) {
-        std::string out;
-        for (const auto &s : b.stmts) out += emitDoStmt(s, ind);
-        return out;
-      },
-      [&](const BreakStmt &) { return std::format("{}break\n", pad); },
-      [&](const ContinueStmt &) { return std::format("{}continue\n", pad); },
-      [&](const UnsupportedStmt &u) {
-        return std::format("{}-- unsupported: {}\n", pad, u.reason);
-      },
-    }, st.v);
+    return std::visit(
+        Overloaded{
+            [&](const VarDeclStmt &v) {
+              std::string kw = v.is_const ? "let" : "let mut";
+              if (v.init) {
+                return std::format("{}{} {} : {} := {}\n", pad, kw, leanIdent(v.name),
+                                   emitType(v.type), emitInlineExpr(*v.init));
+              }
+              return std::format("{}{} {} : {} := default\n", pad, kw, leanIdent(v.name),
+                                 emitType(v.type));
+            },
+            [&](const TupleDeclStmt &td) {
+              std::vector<std::string> names;
+              for (const auto &[n, _] : td.bindings)
+                names.push_back(leanIdent(n));
+              return std::format("{}let ({}) := {}\n", pad, joinWith(names, ", "),
+                                 emitInlineExpr(td.init));
+            },
+            [&](const AssignStmt &a) {
+              if (a.compound_op) {
+                auto lhs = Expr::make(VarExpr{a.target}, a.value->type);
+                auto combined = Expr::make(BinaryExpr{*a.compound_op, lhs, a.value}, a.value->type);
+                return std::format("{}{} := {}\n", pad, leanIdent(a.target),
+                                   emitInlineExpr(combined));
+              }
+              return std::format("{}{} := {}\n", pad, leanIdent(a.target), emitInlineExpr(a.value));
+            },
+            [&](const FieldAssignStmt &fa) {
+              ExprPtr rhs = fa.value;
+              if (fa.compound_op) {
+                auto cur = Expr::make(FieldExpr{fa.base, fa.field}, fa.value->type);
+                rhs = Expr::make(BinaryExpr{*fa.compound_op, std::move(cur), rhs}, fa.value->type);
+              }
+              return std::format("{}{}.{} := {}\n", pad, emitInlineExpr(fa.base),
+                                 leanIdent(fa.field), emitInlineExpr(rhs));
+            },
+            [&](const ExprStmt &es) {
+              return std::format("{}let _ := {}\n", pad, emitInlineExpr(es.expr));
+            },
+            [&](const IfStmt &ifs) {
+              std::string out = std::format("{}if {} then\n", pad, emitInlineExpr(ifs.cond));
+              for (const auto &s : ifs.then_body)
+                out += emitDoStmt(s, ind + 1);
+              if (!ifs.else_body.empty()) {
+                out += std::format("{}else\n", pad);
+                for (const auto &s : ifs.else_body)
+                  out += emitDoStmt(s, ind + 1);
+              }
+              return out;
+            },
+            [&](const SwitchStmt &sw) {
+              std::string out = std::format("{}match {} with\n", pad, emitInlineExpr(sw.scrutinee));
+              for (const auto &c : sw.cases) {
+                std::vector<std::string> pats;
+                for (const auto &v : c.values)
+                  pats.push_back(emitConst(v, opts_.emit_float_comments));
+                out += std::format("{}| {} =>\n", pad, joinWith(pats, " | "));
+                for (const auto &s : c.body)
+                  out += emitDoStmt(s, ind + 1);
+              }
+              if (!sw.default_body.empty()) {
+                out += std::format("{}| _ =>\n", pad);
+                for (const auto &s : sw.default_body)
+                  out += emitDoStmt(s, ind + 1);
+              }
+              return out;
+            },
+            [&](const WhileStmt &w) {
+              std::string out = std::format("{}while {} do\n", pad, emitInlineExpr(w.cond));
+              for (const auto &s : w.body)
+                out += emitDoStmt(s, ind + 1);
+              return out;
+            },
+            [&](const ForStmt &f) {
+              std::string out;
+              if (f.init && *f.init)
+                out += emitDoStmt(**f.init, ind);
+              std::string cond = f.cond ? emitInlineExpr(*f.cond) : "true";
+              out += std::format("{}while {} do\n", pad, cond);
+              for (const auto &s : f.body)
+                out += emitDoStmt(s, ind + 1);
+              if (f.step && *f.step)
+                out += emitDoStmt(**f.step, ind + 1);
+              return out;
+            },
+            [&](const ReturnStmt &r) {
+              if (r.value)
+                return std::format("{}return {}\n", pad, emitInlineExpr(*r.value));
+              return std::format("{}return ()\n", pad);
+            },
+            [&](const BlockStmt &b) {
+              std::string out;
+              for (const auto &s : b.stmts)
+                out += emitDoStmt(s, ind);
+              return out;
+            },
+            [&](const BreakStmt &) { return std::format("{}break\n", pad); },
+            [&](const ContinueStmt &) { return std::format("{}continue\n", pad); },
+            [&](const UnsupportedStmt &u) {
+              return std::format("{}-- unsupported: {}\n", pad, u.reason);
+            },
+        },
+        st.v);
   }
 
   EmitOptions opts_;
@@ -881,122 +955,254 @@ def kernel : Core.UnaryKernel {} :=
 // ============================================================================
 
 auto dumpExprIR(const ExprPtr &e, int ind) -> std::string {
-  if (!e) return indentStr(ind) + "<null>\n";
+  if (!e)
+    return indentStr(ind) + "<null>\n";
   auto pad = indentStr(ind);
-  return std::visit(Overloaded{
-    [&](const ConstExpr &c) {
-      return std::format("{}Const({} : {})\n", pad, emitConst(c.value, true), emitType(e->type));
-    },
-    [&](const VarExpr &v) {
-      return std::format("{}Var({} : {})\n", pad, v.name, emitType(e->type));
-    },
-    [&](const TableRefExpr &t) {
-      return std::format("{}TableRef({} : {})\n", pad, t.table_name, emitType(e->type));
-    },
-    [&](const UnaryExpr &u) {
-      return std::format("{}Unary({})\n{}", pad, static_cast<int>(u.op), dumpExprIR(u.operand, ind + 1));
-    },
-    [&](const BinaryExpr &b) {
-      return std::format("{}Binary({} : {})\n{}{}", pad, static_cast<int>(b.op), emitType(e->type),
-                         dumpExprIR(b.lhs, ind + 1), dumpExprIR(b.rhs, ind + 1));
-    },
-    [&](const CastExpr &c) {
-      return std::format("{}Cast({} -> {})\n{}", pad, static_cast<int>(c.kind), emitType(e->type),
-                         dumpExprIR(c.operand, ind + 1));
-    },
-    [&](const SelectExpr &s) {
-      return std::format("{}Select\n{}{}{}", pad, dumpExprIR(s.cond, ind + 1),
-                         dumpExprIR(s.then_e, ind + 1), dumpExprIR(s.else_e, ind + 1));
-    },
-    [&](const IndexExpr &ix) {
-      return std::format("{}Index\n{}{}", pad, dumpExprIR(ix.base, ind + 1), dumpExprIR(ix.index, ind + 1));
-    },
-    [&](const FieldExpr &f) {
-      return std::format("{}Field(.{})\n{}", pad, f.field, dumpExprIR(f.base, ind + 1));
-    },
-    [&](const StructLitExpr &sl) {
-      std::string out = std::format("{}StructLit({})\n", pad, sl.type_name);
-      for (const auto &[fn, fe] : sl.fields) {
-        out += std::format("{}  .{} =\n{}", pad, fn, dumpExprIR(fe, ind + 2));
-      }
-      return out;
-    },
-    [&](const StructUpdateExpr &su) {
-      return std::format("{}StructUpdate(.{})\n{}{}", pad, su.field,
-                         dumpExprIR(su.base, ind + 1), dumpExprIR(su.value, ind + 1));
-    },
-    [&](const CoreCallExpr &cc) {
-      std::string out = std::format("{}CoreCall({} : {}, mode={}, cfg={})\n",
-                                    pad, cc.lean_name, emitType(e->type),
-                                    cc.needs_mode, cc.needs_config);
-      for (const auto &a : cc.args) out += dumpExprIR(a, ind + 1);
-      return out;
-    },
-    [&](const PolyevalExpr &pe) {
-      auto scheme = pe.scheme == PolyScheme::Estrin ? "Estrin"
-                    : (pe.scheme == PolyScheme::AltHorner ? "AltHorner" : "Horner");
-      std::string out = std::format("{}Polyeval({}, offset={}, array={}, deg={})\n",
-                                    pad, scheme, pe.offset, pe.array_arg,
-                                    pe.coeffs.empty() ? 0 : pe.coeffs.size() - 1);
-      out += std::format("{}  var:\n{}", pad, dumpExprIR(pe.var, ind + 2));
-      for (auto [idx, c] : std::views::enumerate(pe.coeffs)) {
-        out += std::format("{}  c[{}]:\n{}", pad, idx, dumpExprIR(c, ind + 2));
-      }
-      return out;
-    },
-    [&](const FuncCallExpr &fc) {
-      std::string out = std::format("{}FuncCall({} : {}, mode={})\n",
-                                    pad, fc.callee, emitType(e->type), fc.needs_mode);
-      for (const auto &a : fc.args) out += dumpExprIR(a, ind + 1);
-      return out;
-    },
-    [&](const LetExpr &le) {
-      return std::format("{}Let({} : {})\n{}{}", pad, le.name, emitType(le.bind_type),
-                         dumpExprIR(le.value, ind + 1), dumpExprIR(le.body, ind));
-    },
-    [&](const LetJoinExpr &lj) {
-      return std::format("{}LetJoin({} : {})\n{}{}", pad, lj.name, emitType(lj.result_type),
-                         dumpExprIR(lj.join_body, ind + 1), dumpExprIR(lj.body, ind));
-    },
-    [&](const CallJoinExpr &cj) {
-      return std::format("{}CallJoin({})\n", pad, cj.name);
-    },
-    [&](const LetTupleExpr &lt) {
-      std::string out = std::format("{}LetTuple\n", pad);
-      out += dumpExprIR(lt.value, ind + 1);
-      out += dumpExprIR(lt.body, ind);
-      return out;
-    },
-    [&](const TupleExpr &te) {
-      std::string out = std::format("{}Tuple\n", pad);
-      for (const auto &el : te.elems) out += dumpExprIR(el, ind + 1);
-      return out;
-    },
-    [&](const IfExpr &ie) {
-      return std::format("{}If\n{}  cond:\n{}{}  then:\n{}{}  else:\n{}", pad,
-                         pad, dumpExprIR(ie.cond, ind + 2),
-                         pad, dumpExprIR(ie.then_e, ind + 2),
-                         pad, dumpExprIR(ie.else_e, ind + 2));
-    },
-    [&](const MatchExpr &me) {
-      std::string out = std::format("{}Match\n{}", pad, dumpExprIR(me.scrutinee, ind + 1));
-      for (const auto &arm : me.arms) {
-        out += std::format("{}  arm:\n{}", pad, dumpExprIR(arm.body, ind + 2));
-      }
-      out += std::format("{}  default:\n{}", pad, dumpExprIR(me.default_arm, ind + 2));
-      return out;
-    },
-    [&](const UnsupportedExpr &u) {
-      return std::format("{}Unsupported(\"{}\")\n", pad, u.reason);
-    },
-  }, e->v);
+  return std::visit(
+      Overloaded{
+          [&](const ConstExpr &c) {
+            return std::format("{}Const({} : {})\n", pad, emitConst(c.value, true),
+                               emitType(e->type));
+          },
+          [&](const VarExpr &v) {
+            return std::format("{}Var({} : {})\n", pad, v.name, emitType(e->type));
+          },
+          [&](const TableRefExpr &t) {
+            return std::format("{}TableRef({} : {})\n", pad, t.table_name, emitType(e->type));
+          },
+          [&](const UnaryExpr &u) {
+            return std::format("{}Unary({})\n{}", pad, static_cast<int>(u.op),
+                               dumpExprIR(u.operand, ind + 1));
+          },
+          [&](const BinaryExpr &b) {
+            return std::format("{}Binary({} : {})\n{}{}", pad, static_cast<int>(b.op),
+                               emitType(e->type), dumpExprIR(b.lhs, ind + 1),
+                               dumpExprIR(b.rhs, ind + 1));
+          },
+          [&](const CastExpr &c) {
+            return std::format("{}Cast({} -> {})\n{}", pad, static_cast<int>(c.kind),
+                               emitType(e->type), dumpExprIR(c.operand, ind + 1));
+          },
+          [&](const SelectExpr &s) {
+            return std::format("{}Select\n{}{}{}", pad, dumpExprIR(s.cond, ind + 1),
+                               dumpExprIR(s.then_e, ind + 1), dumpExprIR(s.else_e, ind + 1));
+          },
+          [&](const IndexExpr &ix) {
+            return std::format("{}Index\n{}{}", pad, dumpExprIR(ix.base, ind + 1),
+                               dumpExprIR(ix.index, ind + 1));
+          },
+          [&](const FieldExpr &f) {
+            return std::format("{}Field(.{})\n{}", pad, f.field, dumpExprIR(f.base, ind + 1));
+          },
+          [&](const StructLitExpr &sl) {
+            std::string out = std::format("{}StructLit({})\n", pad, sl.type_name);
+            for (const auto &[fn, fe] : sl.fields) {
+              out += std::format("{}  .{} =\n{}", pad, fn, dumpExprIR(fe, ind + 2));
+            }
+            return out;
+          },
+          [&](const StructUpdateExpr &su) {
+            return std::format("{}StructUpdate(.{})\n{}{}", pad, su.field,
+                               dumpExprIR(su.base, ind + 1), dumpExprIR(su.value, ind + 1));
+          },
+          [&](const CoreCallExpr &cc) {
+            std::string out =
+                std::format("{}CoreCall({} : {}, mode={}, cfg={})\n", pad, cc.lean_name,
+                            emitType(e->type), cc.needs_mode, cc.needs_config);
+            for (const auto &a : cc.args)
+              out += dumpExprIR(a, ind + 1);
+            return out;
+          },
+          [&](const PolyevalExpr &pe) {
+            auto scheme = pe.scheme == PolyScheme::Estrin
+                              ? "Estrin"
+                              : (pe.scheme == PolyScheme::AltHorner ? "AltHorner" : "Horner");
+            std::string out =
+                std::format("{}Polyeval({}, offset={}, array={}, deg={})\n", pad, scheme, pe.offset,
+                            pe.array_arg, pe.coeffs.empty() ? 0 : pe.coeffs.size() - 1);
+            out += std::format("{}  var:\n{}", pad, dumpExprIR(pe.var, ind + 2));
+            for (auto [idx, c] : std::views::enumerate(pe.coeffs)) {
+              out += std::format("{}  c[{}]:\n{}", pad, idx, dumpExprIR(c, ind + 2));
+            }
+            return out;
+          },
+          [&](const FuncCallExpr &fc) {
+            std::string out = std::format("{}FuncCall({} : {}, mode={})\n", pad, fc.callee,
+                                          emitType(e->type), fc.needs_mode);
+            for (const auto &a : fc.args)
+              out += dumpExprIR(a, ind + 1);
+            return out;
+          },
+          [&](const LetExpr &le) {
+            return std::format("{}Let({} : {})\n{}{}", pad, le.name, emitType(le.bind_type),
+                               dumpExprIR(le.value, ind + 1), dumpExprIR(le.body, ind));
+          },
+          [&](const LetJoinExpr &lj) {
+            return std::format("{}LetJoin({} : {})\n{}{}", pad, lj.name, emitType(lj.result_type),
+                               dumpExprIR(lj.join_body, ind + 1), dumpExprIR(lj.body, ind));
+          },
+          [&](const CallJoinExpr &cj) { return std::format("{}CallJoin({})\n", pad, cj.name); },
+          [&](const LetTupleExpr &lt) {
+            std::string out = std::format("{}LetTuple\n", pad);
+            out += dumpExprIR(lt.value, ind + 1);
+            out += dumpExprIR(lt.body, ind);
+            return out;
+          },
+          [&](const TupleExpr &te) {
+            std::string out = std::format("{}Tuple\n", pad);
+            for (const auto &el : te.elems)
+              out += dumpExprIR(el, ind + 1);
+            return out;
+          },
+          [&](const IfExpr &ie) {
+            return std::format("{}If\n{}  cond:\n{}{}  then:\n{}{}  else:\n{}", pad, pad,
+                               dumpExprIR(ie.cond, ind + 2), pad, dumpExprIR(ie.then_e, ind + 2),
+                               pad, dumpExprIR(ie.else_e, ind + 2));
+          },
+          [&](const MatchExpr &me) {
+            std::string out = std::format("{}Match\n{}", pad, dumpExprIR(me.scrutinee, ind + 1));
+            for (const auto &arm : me.arms) {
+              out += std::format("{}  arm:\n{}", pad, dumpExprIR(arm.body, ind + 2));
+            }
+            out += std::format("{}  default:\n{}", pad, dumpExprIR(me.default_arm, ind + 2));
+            return out;
+          },
+          [&](const UnsupportedExpr &u) {
+            return std::format("{}Unsupported(\"{}\")\n", pad, u.reason);
+          },
+      },
+      e->v);
 }
 
 } // namespace
 
+/// Break one generated line that is longer than `kMaxColumns` at a place where Lean does not
+/// care about the line break. Three shapes are handled, and any other line is left as it is:
+///
+/// * a docstring `/-- Extracted from `f` (`mangled`). -/`, broken before the mangled name;
+/// * a definition header `def f (a : A) (b : B) : R :=`, broken between binders;
+/// * a line whose last bracketed list `[a, b, c]` runs past the limit, broken after commas.
+auto wrapLine(std::string_view line) -> std::string {
+  if (line.size() <= kMaxColumns)
+    return std::string(line);
+  std::size_t indent = line.find_first_not_of(' ');
+  if (indent == std::string_view::npos)
+    return std::string(line);
+  std::string_view body = line.substr(indent);
+
+  if (body.starts_with("/-- Extracted from ")) {
+    if (auto at = line.find(" (`"); at != std::string_view::npos) {
+      return std::string(line.substr(0, at)) + "\n" + std::string(indent, ' ') +
+             std::string(line.substr(at + 1));
+    }
+    return std::string(line);
+  }
+
+  // Greedy packing of `pieces` joined by `sep`, continuation lines indented by `cont`.
+  auto pack = [](std::string head, const std::vector<std::string> &pieces, std::string_view sep,
+                 std::string_view tail, std::size_t cont) {
+    std::string out;
+    std::string cur = std::move(head);
+    for (std::size_t k = 0; k < pieces.size(); ++k) {
+      bool last = k + 1 == pieces.size();
+      std::string piece = pieces[k] + (last ? std::string(tail) : std::string(sep));
+      // A space that ends the piece is trimmed if the line is broken after it.
+      std::size_t width = cur.size() + piece.size() - (piece.ends_with(' ') ? 1 : 0);
+      if (cur.find_first_not_of(' ') != std::string::npos && width > kMaxColumns) {
+        while (!cur.empty() && cur.back() == ' ')
+          cur.pop_back();
+        out += cur + "\n";
+        cur = std::string(cont, ' ');
+      }
+      cur += piece;
+    }
+    return out + cur;
+  };
+
+  if (body.starts_with("def ")) {
+    // Split at the spaces that precede a top-level binder or the result type.
+    std::vector<std::string> pieces;
+    std::size_t start = 0;
+    int depth = 0;
+    for (std::size_t k = 0; k < line.size(); ++k) {
+      char ch = line[k];
+      if (ch == '(' || ch == '[' || ch == '{') {
+        if (depth == 0 && k > start && line[k - 1] == ' ') {
+          pieces.emplace_back(line.substr(start, k - start));
+          start = k;
+        }
+        ++depth;
+      } else if (ch == ')' || ch == ']' || ch == '}') {
+        --depth;
+      } else if (depth == 0 && ch == ':' && k > start && line[k - 1] == ' ' &&
+                 k + 1 < line.size() && line[k + 1] == ' ') {
+        // Keep the colon at the end of the binders, as Lean sources are usually written.
+        pieces.emplace_back(line.substr(start, k + 2 - start));
+        start = k + 2;
+      }
+    }
+    pieces.emplace_back(line.substr(start));
+    return pack("", pieces, "", "", indent + 4);
+  }
+
+  // The last top-level `[...]` of the line.
+  std::size_t close = line.rfind(']');
+  if (close == std::string_view::npos)
+    return std::string(line);
+  int depth = 0;
+  std::size_t open = std::string_view::npos;
+  for (std::size_t k = close + 1; k-- > 0;) {
+    if (line[k] == ']')
+      ++depth;
+    else if (line[k] == '[' && --depth == 0) {
+      open = k;
+      break;
+    }
+  }
+  if (open == std::string_view::npos || line.substr(open, close - open).contains('"'))
+    return std::string(line);
+  std::vector<std::string> pieces;
+  std::size_t start = open + 1;
+  depth = 0;
+  for (std::size_t k = open + 1; k < close; ++k) {
+    char ch = line[k];
+    if (ch == '(' || ch == '[' || ch == '{')
+      ++depth;
+    else if (ch == ')' || ch == ']' || ch == '}')
+      --depth;
+    else if (ch == ',' && depth == 0) {
+      pieces.emplace_back(line.substr(start, k - start));
+      start = k + 1;
+      while (start < close && line[start] == ' ')
+        ++start;
+    }
+  }
+  pieces.emplace_back(line.substr(start, close - start));
+  if (pieces.size() < 2)
+    return std::string(line);
+  return pack(std::string(line.substr(0, open + 1)), pieces, ", ", line.substr(close), indent + 4);
+}
+
+/// Apply `wrapLine` to every line of the generated module.
+auto wrapLongLines(std::string_view text) -> std::string {
+  std::string out;
+  out.reserve(text.size() + text.size() / 16);
+  std::size_t pos = 0;
+  while (pos <= text.size()) {
+    std::size_t end = text.find('\n', pos);
+    bool last = end == std::string_view::npos;
+    out += wrapLine(text.substr(pos, last ? std::string_view::npos : end - pos));
+    if (last)
+      break;
+    out += '\n';
+    pos = end + 1;
+  }
+  return out;
+}
+
 auto emitLean(const ir::Module &mod, const EmitOptions &opts) -> std::string {
   LeanEmitter emitter(opts);
-  return emitter.emitModule(mod);
+  return wrapLongLines(emitter.emitModule(mod));
 }
 
 auto emitHighLevelIR(const ir::Module &mod) -> std::string {
@@ -1006,9 +1212,8 @@ auto emitHighLevelIR(const ir::Module &mod) -> std::string {
     out += std::format("  Table {} ({}) : {}\n", t.lean_name, t.cpp_name, emitType(t.type));
   }
   for (const auto &fn : mod.functions) {
-    out += std::format("  Func {} ({}) -> {} [mode={}]\n",
-                       fn.lean_name, fn.cpp_name, emitType(fn.return_type),
-                       fn.uses_rounding_mode);
+    out += std::format("  Func {} ({}) -> {} [mode={}]\n", fn.lean_name, fn.cpp_name,
+                       emitType(fn.return_type), fn.uses_rounding_mode);
     if (fn.lifted_expr) {
       out += dumpExprIR(*fn.lifted_expr, 2);
     } else {
@@ -1020,7 +1225,7 @@ auto emitHighLevelIR(const ir::Module &mod) -> std::string {
 
 auto formatMathConfig(const ir::MathConfig &cfg) -> std::string {
   return std::format(
-R"(MathConfig:
+      R"(MathConfig:
   implVariant             = {}
   targetTriple            = {}
   LIBC_MATH_SKIP_ACCURATE = {}
@@ -1038,21 +1243,12 @@ R"(MathConfig:
   CPU_HAS_FAST_FLOAT16    = {}
   TYPES_HAS_INT128        = {}
 )",
-      cfg.impl_variant, cfg.target_triple,
-      leanBool(cfg.skip_accurate_pass),
-      leanBool(cfg.small_tables),
-      leanBool(cfg.no_errno),
-      leanBool(cfg.no_except),
-      leanBool(cfg.intermediate_comp_in_float),
-      leanBool(cfg.assume_round_nearest_only),
-      leanBool(cfg.has_fma_half),
-      leanBool(cfg.has_fma_float),
-      leanBool(cfg.has_fma_double),
-      leanBool(cfg.has_nearest_int),
-      leanBool(cfg.has_fpu_float),
-      leanBool(cfg.has_fpu_double),
-      leanBool(cfg.has_fast_float16),
-      leanBool(cfg.has_int128));
+      cfg.impl_variant, cfg.target_triple, leanBool(cfg.skip_accurate_pass),
+      leanBool(cfg.small_tables), leanBool(cfg.no_errno), leanBool(cfg.no_except),
+      leanBool(cfg.intermediate_comp_in_float), leanBool(cfg.assume_round_nearest_only),
+      leanBool(cfg.has_fma_half), leanBool(cfg.has_fma_float), leanBool(cfg.has_fma_double),
+      leanBool(cfg.has_nearest_int), leanBool(cfg.has_fpu_float), leanBool(cfg.has_fpu_double),
+      leanBool(cfg.has_fast_float16), leanBool(cfg.has_int128));
 }
 
 } // namespace libc_extract

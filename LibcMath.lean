@@ -8,6 +8,7 @@ import LibcMath.Functions.Binary32Bits
 import LibcMath.Functions.RoundingRanges
 import LibcMath.Functions.ExpRanges
 import LibcMath.Functions.ExpRangesExamples
+import LibcMath.Functions.ExpfPolynomial
 import LibcMath.Functions.AddSpecial
 import LibcMath.Functions.AddRounding
 import LibcMath.SpecExamples

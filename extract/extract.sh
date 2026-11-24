@@ -35,7 +35,8 @@ done
 
 if [[ ! -x "$build/ast2lean" ]]; then
   cmake -S "$root/extract" -B "$build" -G Ninja \
-    -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release >/dev/null
+    -DCMAKE_C_COMPILER="${AST2LEAN_CC:-clang}" -DCMAKE_CXX_COMPILER="${AST2LEAN_CXX:-clang++}" \
+    -DCMAKE_BUILD_TYPE=Release >/dev/null
 fi
 ninja --quiet -C "$build"
 

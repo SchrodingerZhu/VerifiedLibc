@@ -51,16 +51,16 @@ export namespace libc_extract {
 
 struct ParseOptions {
   std::string source_file;
-  std::string source_label;             // Optional display path for KernelMeta.sourceFile.
-  std::string source_commit;            // Optional upstream commit hash for KernelMeta.
-  std::string target_function;          // Qualified name, suffix, or mangled name.
-  std::string lean_name;                // Optional override for Lean def name.
-  std::string impl_variant;             // Optional override for MathConfig.implVariant.
-  std::string resource_dir;             // Empty => auto-detected compile-time Clang resource dir.
-  std::vector<std::string> clang_args;  // Extra Clang flags (-I, -D, -std=..., etc.).
-  bool follow_helpers = false;          // Recursively extract non-CoreOp callees in same TU.
-  bool unwrap_forwarding = true;        // Follow 1-line `return f(args...);` entrypoint wrappers.
-  bool strict = false;                  // Fail on unsupported AST constructs.
+  std::string source_label;            // Optional display path for KernelMeta.sourceFile.
+  std::string source_commit;           // Optional upstream commit hash for KernelMeta.
+  std::string target_function;         // Qualified name, suffix, or mangled name.
+  std::string lean_name;               // Optional override for Lean def name.
+  std::string impl_variant;            // Optional override for MathConfig.implVariant.
+  std::string resource_dir;            // Empty => auto-detected compile-time Clang resource dir.
+  std::vector<std::string> clang_args; // Extra Clang flags (-I, -D, -std=..., etc.).
+  bool follow_helpers = false;         // Recursively extract non-CoreOp callees in same TU.
+  bool unwrap_forwarding = true;       // Follow 1-line `return f(args...);` entrypoint wrappers.
+  bool strict = false;                 // Fail on unsupported AST constructs.
 };
 
 struct FunctionListing {
@@ -72,20 +72,18 @@ struct FunctionListing {
 
 /// Parse a C++ source file with Clang LibTooling and extract the target function
 /// (plus any referenced constexpr tables, captured MathConfig, and optionally called helpers).
-auto parseTranslationUnit(const ParseOptions &opts)
-    -> std::expected<ir::Module, std::string>;
+auto parseTranslationUnit(const ParseOptions &opts) -> std::expected<ir::Module, std::string>;
 
 /// List all defined functions (including instantiated templates) in a translation unit.
 auto listFunctions(const ParseOptions &opts)
     -> std::expected<std::vector<FunctionListing>, std::string>;
 
 /// Parse the translation unit only far enough to snapshot the resolved LLVM libc MathConfig.
-auto inspectMathConfig(const ParseOptions &opts)
-    -> std::expected<ir::MathConfig, std::string>;
+auto inspectMathConfig(const ParseOptions &opts) -> std::expected<ir::MathConfig, std::string>;
 
 } // namespace libc_extract
 
-module :private;
+module : private;
 
 namespace libc_extract {
 namespace {
@@ -96,9 +94,8 @@ auto apIntToUpperHex(const llvm::APInt &val) -> std::string {
   llvm::SmallString<64> buf;
   val.toStringUnsigned(buf, 16);
   std::string out(buf.str());
-  std::ranges::transform(out, out.begin(), [](unsigned char c) {
-    return static_cast<char>(std::toupper(c));
-  });
+  std::ranges::transform(out, out.begin(),
+                         [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
   return out.empty() ? "0" : out;
 }
 
@@ -129,15 +126,16 @@ auto sanitizeLeanIdent(std::string_view raw) -> std::string {
   std::string out;
   out.reserve(raw.size());
   for (char c : raw) {
-    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-        (c >= '0' && c <= '9') || c == '_') {
+    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
       out.push_back(c);
     } else if (c == ':' && (out.empty() || out.back() != '_')) {
       out.push_back('_');
     }
   }
-  if (out.empty()) out = "unnamed";
-  if (out.front() >= '0' && out.front() <= '9') out.insert(out.begin(), '_');
+  if (out.empty())
+    out = "unnamed";
+  if (out.front() >= '0' && out.front() <= '9')
+    out.insert(out.begin(), '_');
   return out;
 }
 
@@ -150,8 +148,7 @@ auto shortLeanName(std::string_view normalized) -> std::string {
 
 auto inferImplVariant(std::string_view cpp_name) -> std::string {
   constexpr std::array<std::string_view, 5> kKnown = {
-    "double_eval", "float_eval_cr_rn", "float_eval", "integer_eval", "static_rounding"
-  };
+      "double_eval", "float_eval_cr_rn", "float_eval", "integer_eval", "static_rounding"};
   for (auto v : kKnown) {
     if (cpp_name.find(v) != std::string_view::npos) {
       return std::string(v);
@@ -162,26 +159,24 @@ auto inferImplVariant(std::string_view cpp_name) -> std::string {
 
 auto captureMathConfig(CompilerInstance &ci) -> ir::MathConfig {
   Preprocessor &pp = ci.getPreprocessor();
-  auto hasMacro = [&](llvm::StringRef name) -> bool {
-    return pp.isMacroDefined(name);
-  };
+  auto hasMacro = [&](llvm::StringRef name) -> bool { return pp.isMacroDefined(name); };
 
   ir::MathConfig cfg;
-  cfg.skip_accurate_pass         = hasMacro("LIBC_MATH_HAS_SKIP_ACCURATE_PASS");
-  cfg.small_tables               = hasMacro("LIBC_MATH_HAS_SMALL_TABLES");
-  cfg.no_errno                   = hasMacro("LIBC_MATH_HAS_NO_ERRNO");
-  cfg.no_except                  = hasMacro("LIBC_MATH_HAS_NO_EXCEPT");
+  cfg.skip_accurate_pass = hasMacro("LIBC_MATH_HAS_SKIP_ACCURATE_PASS");
+  cfg.small_tables = hasMacro("LIBC_MATH_HAS_SMALL_TABLES");
+  cfg.no_errno = hasMacro("LIBC_MATH_HAS_NO_ERRNO");
+  cfg.no_except = hasMacro("LIBC_MATH_HAS_NO_EXCEPT");
   cfg.intermediate_comp_in_float = hasMacro("LIBC_MATH_HAS_INTERMEDIATE_COMP_IN_FLOAT");
-  cfg.assume_round_nearest_only  = hasMacro("LIBC_MATH_HAS_ASSUME_ROUND_NEAREST_ONLY");
-  cfg.has_fma_half               = hasMacro("LIBC_TARGET_CPU_HAS_FMA_HALF");
-  cfg.has_fma_float              = hasMacro("LIBC_TARGET_CPU_HAS_FMA_FLOAT");
-  cfg.has_fma_double             = hasMacro("LIBC_TARGET_CPU_HAS_FMA_DOUBLE");
-  cfg.has_nearest_int            = hasMacro("LIBC_TARGET_CPU_HAS_NEAREST_INT");
-  cfg.has_fpu_float              = hasMacro("LIBC_TARGET_CPU_HAS_FPU_FLOAT");
-  cfg.has_fpu_double             = hasMacro("LIBC_TARGET_CPU_HAS_FPU_DOUBLE");
-  cfg.has_fast_float16           = hasMacro("LIBC_TARGET_CPU_HAS_FAST_FLOAT16_OPS");
-  cfg.has_int128                 = hasMacro("LIBC_TYPES_HAS_INT128");
-  cfg.target_triple              = ci.getTarget().getTriple().str();
+  cfg.assume_round_nearest_only = hasMacro("LIBC_MATH_HAS_ASSUME_ROUND_NEAREST_ONLY");
+  cfg.has_fma_half = hasMacro("LIBC_TARGET_CPU_HAS_FMA_HALF");
+  cfg.has_fma_float = hasMacro("LIBC_TARGET_CPU_HAS_FMA_FLOAT");
+  cfg.has_fma_double = hasMacro("LIBC_TARGET_CPU_HAS_FMA_DOUBLE");
+  cfg.has_nearest_int = hasMacro("LIBC_TARGET_CPU_HAS_NEAREST_INT");
+  cfg.has_fpu_float = hasMacro("LIBC_TARGET_CPU_HAS_FPU_FLOAT");
+  cfg.has_fpu_double = hasMacro("LIBC_TARGET_CPU_HAS_FPU_DOUBLE");
+  cfg.has_fast_float16 = hasMacro("LIBC_TARGET_CPU_HAS_FAST_FLOAT16_OPS");
+  cfg.has_int128 = hasMacro("LIBC_TYPES_HAS_INT128");
+  cfg.target_triple = ci.getTarget().getTriple().str();
   return cfg;
 }
 
@@ -190,28 +185,39 @@ auto floatFmtFromQualType(QualType qt, ASTContext &ctx) -> std::optional<FloatFm
   if (const auto *bt = qt->getAs<BuiltinType>()) {
     switch (bt->getKind()) {
     case BuiltinType::Half:
-    case BuiltinType::Float16:  return FloatFmt::Binary16;
-    case BuiltinType::Float:    return FloatFmt::Binary32;
-    case BuiltinType::Double:   return FloatFmt::Binary64;
-    case BuiltinType::Float128: return FloatFmt::Binary128;
-    default: break;
+    case BuiltinType::Float16:
+      return FloatFmt::Binary16;
+    case BuiltinType::Float:
+      return FloatFmt::Binary32;
+    case BuiltinType::Double:
+      return FloatFmt::Binary64;
+    case BuiltinType::Float128:
+      return FloatFmt::Binary128;
+    default:
+      break;
     }
   }
   if (qt->isFloatingType()) {
     switch (ctx.getTypeSize(qt)) {
-    case 16:  return FloatFmt::Binary16;
-    case 32:  return FloatFmt::Binary32;
-    case 64:  return FloatFmt::Binary64;
-    case 128: return FloatFmt::Binary128;
-    default: break;
+    case 16:
+      return FloatFmt::Binary16;
+    case 32:
+      return FloatFmt::Binary32;
+    case 64:
+      return FloatFmt::Binary64;
+    case 128:
+      return FloatFmt::Binary128;
+    default:
+      break;
     }
   }
   return std::nullopt;
 }
 
-auto getTemplateFirstFloatArg(const ClassTemplateSpecializationDecl *spec,
-                              ASTContext &ctx) -> FloatFmt {
-  if (!spec) return FloatFmt::Binary32;
+auto getTemplateFirstFloatArg(const ClassTemplateSpecializationDecl *spec, ASTContext &ctx)
+    -> FloatFmt {
+  if (!spec)
+    return FloatFmt::Binary32;
   const auto &args = spec->getTemplateArgs();
   for (unsigned i = 0; i < args.size(); ++i) {
     if (args[i].getKind() == TemplateArgument::Type) {
@@ -225,7 +231,8 @@ auto getTemplateFirstFloatArg(const ClassTemplateSpecializationDecl *spec,
 
 auto getTemplateFirstIntegralArg(const ClassTemplateSpecializationDecl *spec,
                                  std::uint64_t fallback) -> std::uint64_t {
-  if (!spec) return fallback;
+  if (!spec)
+    return fallback;
   const auto &args = spec->getTemplateArgs();
   for (unsigned i = 0; i < args.size(); ++i) {
     if (args[i].getKind() == TemplateArgument::Integral) {
@@ -235,11 +242,13 @@ auto getTemplateFirstIntegralArg(const ClassTemplateSpecializationDecl *spec,
   return fallback;
 }
 
-auto getFuncTemplateFirstIntegralArg(const FunctionDecl *fd,
-                                     std::uint64_t fallback) -> std::uint64_t {
-  if (!fd) return fallback;
+auto getFuncTemplateFirstIntegralArg(const FunctionDecl *fd, std::uint64_t fallback)
+    -> std::uint64_t {
+  if (!fd)
+    return fallback;
   const TemplateArgumentList *targs = fd->getTemplateSpecializationArgs();
-  if (!targs) return fallback;
+  if (!targs)
+    return fallback;
   for (unsigned i = 0; i < targs->size(); ++i) {
     if ((*targs)[i].getKind() == TemplateArgument::Integral) {
       return (*targs)[i].getAsIntegral().getZExtValue();
@@ -264,8 +273,8 @@ auto unwrapExprSugar(const Expr *e) -> const Expr * {
       e = dae->getExpr();
     } else if (const auto *ic = dyn_cast<ImplicitCastExpr>(e)) {
       auto ck = ic->getCastKind();
-      if (ck == CK_LValueToRValue || ck == CK_NoOp ||
-          ck == CK_FunctionToPointerDecay || ck == CK_ArrayToPointerDecay) {
+      if (ck == CK_LValueToRValue || ck == CK_NoOp || ck == CK_FunctionToPointerDecay ||
+          ck == CK_ArrayToPointerDecay) {
         e = ic->getSubExpr();
       } else {
         break;
@@ -279,13 +288,14 @@ auto unwrapExprSugar(const Expr *e) -> const Expr * {
 
 class AstExtractor {
 public:
-  AstExtractor(ASTContext &ctx, const ParseOptions &opts)
-      : ctx_(ctx), opts_(opts) {}
+  AstExtractor(ASTContext &ctx, const ParseOptions &opts) : ctx_(ctx), opts_(opts) {}
 
   auto convertType(QualType qt) -> ir::TypePtr {
     qt = qt.getNonReferenceType().getCanonicalType().getUnqualifiedType();
-    if (qt->isVoidType()) return ir::Type::makeVoid();
-    if (qt->isBooleanType()) return ir::Type::makeBool();
+    if (qt->isVoidType())
+      return ir::Type::makeVoid();
+    if (qt->isBooleanType())
+      return ir::Type::makeBool();
     if (auto fmt = floatFmtFromQualType(qt, ctx_)) {
       return ir::Type::makeFloat(*fmt);
     }
@@ -294,8 +304,7 @@ public:
       return ir::Type::makeInt(bits, qt->isSignedIntegerType());
     }
     if (const auto *cat = ctx_.getAsConstantArrayType(qt)) {
-      return ir::Type::makeArray(convertType(cat->getElementType()),
-                                 cat->getSize().getZExtValue());
+      return ir::Type::makeArray(convertType(cat->getElementType()), cat->getSize().getZExtValue());
     }
     if (const auto *pt = qt->getAs<PointerType>()) {
       return ir::Type::makePtr(convertType(pt->getPointeeType()));
@@ -319,25 +328,22 @@ public:
         case CoreTypeKind::Frac64:
           return ir::Type::makeFrac64();
         case CoreTypeKind::ExceptValues:
-          return ir::Type::makeExceptValues(
-              getTemplateFirstFloatArg(spec, ctx_),
-              getTemplateFirstIntegralArg(spec, 0));
+          return ir::Type::makeExceptValues(getTemplateFirstFloatArg(spec, ctx_),
+                                            getTemplateFirstIntegralArg(spec, 0));
         case CoreTypeKind::Sign:
           return ir::Type::makeSign();
         case CoreTypeKind::Optional:
           if (spec && spec->getTemplateArgs().size() >= 1 &&
               spec->getTemplateArgs()[0].getKind() == TemplateArgument::Type) {
-            return ir::Type::makeOptional(
-                convertType(spec->getTemplateArgs()[0].getAsType()));
+            return ir::Type::makeOptional(convertType(spec->getTemplateArgs()[0].getAsType()));
           }
           return ir::Type::makeOptional(ir::Type::makeOpaque("T"));
         case CoreTypeKind::Array:
           if (spec && spec->getTemplateArgs().size() >= 2 &&
               spec->getTemplateArgs()[0].getKind() == TemplateArgument::Type &&
               spec->getTemplateArgs()[1].getKind() == TemplateArgument::Integral) {
-            return ir::Type::makeArray(
-                convertType(spec->getTemplateArgs()[0].getAsType()),
-                spec->getTemplateArgs()[1].getAsIntegral().getZExtValue());
+            return ir::Type::makeArray(convertType(spec->getTemplateArgs()[0].getAsType()),
+                                       spec->getTemplateArgs()[1].getAsIntegral().getZExtValue());
           }
           break;
         }
@@ -386,9 +392,8 @@ public:
       unsigned n = val.getArraySize();
       arr.elems.reserve(n);
       for (unsigned i = 0; i < n; ++i) {
-        const APValue &elem = i < val.getArrayInitializedElts()
-                                  ? val.getArrayInitializedElt(i)
-                                  : val.getArrayFiller();
+        const APValue &elem = i < val.getArrayInitializedElts() ? val.getArrayInitializedElt(i)
+                                                                : val.getArrayFiller();
         if (auto c = convertAPValue(elem, elem_qt)) {
           arr.elems.push_back(std::move(*c));
         } else {
@@ -400,7 +405,8 @@ public:
 
     if (val.isStruct()) {
       const auto *rt = qt->getAs<RecordType>();
-      if (!rt) return std::nullopt;
+      if (!rt)
+        return std::nullopt;
       const RecordDecl *rd = rt->getDecl();
       auto qname = rd->getQualifiedNameAsString();
       auto norm = normalizeQualifiedName(qname);
@@ -447,16 +453,18 @@ public:
         dc.bits = static_cast<std::uint32_t>(getTemplateFirstIntegralArg(spec, 128));
         unsigned idx = 0;
         for (const FieldDecl *fd : rd->fields()) {
-          if (idx >= val.getStructNumFields()) break;
+          if (idx >= val.getStructNumFields())
+            break;
           const APValue &fv = val.getStructField(idx++);
           auto fname = fd->getName();
           if (fname == "sign") {
-            if (fv.isInt()) dc.sign_neg = fv.getInt().getBoolValue();
-            else if (fv.isStruct() && fv.getStructNumFields() >= 1 &&
-                     fv.getStructField(0).isInt())
+            if (fv.isInt())
+              dc.sign_neg = fv.getInt().getBoolValue();
+            else if (fv.isStruct() && fv.getStructNumFields() >= 1 && fv.getStructField(0).isInt())
               dc.sign_neg = fv.getStructField(0).getInt().getBoolValue();
           } else if (fname == "exponent") {
-            if (fv.isInt()) dc.exponent = fv.getInt().getExtValue();
+            if (fv.isInt())
+              dc.exponent = fv.getInt().getExtValue();
           } else if (fname == "mantissa") {
             if (fv.isInt()) {
               dc.mantissa_hex = apIntToUpperHex(fv.getInt());
@@ -467,7 +475,8 @@ public:
             }
           }
         }
-        if (dc.mantissa_hex.empty()) dc.mantissa_hex = "0";
+        if (dc.mantissa_hex.empty())
+          dc.mantissa_hex = "0";
         return ir::ConstVal{std::move(dc)};
       }
 
@@ -477,12 +486,15 @@ public:
         np.fmt = getTemplateFirstFloatArg(spec, ctx_);
         unsigned idx = 0;
         for (const FieldDecl *fd : rd->fields()) {
-          if (idx >= val.getStructNumFields()) break;
+          if (idx >= val.getStructNumFields())
+            break;
           const APValue &fv = val.getStructField(idx++);
           if (fv.isFloat()) {
             auto raw = fv.getFloat().bitcastToAPInt().getZExtValue();
-            if (fd->getName() == "hi") np.hi_bits = raw;
-            else if (fd->getName() == "lo") np.lo_bits = raw;
+            if (fd->getName() == "hi")
+              np.hi_bits = raw;
+            else if (fd->getName() == "lo")
+              np.lo_bits = raw;
           }
         }
         return ir::ConstVal{np};
@@ -492,7 +504,8 @@ public:
       sc.type_name = shortLeanName(norm);
       unsigned idx = 0;
       for (const FieldDecl *fd : rd->fields()) {
-        if (idx >= val.getStructNumFields()) break;
+        if (idx >= val.getStructNumFields())
+          break;
         if (auto c = convertAPValue(val.getStructField(idx++), fd->getType())) {
           sc.fields.emplace_back(fd->getNameAsString(), std::move(*c));
         } else {
@@ -510,9 +523,11 @@ public:
       return it->second;
     }
     const APValue *apv = vd->evaluateValue();
-    if (!apv) return std::nullopt;
+    if (!apv)
+      return std::nullopt;
     auto cval = convertAPValue(*apv, vd->getType());
-    if (!cval) return std::nullopt;
+    if (!cval)
+      return std::nullopt;
 
     auto cpp_name = normalizeQualifiedName(vd->getQualifiedNameAsString());
     auto lean_name = sanitizeLeanIdent(vd->getNameAsString());
@@ -523,10 +538,10 @@ public:
     tables_seen_[vd] = lean_name;
 
     module_.tables.push_back(ir::Table{
-      .lean_name = lean_name,
-      .cpp_name = cpp_name,
-      .type = convertType(vd->getType()),
-      .value = std::move(*cval),
+        .lean_name = lean_name,
+        .cpp_name = cpp_name,
+        .type = convertType(vd->getType()),
+        .value = std::move(*cval),
     });
     return lean_name;
   }
@@ -537,8 +552,8 @@ public:
       return it->second;
     }
     auto cpp_name = normalizeQualifiedName(fd->getQualifiedNameAsString());
-    std::string candidate = !override_name.empty() ? std::string(override_name)
-                                                   : shortLeanName(cpp_name);
+    std::string candidate =
+        !override_name.empty() ? std::string(override_name) : shortLeanName(cpp_name);
     if (used_func_names_.contains(candidate)) {
       candidate = sanitizeLeanIdent(cpp_name);
     }
@@ -554,7 +569,8 @@ public:
 
   auto extractFunction(const FunctionDecl *fd, std::string lean_name_override = "")
       -> std::expected<void, std::string> {
-    if (extracted_funcs_.contains(fd)) return {};
+    if (extracted_funcs_.contains(fd))
+      return {};
     extracted_funcs_.insert(fd);
 
     if (!fd->hasBody()) {
@@ -570,7 +586,8 @@ public:
 
     for (const ParmVarDecl *p : fd->parameters()) {
       std::string pname = p->getNameAsString();
-      if (pname.empty()) pname = std::format("arg{}", fn.params.size());
+      if (pname.empty())
+        pname = std::format("arg{}", fn.params.size());
       fn.params.push_back(ir::Param{pname, convertType(p->getType())});
     }
 
@@ -591,7 +608,8 @@ public:
     auto pending = std::move(pending_helpers_);
     pending_helpers_.clear();
     for (const FunctionDecl *helper : pending) {
-      if (auto r = extractFunction(helper); !r) return r;
+      if (auto r = extractFunction(helper); !r)
+        return r;
     }
 
     module_.functions.push_back(std::move(fn));
@@ -606,14 +624,15 @@ private:
     while (cur->isStruct() && cur->getStructNumFields() == 1) {
       cur = &cur->getStructField(0);
     }
-    if (cur->isInt()) return apIntToUpperHex(cur->getInt());
+    if (cur->isInt())
+      return apIntToUpperHex(cur->getInt());
     if (cur->isArray() && cur->getArraySize() > 0) {
       llvm::APInt acc(64 * cur->getArraySize(), 0);
       for (unsigned i = 0; i < cur->getArraySize(); ++i) {
-        const APValue &elt = i < cur->getArrayInitializedElts()
-                                 ? cur->getArrayInitializedElt(i)
-                                 : cur->getArrayFiller();
-        if (!elt.isInt()) return std::nullopt;
+        const APValue &elt = i < cur->getArrayInitializedElts() ? cur->getArrayInitializedElt(i)
+                                                                : cur->getArrayFiller();
+        if (!elt.isInt())
+          return std::nullopt;
         llvm::APInt word = elt.getInt().zextOrTrunc(acc.getBitWidth());
         acc |= (word << (i * 64));
       }
@@ -641,7 +660,8 @@ private:
   }
 
   void extractStmtInto(const Stmt *s, std::vector<ir::Stmt> &out) {
-    if (!s || isa<NullStmt>(s)) return;
+    if (!s || isa<NullStmt>(s))
+      return;
 
     if (const auto *cs = dyn_cast<CompoundStmt>(s)) {
       for (const Stmt *sub : cs->body()) {
@@ -664,9 +684,8 @@ private:
           continue;
         }
         if (const auto *vd = dyn_cast<VarDecl>(d)) {
-          if (vd->isConstexpr() &&
-              (vd->getType()->isArrayType() ||
-               (vd->isStaticLocal() && vd->getType()->isRecordType()))) {
+          if (vd->isConstexpr() && (vd->getType()->isArrayType() ||
+                                    (vd->isStaticLocal() && vd->getType()->isRecordType()))) {
             registerTable(vd);
             continue;
           }
@@ -719,8 +738,10 @@ private:
 
       ir::IfStmt node;
       node.cond = extractExpr(ifs->getCond());
-      if (ifs->getThen()) extractStmtInto(ifs->getThen(), node.then_body);
-      if (ifs->getElse()) extractStmtInto(ifs->getElse(), node.else_body);
+      if (ifs->getThen())
+        extractStmtInto(ifs->getThen(), node.then_body);
+      if (ifs->getElse())
+        extractStmtInto(ifs->getElse(), node.else_body);
       out.push_back(ir::Stmt{std::move(node)});
       return;
     }
@@ -739,7 +760,8 @@ private:
     if (const auto *ws = dyn_cast<clang::WhileStmt>(s)) {
       ir::WhileStmt node;
       node.cond = extractExpr(ws->getCond());
-      if (ws->getBody()) extractStmtInto(ws->getBody(), node.body);
+      if (ws->getBody())
+        extractStmtInto(ws->getBody(), node.body);
       out.push_back(ir::Stmt{std::move(node)});
       return;
     }
@@ -755,7 +777,8 @@ private:
           node.init = std::make_shared<ir::Stmt>(ir::Stmt{ir::BlockStmt{std::move(inits)}});
         }
       }
-      if (fs->getCond()) node.cond = extractExpr(fs->getCond());
+      if (fs->getCond())
+        node.cond = extractExpr(fs->getCond());
       if (fs->getInc()) {
         std::vector<ir::Stmt> steps;
         extractStmtInto(fs->getInc(), steps);
@@ -763,7 +786,8 @@ private:
           node.step = std::make_shared<ir::Stmt>(std::move(steps[0]));
         }
       }
-      if (fs->getBody()) extractStmtInto(fs->getBody(), node.body);
+      if (fs->getBody())
+        extractStmtInto(fs->getBody(), node.body);
       out.push_back(ir::Stmt{std::move(node)});
       return;
     }
@@ -782,13 +806,14 @@ private:
       return;
     }
 
-    out.push_back(recordUnsupportedStmt(
-        std::format("unsupported stmt kind '{}'", s->getStmtClassName())));
+    out.push_back(
+        recordUnsupportedStmt(std::format("unsupported stmt kind '{}'", s->getStmtClassName())));
   }
 
   void extractSwitchBody(const Stmt *body, ir::SwitchStmt &sw) {
     const auto *cs = dyn_cast_or_null<CompoundStmt>(body);
-    if (!cs) return;
+    if (!cs)
+      return;
 
     std::vector<ir::ConstVal> pending_vals;
     bool in_default = false;
@@ -818,11 +843,13 @@ private:
 
     std::function<void(const Stmt *)> visitSwitchItem = [&](const Stmt *item) {
       if (const auto *c = dyn_cast<CaseStmt>(item)) {
-        if (!current_body.empty() || in_default) flush();
+        if (!current_body.empty() || in_default)
+          flush();
         pending_vals.push_back(evalCaseVal(c));
         visitSwitchItem(c->getSubStmt());
       } else if (const auto *d = dyn_cast<DefaultStmt>(item)) {
-        if (!current_body.empty() || !pending_vals.empty()) flush();
+        if (!current_body.empty() || !pending_vals.empty())
+          flush();
         in_default = true;
         visitSwitchItem(d->getSubStmt());
       } else if (isa<clang::BreakStmt>(item)) {
@@ -840,21 +867,22 @@ private:
 
   void extractExprAsStmt(const Expr *raw, std::vector<ir::Stmt> &out) {
     const Expr *e = unwrapExprSugar(raw);
-    if (!e) return;
+    if (!e)
+      return;
 
     if (const auto *bo = dyn_cast<BinaryOperator>(e); bo && bo->isAssignmentOp()) {
       auto compound = mapCompoundAssignOp(bo->getOpcode());
       const Expr *lhs = unwrapExprSugar(bo->getLHS());
       ir::ExprPtr rhs = extractExpr(bo->getRHS());
       if (const auto *dre = dyn_cast<DeclRefExpr>(lhs)) {
-        out.push_back(ir::Stmt{ir::AssignStmt{
-          dre->getDecl()->getNameAsString(), compound, std::move(rhs)}});
+        out.push_back(
+            ir::Stmt{ir::AssignStmt{dre->getDecl()->getNameAsString(), compound, std::move(rhs)}});
         return;
       }
       if (const auto *me = dyn_cast<MemberExpr>(lhs)) {
-        out.push_back(ir::Stmt{ir::FieldAssignStmt{
-          extractExpr(me->getBase()), me->getMemberDecl()->getNameAsString(),
-          compound, std::move(rhs)}});
+        out.push_back(ir::Stmt{ir::FieldAssignStmt{extractExpr(me->getBase()),
+                                                   me->getMemberDecl()->getNameAsString(), compound,
+                                                   std::move(rhs)}});
         return;
       }
     }
@@ -868,26 +896,33 @@ private:
       if (kind == OO_Equal) {
         is_assign = true;
       } else if (kind == OO_PlusEqual) {
-        is_assign = true; compound = ir::BinaryOp::Add;
+        is_assign = true;
+        compound = ir::BinaryOp::Add;
       } else if (kind == OO_MinusEqual) {
-        is_assign = true; compound = ir::BinaryOp::Sub;
+        is_assign = true;
+        compound = ir::BinaryOp::Sub;
       } else if (kind == OO_StarEqual) {
-        is_assign = true; compound = ir::BinaryOp::Mul;
+        is_assign = true;
+        compound = ir::BinaryOp::Mul;
       }
       if (is_assign) {
         if (const auto *dre = dyn_cast<DeclRefExpr>(lhs)) {
           auto lhs_ty = convertType(dre->getType());
           if (lhs_ty->isFrac64() && compound == ir::BinaryOp::Mul) {
-            auto mul = ir::Expr::make(
-                ir::CoreCallExpr{CoreOpKind::Frac64Mul, "Core.Frac64.mul",
-                                 {extractExpr(lhs), std::move(rhs)}, {}, false, true, false},
-                lhs_ty);
-            out.push_back(ir::Stmt{ir::AssignStmt{
-              dre->getDecl()->getNameAsString(), std::nullopt, std::move(mul)}});
+            auto mul = ir::Expr::make(ir::CoreCallExpr{CoreOpKind::Frac64Mul,
+                                                       "Core.Frac64.mul",
+                                                       {extractExpr(lhs), std::move(rhs)},
+                                                       {},
+                                                       false,
+                                                       true,
+                                                       false},
+                                      lhs_ty);
+            out.push_back(ir::Stmt{
+                ir::AssignStmt{dre->getDecl()->getNameAsString(), std::nullopt, std::move(mul)}});
             return;
           }
-          out.push_back(ir::Stmt{ir::AssignStmt{
-            dre->getDecl()->getNameAsString(), compound, std::move(rhs)}});
+          out.push_back(ir::Stmt{
+              ir::AssignStmt{dre->getDecl()->getNameAsString(), compound, std::move(rhs)}});
           return;
         }
       }
@@ -903,12 +938,12 @@ private:
           w = it->width;
           is_s = it->is_signed;
         }
-        auto one = ir::Expr::make(
-            ir::ConstExpr{ir::ConstVal{ir::IntConst{w, is_s, "1", 1, true}}}, ty);
+        auto one =
+            ir::Expr::make(ir::ConstExpr{ir::ConstVal{ir::IntConst{w, is_s, "1", 1, true}}}, ty);
         out.push_back(ir::Stmt{ir::AssignStmt{
-          dre->getDecl()->getNameAsString(),
-          uo->isIncrementOp() ? ir::BinaryOp::Add : ir::BinaryOp::Sub,
-          std::move(one),
+            dre->getDecl()->getNameAsString(),
+            uo->isIncrementOp() ? ir::BinaryOp::Add : ir::BinaryOp::Sub,
+            std::move(one),
         }});
         return;
       }
@@ -919,7 +954,8 @@ private:
 
   auto extractExpr(const Expr *raw) -> ir::ExprPtr {
     const Expr *e = unwrapExprSugar(raw);
-    if (!e) return ir::Expr::make(ir::UnsupportedExpr{"null expr"}, ir::Type::makeVoid());
+    if (!e)
+      return ir::Expr::make(ir::UnsupportedExpr{"null expr"}, ir::Type::makeVoid());
 
     if (const auto *bl = dyn_cast<CXXBoolLiteralExpr>(e)) {
       return ir::Expr::make(ir::ConstExpr{ir::ConstVal{ir::BoolConst{bl->getValue()}}},
@@ -931,9 +967,8 @@ private:
       llvm::APInt v = il->getValue();
       auto w = static_cast<std::uint32_t>(v.getBitWidth());
       bool fits = v.getSignificantBits() <= 64;
-      std::int64_t sval = fits ? (is_s ? v.getSExtValue()
-                                       : static_cast<std::int64_t>(v.getZExtValue()))
-                               : 0;
+      std::int64_t sval =
+          fits ? (is_s ? v.getSExtValue() : static_cast<std::int64_t>(v.getZExtValue())) : 0;
       return ir::Expr::make(
           ir::ConstExpr{ir::ConstVal{ir::IntConst{w, is_s, apIntToUpperHex(v), sval, fits}}},
           std::move(ty));
@@ -953,10 +988,9 @@ private:
       if (const auto *ecd = dyn_cast<EnumConstantDecl>(vd)) {
         const llvm::APSInt &v = ecd->getInitVal();
         auto w = static_cast<std::uint32_t>(v.getBitWidth());
-        return ir::Expr::make(
-            ir::ConstExpr{ir::ConstVal{ir::IntConst{w, v.isSigned(), apIntToUpperHex(v),
-                                                    v.getExtValue(), true}}},
-            convertType(dre->getType()));
+        return ir::Expr::make(ir::ConstExpr{ir::ConstVal{ir::IntConst{
+                                  w, v.isSigned(), apIntToUpperHex(v), v.getExtValue(), true}}},
+                              convertType(dre->getType()));
       }
       if (const auto *var = dyn_cast<VarDecl>(vd)) {
         auto var_ty = convertType(var->getType());
@@ -1036,15 +1070,15 @@ private:
             ir::BinaryExpr{*op, extractExpr(bo->getLHS()), extractExpr(bo->getRHS())},
             convertType(bo->getType()));
       }
-      return recordUnsupportedExpr(
-          std::format("binary operator '{}'", bo->getOpcodeStr().str()), bo->getType());
+      return recordUnsupportedExpr(std::format("binary operator '{}'", bo->getOpcodeStr().str()),
+                                   bo->getType());
     }
 
     if (const auto *co = dyn_cast<ConditionalOperator>(e)) {
-      return ir::Expr::make(
-          ir::SelectExpr{extractExpr(co->getCond()), extractExpr(co->getTrueExpr()),
-                         extractExpr(co->getFalseExpr())},
-          convertType(co->getType()));
+      return ir::Expr::make(ir::SelectExpr{extractExpr(co->getCond()),
+                                           extractExpr(co->getTrueExpr()),
+                                           extractExpr(co->getFalseExpr())},
+                            convertType(co->getType()));
     }
 
     if (const auto *ase = dyn_cast<ArraySubscriptExpr>(e)) {
@@ -1055,9 +1089,8 @@ private:
           return ir::Expr::make(ir::FieldExpr{fe->base, "val"}, convertType(ase->getType()));
         }
       }
-      return ir::Expr::make(
-          ir::IndexExpr{std::move(base), extractExpr(ase->getIdx())},
-          convertType(ase->getType()));
+      return ir::Expr::make(ir::IndexExpr{std::move(base), extractExpr(ase->getIdx())},
+                            convertType(ase->getType()));
     }
 
     if (const auto *me = dyn_cast<MemberExpr>(e)) {
@@ -1068,9 +1101,8 @@ private:
 
     if (const auto *bbc = dyn_cast<BuiltinBitCastExpr>(e)) {
       auto dst_ty = convertType(bbc->getType());
-      return ir::Expr::make(
-          ir::CastExpr{ir::CastKind::BitCast, extractExpr(bbc->getSubExpr())},
-          std::move(dst_ty));
+      return ir::Expr::make(ir::CastExpr{ir::CastKind::BitCast, extractExpr(bbc->getSubExpr())},
+                            std::move(dst_ty));
     }
 
     if (const auto *ce = dyn_cast<CastExpr>(e)) {
@@ -1104,8 +1136,8 @@ private:
       }
     }
 
-    return recordUnsupportedExpr(
-        std::format("expr kind '{}'", e->getStmtClassName()), e->getType());
+    return recordUnsupportedExpr(std::format("expr kind '{}'", e->getStmtClassName()),
+                                 e->getType());
   }
 
   auto extractCastExpr(const CastExpr *ce) -> ir::ExprPtr {
@@ -1113,9 +1145,8 @@ private:
     auto dst_ty = convertType(ce->getType());
     auto ck = ce->getCastKind();
 
-    if (ck == CK_ConstructorConversion || ck == CK_UserDefinedConversion ||
-        ck == CK_NoOp || ck == CK_LValueToRValue ||
-        ck == CK_DerivedToBase || ck == CK_UncheckedDerivedToBase ||
+    if (ck == CK_ConstructorConversion || ck == CK_UserDefinedConversion || ck == CK_NoOp ||
+        ck == CK_LValueToRValue || ck == CK_DerivedToBase || ck == CK_UncheckedDerivedToBase ||
         ck == CK_FunctionToPointerDecay || ck == CK_ArrayToPointerDecay) {
       return extractExpr(sub);
     }
@@ -1167,18 +1198,21 @@ private:
           return ir::Expr::make(ir::FieldExpr{fe->base, "val"}, std::move(ret_ty));
         }
       }
-      return ir::Expr::make(
-          ir::IndexExpr{std::move(base), extractExpr(oce->getArg(1))},
-          std::move(ret_ty));
+      return ir::Expr::make(ir::IndexExpr{std::move(base), extractExpr(oce->getArg(1))},
+                            std::move(ret_ty));
     }
 
     if (op == OO_Star && oce->getNumArgs() == 1) {
       auto arg0 = extractExpr(oce->getArg(0));
       if (arg0->type && std::holds_alternative<ir::OptionalType>(arg0->type->v)) {
-        return ir::Expr::make(
-            ir::CoreCallExpr{CoreOpKind::OptionalValue, "Option.get!", {std::move(arg0)},
-                             {}, false, false, false},
-            std::move(ret_ty));
+        return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::OptionalValue,
+                                               "Option.get!",
+                                               {std::move(arg0)},
+                                               {},
+                                               false,
+                                               false,
+                                               false},
+                              std::move(ret_ty));
       }
     }
 
@@ -1188,10 +1222,14 @@ private:
 
       if (lhs->type && lhs->type->isFrac64()) {
         if (op == OO_Star) {
-          return ir::Expr::make(
-              ir::CoreCallExpr{CoreOpKind::Frac64Mul, "Core.Frac64.mul",
-                               {std::move(lhs), std::move(rhs)}, {}, false, true, false},
-              std::move(ret_ty));
+          return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::Frac64Mul,
+                                                 "Core.Frac64.mul",
+                                                 {std::move(lhs), std::move(rhs)},
+                                                 {},
+                                                 false,
+                                                 true,
+                                                 false},
+                                std::move(ret_ty));
         }
         if (auto bop = mapOverloadedBinaryOp(op)) {
           return ir::Expr::make(ir::BinaryExpr{*bop, std::move(lhs), std::move(rhs)},
@@ -1201,16 +1239,24 @@ private:
 
       if (lhs->type && lhs->type->isDyadic()) {
         if (op == OO_Plus) {
-          return ir::Expr::make(
-              ir::CoreCallExpr{CoreOpKind::DyadicAdd, "Core.DyadicFloat.quickAdd",
-                               {std::move(lhs), std::move(rhs)}, {}, false, false, false},
-              std::move(ret_ty));
+          return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::DyadicAdd,
+                                                 "Core.DyadicFloat.quickAdd",
+                                                 {std::move(lhs), std::move(rhs)},
+                                                 {},
+                                                 false,
+                                                 false,
+                                                 false},
+                                std::move(ret_ty));
         }
         if (op == OO_Star) {
-          return ir::Expr::make(
-              ir::CoreCallExpr{CoreOpKind::DyadicMul, "Core.DyadicFloat.quickMul",
-                               {std::move(lhs), std::move(rhs)}, {}, false, false, false},
-              std::move(ret_ty));
+          return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::DyadicMul,
+                                                 "Core.DyadicFloat.quickMul",
+                                                 {std::move(lhs), std::move(rhs)},
+                                                 {},
+                                                 false,
+                                                 false,
+                                                 false},
+                                std::move(ret_ty));
         }
       }
 
@@ -1249,24 +1295,35 @@ private:
       auto core_owner = matchCoreType(owner_qname);
       auto recv = extractExpr(mce->getImplicitObjectArgument());
       if (core_owner == CoreTypeKind::FPBits && ret_ty->isFloat()) {
-        return ir::Expr::make(
-            ir::CoreCallExpr{CoreOpKind::FPBitsGetVal, "Core.FPBits.getVal",
-                             {std::move(recv)}, {}, false, false, false},
-            std::move(ret_ty));
+        return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::FPBitsGetVal,
+                                               "Core.FPBits.getVal",
+                                               {std::move(recv)},
+                                               {},
+                                               false,
+                                               false,
+                                               false},
+                              std::move(ret_ty));
       }
       if (core_owner == CoreTypeKind::Optional && ret_ty->isBool()) {
-        return ir::Expr::make(
-            ir::CoreCallExpr{CoreOpKind::OptionalHasValue, "Option.isSome",
-                             {std::move(recv)}, {}, false, false, false},
-            ir::Type::makeBool());
+        return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::OptionalHasValue,
+                                               "Option.isSome",
+                                               {std::move(recv)},
+                                               {},
+                                               false,
+                                               false,
+                                               false},
+                              ir::Type::makeBool());
       }
       if (core_owner == CoreTypeKind::DyadicFloat && ret_ty->isFloat()) {
         auto fmt = std::get<ir::FloatType>(ret_ty->v).fmt;
-        return ir::Expr::make(
-            ir::CoreCallExpr{CoreOpKind::DyadicAs, "Core.DyadicFloat.asFloat",
-                             {std::move(recv)}, {std::string(floatFmtLean(fmt))},
-                             true, false, false},
-            std::move(ret_ty));
+        return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::DyadicAs,
+                                               "Core.DyadicFloat.asFloat",
+                                               {std::move(recv)},
+                                               {std::string(floatFmtLean(fmt))},
+                                               true,
+                                               false,
+                                               false},
+                              std::move(ret_ty));
       }
     }
 
@@ -1274,7 +1331,8 @@ private:
     if (!core_owner) {
       if (const Expr *obj = mce->getImplicitObjectArgument()) {
         QualType obj_qt = obj->getType().getCanonicalType().getUnqualifiedType();
-        if (obj_qt->isPointerType()) obj_qt = obj_qt->getPointeeType().getCanonicalType();
+        if (obj_qt->isPointerType())
+          obj_qt = obj_qt->getPointeeType().getCanonicalType();
         if (const auto *rt = obj_qt->getAs<RecordType>()) {
           core_owner = matchCoreType(rt->getDecl()->getQualifiedNameAsString());
         }
@@ -1289,18 +1347,17 @@ private:
           args.push_back(extractExpr(arg));
         }
         std::vector<std::string> type_args;
-        if (spec->kind == CoreOpKind::DyadicFastAs ||
-            spec->kind == CoreOpKind::DyadicGenericAs ||
+        if (spec->kind == CoreOpKind::DyadicFastAs || spec->kind == CoreOpKind::DyadicGenericAs ||
             spec->kind == CoreOpKind::DyadicAs) {
           if (const auto *ft = std::get_if<ir::FloatType>(&ret_ty->v)) {
             type_args.emplace_back(floatFmtLean(ft->fmt));
           }
         }
-        return ir::Expr::make(
-            ir::CoreCallExpr{spec->kind, std::string(spec->lean_name), std::move(args),
-                             std::move(type_args), spec->needs_mode, spec->needs_config,
-                             spec->is_effect},
-            std::move(ret_ty));
+        return ir::Expr::make(ir::CoreCallExpr{spec->kind, std::string(spec->lean_name),
+                                               std::move(args), std::move(type_args),
+                                               spec->needs_mode, spec->needs_config,
+                                               spec->is_effect},
+                              std::move(ret_ty));
       }
     }
 
@@ -1320,7 +1377,8 @@ private:
   auto extractConstructExpr(const CXXConstructExpr *cce) -> ir::ExprPtr {
     const CXXConstructorDecl *ctor = cce->getConstructor();
     auto ret_ty = convertType(cce->getType());
-    if (!ctor) return recordUnsupportedExpr("null constructor", cce->getType());
+    if (!ctor)
+      return recordUnsupportedExpr("null constructor", cce->getType());
 
     if (ctor->isCopyOrMoveConstructor() && cce->getNumArgs() == 1) {
       return extractExpr(cce->getArg(0));
@@ -1338,21 +1396,33 @@ private:
       case CoreTypeKind::FPBits:
         if (args.empty()) {
           auto fmt = std::get<ir::FPBitsType>(ret_ty->v).fmt;
-          return ir::Expr::make(
-              ir::CoreCallExpr{CoreOpKind::FPBitsZero, "Core.FPBits.zero", {},
-                               {std::string(floatFmtLean(fmt))}, false, false, false},
-              std::move(ret_ty));
+          return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::FPBitsZero,
+                                                 "Core.FPBits.zero",
+                                                 {},
+                                                 {std::string(floatFmtLean(fmt))},
+                                                 false,
+                                                 false,
+                                                 false},
+                                std::move(ret_ty));
         }
         if (args[0]->type && args[0]->type->isFloat()) {
-          return ir::Expr::make(
-              ir::CoreCallExpr{CoreOpKind::FPBitsOfVal, "Core.FPBits.ofVal", std::move(args),
-                               {}, false, false, false},
-              std::move(ret_ty));
+          return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::FPBitsOfVal,
+                                                 "Core.FPBits.ofVal",
+                                                 std::move(args),
+                                                 {},
+                                                 false,
+                                                 false,
+                                                 false},
+                                std::move(ret_ty));
         }
-        return ir::Expr::make(
-            ir::CoreCallExpr{CoreOpKind::FPBitsOfBits, "Core.FPBits.ofBits", std::move(args),
-                             {}, false, false, false},
-            std::move(ret_ty));
+        return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::FPBitsOfBits,
+                                               "Core.FPBits.ofBits",
+                                               std::move(args),
+                                               {},
+                                               false,
+                                               false,
+                                               false},
+                              std::move(ret_ty));
       case CoreTypeKind::Frac64: {
         if (args.empty()) {
           return ir::Expr::make(ir::ConstExpr{ir::ConstVal{ir::Frac64Const{"0"}}},
@@ -1366,17 +1436,25 @@ private:
                                   ir::Type::makeInt(64, false));
           }
         }
-        return ir::Expr::make(
-            ir::CoreCallExpr{CoreOpKind::Frac64OfBits, "Core.Frac64.ofBits", {std::move(arg0)},
-                             {}, false, false, false},
-            std::move(ret_ty));
+        return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::Frac64OfBits,
+                                               "Core.Frac64.ofBits",
+                                               {std::move(arg0)},
+                                               {},
+                                               false,
+                                               false,
+                                               false},
+                              std::move(ret_ty));
       }
       case CoreTypeKind::DyadicFloat: {
         auto bits = std::get<ir::DyadicFloatType>(ret_ty->v).bits;
-        return ir::Expr::make(
-            ir::CoreCallExpr{CoreOpKind::DyadicFromFloat, "Core.DyadicFloat.ofFloat",
-                             std::move(args), {std::to_string(bits)}, false, false, false},
-            std::move(ret_ty));
+        return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::DyadicFromFloat,
+                                               "Core.DyadicFloat.ofFloat",
+                                               std::move(args),
+                                               {std::to_string(bits)},
+                                               false,
+                                               false,
+                                               false},
+                              std::move(ret_ty));
       }
       case CoreTypeKind::NumberPair:
         if (args.size() == 2) {
@@ -1394,8 +1472,8 @@ private:
               std::move(ret_ty));
         }
         return ir::Expr::make(
-            ir::CoreCallExpr{CoreOpKind::OptionalSome, "some", std::move(args), {},
-                             false, false, false},
+            ir::CoreCallExpr{
+                CoreOpKind::OptionalSome, "some", std::move(args), {}, false, false, false},
             std::move(ret_ty));
       default:
         break;
@@ -1426,8 +1504,10 @@ private:
       if (core == CoreTypeKind::NumberPair && ile->getNumInits() == 2) {
         ir::StructLitExpr lit;
         auto fmt = std::get<ir::NumberPairType>(ret_ty->v).fmt;
-        lit.type_name = (fmt == FloatFmt::Binary32) ? "Core.FloatFloat"
-                        : (fmt == FloatFmt::Binary64 ? "Core.DoubleDouble" : "Core.NumberPair _");
+        lit.type_name =
+            (fmt == FloatFmt::Binary32)
+                ? "Core.FloatFloat"
+                : (fmt == FloatFmt::Binary64 ? "Core.DoubleDouble" : "Core.NumberPair _");
         lit.fields.emplace_back("lo", extractExpr(ile->getInit(0)));
         lit.fields.emplace_back("hi", extractExpr(ile->getInit(1)));
         return ir::Expr::make(std::move(lit), std::move(ret_ty));
@@ -1436,7 +1516,8 @@ private:
       lit.type_name = shortLeanName(normalizeQualifiedName(rd->getQualifiedNameAsString()));
       unsigned i = 0;
       for (const FieldDecl *fd : rd->fields()) {
-        if (i >= ile->getNumInits()) break;
+        if (i >= ile->getNumInits())
+          break;
         lit.fields.emplace_back(fd->getNameAsString(), extractExpr(ile->getInit(i++)));
       }
       return ir::Expr::make(std::move(lit), std::move(ret_ty));
@@ -1458,7 +1539,8 @@ private:
         if (auto spec = matchMethodCoreOp(*core_owner, md->getNameAsString())) {
           std::vector<ir::ExprPtr> args;
           for (const Expr *arg : call->arguments()) {
-            if (!isa<CXXDefaultArgExpr>(arg)) args.push_back(extractExpr(arg));
+            if (!isa<CXXDefaultArgExpr>(arg))
+              args.push_back(extractExpr(arg));
           }
           std::vector<std::string> type_args;
           if (*core_owner == CoreTypeKind::FPBits) {
@@ -1469,11 +1551,11 @@ private:
               type_args.emplace_back(floatFmtLean(getTemplateFirstFloatArg(cspec, ctx_)));
             }
           }
-          return ir::Expr::make(
-              ir::CoreCallExpr{spec->kind, std::string(spec->lean_name), std::move(args),
-                               std::move(type_args), spec->needs_mode, spec->needs_config,
-                               spec->is_effect},
-              std::move(ret_ty));
+          return ir::Expr::make(ir::CoreCallExpr{spec->kind, std::string(spec->lean_name),
+                                                 std::move(args), std::move(type_args),
+                                                 spec->needs_mode, spec->needs_config,
+                                                 spec->is_effect},
+                                std::move(ret_ty));
         }
       }
     }
@@ -1487,8 +1569,7 @@ private:
         return extractExpr(call->getArg(0));
       }
 
-      if ((spec->kind == CoreOpKind::Polyeval ||
-           spec->kind == CoreOpKind::AltPolyeval ||
+      if ((spec->kind == CoreOpKind::Polyeval || spec->kind == CoreOpKind::AltPolyeval ||
            spec->kind == CoreOpKind::Estrin) &&
           call->getNumArgs() >= 2) {
         ir::PolyevalExpr poly;
@@ -1544,31 +1625,30 @@ private:
         if (kind == CoreOpKind::DyadicQuickMul) {
           bool scalar_lhs = args.size() == 2 && args[0]->type && args[0]->type->isFloat();
           kind = scalar_lhs ? CoreOpKind::DDQuickMultScalar : CoreOpKind::DDQuickMult;
-          lean_name = scalar_lhs ? "Core.NumberPair.quickMultScalar"
-                                 : "Core.NumberPair.quickMult";
+          lean_name = scalar_lhs ? "Core.NumberPair.quickMultScalar" : "Core.NumberPair.quickMult";
           needs_mode = true;
           needs_config = true;
         }
       }
-      if (kind == CoreOpKind::DDQuickMult && args.size() == 2 &&
-          args[0]->type && args[0]->type->isFloat()) {
+      if (kind == CoreOpKind::DDQuickMult && args.size() == 2 && args[0]->type &&
+          args[0]->type->isFloat()) {
         kind = CoreOpKind::DDQuickMultScalar;
         lean_name = "Core.NumberPair.quickMultScalar";
       }
       if (kind == CoreOpKind::DDAdd && args.size() == 2) {
-        if (args[0]->type && args[0]->type->isNumberPair() &&
-            args[1]->type && args[1]->type->isFloat()) {
+        if (args[0]->type && args[0]->type->isNumberPair() && args[1]->type &&
+            args[1]->type->isFloat()) {
           lean_name = "Core.NumberPair.addScalar";
-        } else if (args[0]->type && args[0]->type->isFloat() &&
-                   args[1]->type && args[1]->type->isNumberPair()) {
+        } else if (args[0]->type && args[0]->type->isFloat() && args[1]->type &&
+                   args[1]->type->isNumberPair()) {
           lean_name = "Core.NumberPair.scalarAdd";
         }
       }
 
-      return ir::Expr::make(
-          ir::CoreCallExpr{kind, std::move(lean_name), std::move(args),
-                           std::move(type_args), needs_mode, needs_config, spec->is_effect},
-          std::move(ret_ty));
+      return ir::Expr::make(ir::CoreCallExpr{kind, std::move(lean_name), std::move(args),
+                                             std::move(type_args), needs_mode, needs_config,
+                                             spec->is_effect},
+                            std::move(ret_ty));
     }
 
     if (opts_.follow_helpers && callee->hasBody()) {
@@ -1585,64 +1665,112 @@ private:
 
   static auto mapBinaryOp(BinaryOperatorKind op) -> std::optional<ir::BinaryOp> {
     switch (op) {
-    case BO_Add:  return ir::BinaryOp::Add;
-    case BO_Sub:  return ir::BinaryOp::Sub;
-    case BO_Mul:  return ir::BinaryOp::Mul;
-    case BO_Div:  return ir::BinaryOp::Div;
-    case BO_Rem:  return ir::BinaryOp::Rem;
-    case BO_And:  return ir::BinaryOp::BitAnd;
-    case BO_Or:   return ir::BinaryOp::BitOr;
-    case BO_Xor:  return ir::BinaryOp::BitXor;
-    case BO_Shl:  return ir::BinaryOp::Shl;
-    case BO_Shr:  return ir::BinaryOp::Shr;
-    case BO_EQ:   return ir::BinaryOp::Eq;
-    case BO_NE:   return ir::BinaryOp::Ne;
-    case BO_LT:   return ir::BinaryOp::Lt;
-    case BO_LE:   return ir::BinaryOp::Le;
-    case BO_GT:   return ir::BinaryOp::Gt;
-    case BO_GE:   return ir::BinaryOp::Ge;
-    case BO_LAnd: return ir::BinaryOp::LogAnd;
-    case BO_LOr:  return ir::BinaryOp::LogOr;
-    default:      return std::nullopt;
+    case BO_Add:
+      return ir::BinaryOp::Add;
+    case BO_Sub:
+      return ir::BinaryOp::Sub;
+    case BO_Mul:
+      return ir::BinaryOp::Mul;
+    case BO_Div:
+      return ir::BinaryOp::Div;
+    case BO_Rem:
+      return ir::BinaryOp::Rem;
+    case BO_And:
+      return ir::BinaryOp::BitAnd;
+    case BO_Or:
+      return ir::BinaryOp::BitOr;
+    case BO_Xor:
+      return ir::BinaryOp::BitXor;
+    case BO_Shl:
+      return ir::BinaryOp::Shl;
+    case BO_Shr:
+      return ir::BinaryOp::Shr;
+    case BO_EQ:
+      return ir::BinaryOp::Eq;
+    case BO_NE:
+      return ir::BinaryOp::Ne;
+    case BO_LT:
+      return ir::BinaryOp::Lt;
+    case BO_LE:
+      return ir::BinaryOp::Le;
+    case BO_GT:
+      return ir::BinaryOp::Gt;
+    case BO_GE:
+      return ir::BinaryOp::Ge;
+    case BO_LAnd:
+      return ir::BinaryOp::LogAnd;
+    case BO_LOr:
+      return ir::BinaryOp::LogOr;
+    default:
+      return std::nullopt;
     }
   }
 
   static auto mapCompoundAssignOp(BinaryOperatorKind op) -> std::optional<ir::BinaryOp> {
     switch (op) {
-    case BO_Assign:    return std::nullopt;
-    case BO_AddAssign: return ir::BinaryOp::Add;
-    case BO_SubAssign: return ir::BinaryOp::Sub;
-    case BO_MulAssign: return ir::BinaryOp::Mul;
-    case BO_DivAssign: return ir::BinaryOp::Div;
-    case BO_RemAssign: return ir::BinaryOp::Rem;
-    case BO_AndAssign: return ir::BinaryOp::BitAnd;
-    case BO_OrAssign:  return ir::BinaryOp::BitOr;
-    case BO_XorAssign: return ir::BinaryOp::BitXor;
-    case BO_ShlAssign: return ir::BinaryOp::Shl;
-    case BO_ShrAssign: return ir::BinaryOp::Shr;
-    default:           return std::nullopt;
+    case BO_Assign:
+      return std::nullopt;
+    case BO_AddAssign:
+      return ir::BinaryOp::Add;
+    case BO_SubAssign:
+      return ir::BinaryOp::Sub;
+    case BO_MulAssign:
+      return ir::BinaryOp::Mul;
+    case BO_DivAssign:
+      return ir::BinaryOp::Div;
+    case BO_RemAssign:
+      return ir::BinaryOp::Rem;
+    case BO_AndAssign:
+      return ir::BinaryOp::BitAnd;
+    case BO_OrAssign:
+      return ir::BinaryOp::BitOr;
+    case BO_XorAssign:
+      return ir::BinaryOp::BitXor;
+    case BO_ShlAssign:
+      return ir::BinaryOp::Shl;
+    case BO_ShrAssign:
+      return ir::BinaryOp::Shr;
+    default:
+      return std::nullopt;
     }
   }
 
   static auto mapOverloadedBinaryOp(OverloadedOperatorKind op) -> std::optional<ir::BinaryOp> {
     switch (op) {
-    case OO_Plus:         return ir::BinaryOp::Add;
-    case OO_Minus:        return ir::BinaryOp::Sub;
-    case OO_Star:         return ir::BinaryOp::Mul;
-    case OO_Slash:        return ir::BinaryOp::Div;
-    case OO_Percent:      return ir::BinaryOp::Rem;
-    case OO_Amp:          return ir::BinaryOp::BitAnd;
-    case OO_Pipe:         return ir::BinaryOp::BitOr;
-    case OO_Caret:        return ir::BinaryOp::BitXor;
-    case OO_LessLess:     return ir::BinaryOp::Shl;
-    case OO_GreaterGreater: return ir::BinaryOp::Shr;
-    case OO_EqualEqual:   return ir::BinaryOp::Eq;
-    case OO_ExclaimEqual: return ir::BinaryOp::Ne;
-    case OO_Less:         return ir::BinaryOp::Lt;
-    case OO_LessEqual:    return ir::BinaryOp::Le;
-    case OO_Greater:      return ir::BinaryOp::Gt;
-    case OO_GreaterEqual: return ir::BinaryOp::Ge;
-    default:              return std::nullopt;
+    case OO_Plus:
+      return ir::BinaryOp::Add;
+    case OO_Minus:
+      return ir::BinaryOp::Sub;
+    case OO_Star:
+      return ir::BinaryOp::Mul;
+    case OO_Slash:
+      return ir::BinaryOp::Div;
+    case OO_Percent:
+      return ir::BinaryOp::Rem;
+    case OO_Amp:
+      return ir::BinaryOp::BitAnd;
+    case OO_Pipe:
+      return ir::BinaryOp::BitOr;
+    case OO_Caret:
+      return ir::BinaryOp::BitXor;
+    case OO_LessLess:
+      return ir::BinaryOp::Shl;
+    case OO_GreaterGreater:
+      return ir::BinaryOp::Shr;
+    case OO_EqualEqual:
+      return ir::BinaryOp::Eq;
+    case OO_ExclaimEqual:
+      return ir::BinaryOp::Ne;
+    case OO_Less:
+      return ir::BinaryOp::Lt;
+    case OO_LessEqual:
+      return ir::BinaryOp::Le;
+    case OO_Greater:
+      return ir::BinaryOp::Gt;
+    case OO_GreaterEqual:
+      return ir::BinaryOp::Ge;
+    default:
+      return std::nullopt;
     }
   }
 
@@ -1679,15 +1807,21 @@ public:
 auto unwrapForwardingWrapper(const FunctionDecl *fd) -> const FunctionDecl * {
   for (int depth = 0; depth < 4 && fd && fd->hasBody(); ++depth) {
     const auto *cs = dyn_cast<CompoundStmt>(fd->getBody());
-    if (!cs || cs->size() != 1) break;
+    if (!cs || cs->size() != 1)
+      break;
     const auto *rs = dyn_cast<ReturnStmt>(*cs->body_begin());
-    if (!rs || !rs->getRetValue()) break;
+    if (!rs || !rs->getRetValue())
+      break;
     const auto *call = dyn_cast<CallExpr>(unwrapExprSugar(rs->getRetValue()));
-    if (!call) break;
+    if (!call)
+      break;
     const FunctionDecl *callee = call->getDirectCallee();
-    if (!callee || !callee->hasBody()) break;
-    if (matchFreeCoreOp(callee->getQualifiedNameAsString())) break;
-    if (call->getNumArgs() != fd->getNumParams()) break;
+    if (!callee || !callee->hasBody())
+      break;
+    if (matchFreeCoreOp(callee->getQualifiedNameAsString()))
+      break;
+    if (call->getNumArgs() != fd->getNumParams())
+      break;
     bool all_direct_params = true;
     for (unsigned i = 0; i < call->getNumArgs(); ++i) {
       const auto *dre = dyn_cast<DeclRefExpr>(unwrapExprSugar(call->getArg(i)));
@@ -1696,7 +1830,8 @@ auto unwrapForwardingWrapper(const FunctionDecl *fd) -> const FunctionDecl * {
         break;
       }
     }
-    if (!all_direct_params) break;
+    if (!all_direct_params)
+      break;
     fd = callee;
   }
   return fd;
@@ -1708,15 +1843,15 @@ auto buildClangArgs(const ParseOptions &opts) -> std::vector<std::string> {
     return a == "-resource-dir" || a.starts_with("-resource-dir=");
   });
   if (!has_resource_dir) {
-    std::string rdir = opts.resource_dir.empty() ? AST2LEAN_DEFAULT_RESOURCE_DIR : opts.resource_dir;
+    std::string rdir =
+        opts.resource_dir.empty() ? AST2LEAN_DEFAULT_RESOURCE_DIR : opts.resource_dir;
     if (!rdir.empty()) {
       args.emplace_back("-resource-dir");
       args.push_back(std::move(rdir));
     }
   }
-  bool has_std = std::ranges::any_of(args, [](std::string_view a) {
-    return a.starts_with("-std=");
-  });
+  bool has_std =
+      std::ranges::any_of(args, [](std::string_view a) { return a.starts_with("-std="); });
   if (!has_std) {
     args.emplace_back("-std=gnu++17");
   }
@@ -1737,8 +1872,8 @@ struct ExtractActionResult {
 
 class ExtractASTConsumer : public ASTConsumer {
 public:
-  ExtractASTConsumer(CompilerInstance &ci, const ParseOptions &opts,
-                     ToolMode mode, ExtractActionResult &out)
+  ExtractASTConsumer(CompilerInstance &ci, const ParseOptions &opts, ToolMode mode,
+                     ExtractActionResult &out)
       : ci_(ci), opts_(opts), mode_(mode), out_(out) {}
 
   void HandleTranslationUnit(ASTContext &ctx) override {
@@ -1762,10 +1897,10 @@ public:
     if (mode_ == ToolMode::ListFunctions) {
       for (const FunctionDecl *fd : finder.funcs) {
         out_.listings.push_back(FunctionListing{
-          .qualified_name = normalizeQualifiedName(fd->getQualifiedNameAsString()),
-          .mangled_name = mangleDecl(ctx, fd),
-          .signature = fd->getType().getAsString(),
-          .is_template_instantiation = fd->isTemplateInstantiation(),
+            .qualified_name = normalizeQualifiedName(fd->getQualifiedNameAsString()),
+            .mangled_name = mangleDecl(ctx, fd),
+            .signature = fd->getType().getAsString(),
+            .is_template_instantiation = fd->isTemplateInstantiation(),
         });
       }
       return;
@@ -1797,8 +1932,7 @@ public:
           "multiple functions match '{}'; disambiguate with qualified or mangled name:\n",
           opts_.target_function);
       for (const FunctionDecl *fd : matches) {
-        msg += std::format("  {}  [{}]\n",
-                           normalizeQualifiedName(fd->getQualifiedNameAsString()),
+        msg += std::format("  {}  [{}]\n", normalizeQualifiedName(fd->getQualifiedNameAsString()),
                            mangleDecl(ctx, fd));
       }
       out_.module_result = std::unexpected(std::move(msg));
@@ -1818,10 +1952,10 @@ public:
 
     ir::Module mod = extractor.takeModule();
     mod.config = out_.config;
-    mod.config.impl_variant = !opts_.impl_variant.empty()
-                                  ? opts_.impl_variant
-                                  : inferImplVariant(
-                                        normalizeQualifiedName(target->getQualifiedNameAsString()));
+    mod.config.impl_variant =
+        !opts_.impl_variant.empty()
+            ? opts_.impl_variant
+            : inferImplVariant(normalizeQualifiedName(target->getQualifiedNameAsString()));
     mod.source_file = opts_.source_label.empty() ? opts_.source_file : opts_.source_label;
     mod.source_commit = opts_.source_commit;
     mod.clang_version = AST2LEAN_CLANG_VERSION;
@@ -1881,18 +2015,18 @@ auto runClangTool(const ParseOptions &opts, ToolMode mode)
     return std::unexpected(result.module_result->error());
   }
   if (rc != 0 && mode == ToolMode::Extract && !result.module_result) {
-    return std::unexpected(std::format("Clang failed to parse '{}' (exit code {})",
-                                       opts.source_file, rc));
+    return std::unexpected(
+        std::format("Clang failed to parse '{}' (exit code {})", opts.source_file, rc));
   }
   return result;
 }
 
 } // namespace
 
-auto parseTranslationUnit(const ParseOptions &opts)
-    -> std::expected<ir::Module, std::string> {
+auto parseTranslationUnit(const ParseOptions &opts) -> std::expected<ir::Module, std::string> {
   auto res = runClangTool(opts, ToolMode::Extract);
-  if (!res) return std::unexpected(res.error());
+  if (!res)
+    return std::unexpected(res.error());
   if (!res->module_result) {
     return std::unexpected("internal error: Clang action produced no result");
   }
@@ -1902,14 +2036,15 @@ auto parseTranslationUnit(const ParseOptions &opts)
 auto listFunctions(const ParseOptions &opts)
     -> std::expected<std::vector<FunctionListing>, std::string> {
   auto res = runClangTool(opts, ToolMode::ListFunctions);
-  if (!res) return std::unexpected(res.error());
+  if (!res)
+    return std::unexpected(res.error());
   return std::move(res->listings);
 }
 
-auto inspectMathConfig(const ParseOptions &opts)
-    -> std::expected<ir::MathConfig, std::string> {
+auto inspectMathConfig(const ParseOptions &opts) -> std::expected<ir::MathConfig, std::string> {
   auto res = runClangTool(opts, ToolMode::InspectConfig);
-  if (!res) return std::unexpected(res.error());
+  if (!res)
+    return std::unexpected(res.error());
   if (!opts.impl_variant.empty()) {
     res->config.impl_variant = opts.impl_variant;
   } else if (!opts.target_function.empty()) {

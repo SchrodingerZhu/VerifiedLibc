@@ -1,0 +1,17 @@
+\title{A \code{\verb~|rfl~} lemma in \code{\verb~|simp~} can leave Lean's kernel a conversion it handles badly}
+\taxon{Insight}
+\date{2026-11-24}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{kernel}
+\tag{automation}
+\import{base-macros}
+
+\p{Source: an investigation on 2026-11-23 of why the proof of [prob-W1QC](prob-W1QC) did not finish, before the files it concerns were removed by \pr{17}. The lesson does not depend on those files. Lean 4.36.0.}
+\ul{
+\li{\strong{Measure where the time is.} \code{\verb~|lean -D profiler=true~} reports \code{\verb~|type checking~}, which is the kernel, apart from \code{\verb~|simp~} and the other tactics, which are the elaborator. \code{\verb~|-D debug.skipKernelTC=true~} skips the kernel: a prefix of the proof took 9 s without it and 75 s with it, at 13 GB.}
+\li{\strong{The cause.} \code{\verb~|Option.bind_some~} holds by \code{\verb~|rfl~}, so \code{\verb~|simp only [Option.bind_some]~} records no proof step. The kernel is given a proof of \code{\verb~|… = (some v).bind k~} where \code{\verb~|… = k v~} is expected and has to decide that the two are definitionally equal, with \code{\verb~|k v~} the symbolic execution of the rest of a block. The same goal closed with \code{\verb~|rw [Option.bind_some]~}, which records the lemma, is checked in well under a second. That the built-in kernel computes the weak head normal form of the wrong side first is an inference from this, not an observation.}
+\li{\strong{Other kernels.} The same declaration, exported with \code{\verb~|lean4export~} 3.1.0, is accepted by gruszka in 0.15 s and by sokonanoda in 0.2 s, both of which decide conversion by normalization by evaluation. The cost is a property of the built-in kernel on this shape of term, not of the term. sokonanoda had an open soundness issue at the time, so its verdict is a timing, not evidence of correctness.}
+\li{\strong{What was not settled.} With the kernel skipped, the elaborator alone did not finish the complete proof in nine minutes. The slow tactic was not found, and the maintainer decided against interpreting basic blocks at all: [dec-03IY](dec-03IY).}
+\li{\strong{For other proofs.} When a \code{\verb~|simp~} set contains lemmas that hold by \code{\verb~|rfl~} and the goal contains a large term that reduces, state the lemma again with a proof term (\code{\verb~|by rw […]~}), as \code{\verb~|bind_eq_optionBind~} did, or prove the step against a variable in place of the large term. \code{\verb~|attribute [irreducible]~} is read by the elaborator only and does not protect the kernel.}
+}
