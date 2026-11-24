@@ -1,4 +1,4 @@
-import LibcMath.Exhaustive.Interface
+import LibcMath.Check.Oracle
 import LibcMath.Functions
 import LibcMath.SpecLemmas
 import LibcMathMpfr.Basic

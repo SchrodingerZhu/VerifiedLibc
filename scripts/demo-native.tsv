@@ -1,9 +1,0 @@
-mode	first	count	status	millis
-nearest	1065353216	512	ok	15
-nearest	1065353728	512	ok	15
-towardZero	1065353216	512	ok	36
-towardZero	1065353728	512	ok	34
-up	1065353216	512	ok	41
-up	1065353728	512	ok	40
-down	1065353216	512	ok	36
-down	1065353728	512	ok	36

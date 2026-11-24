@@ -22,23 +22,32 @@ lake build             # must end with "Build completed successfully"
 
 ## What must stay true
 
-- No `sorry`, no new `axiom`, and no `native_decide` outside files whose name or directory says
-  so. Top-level theorems carry a `#guard_msgs in #print axioms …` check (see
-  `LibcMath/Extracted/Expf/Exhaustive.lean` and `LibcMath/Extracted/Expf/Main.lean`); add one for each new
-  top-level result, so that a regression fails the build instead of relying on a claim in a pull
-  request.
-- An oracle that trusts an external library states that trust as one named axiom, as
-  `MpfrOracle.mpfrExpf_sameValue` does for MPFR, and the theorems that use it carry a check of
-  their axioms. `expOracle` is proved in Lean and is the default.
+- **What is open is a `sorry`, in plain sight.** A statement that is not proved yet is a named
+  lemma that ends in `sorry`, with a docstring that starts with **Open.** and says what a proof
+  has to show. Do not turn it into a hypothesis of the theorem that needs it: a theorem with an
+  unproved hypothesis passes every check of its axioms and hides what is missing. The open lemmas
+  of `expf` are in `LibcMath/Extracted/Expf/Main.lean`; `rg -n 'sorry' LibcMath` lists all of them,
+  and there should be no other.
+- A top-level theorem carries a `#guard_msgs in #print axioms …` check. It lists `sorryAx` while
+  an open lemma is used, so the check changes when the lemma is proved.
+- No new `axiom`, except the one that states the trust in an external library used by an oracle
+  (`MpfrOracle.mpfrExpf_sameValue`). `native_decide` only in tests of tools, such as
+  `LibcMath/Check/MpfrExamples.lean`, never in a proof about a function.
+- **Proofs about a function are by analysis.** Ranges of inputs are closed by symbolic evaluation
+  and by bounds on errors. Do not prove, or plan to prove, a range by running the function on
+  each of its inputs. `checkrange` and the oracles under `LibcMath/Check/` and `LibcMath/Oracle/`
+  are tests.
 - Files named `…Examples.lean` are part of the build. They are the tests: put a small worked case
   there for every new definition that is meant to be evaluated.
-- Files under `LibcMath/Extracted/Expf/` other than `Plans.lean` and `Examples.lean` are generated.
-  Do not edit them; change `extract/` and run `extract/extract-expf-plans.sh <llvm-project>/libc`
-  in the flake shell, at the commit of LLVM that the files record.
+- Files under `LibcMath/Extracted/Expf/` whose first line says they are generated are not edited;
+  change `extract/` and run `extract/extract-expf-plans.sh <llvm-project>/libc` in the flake
+  shell, at the commit of LLVM that the files record.
 - Lean, C++ and Nix sources stay within 100 columns. The exceptions are expected messages under
-  `#guard_msgs` and string literals, which cannot be broken.
+  `#guard_msgs`, string literals, and long expressions in generated files.
+- When a status is reported, say first whether the main theorem is complete, and name what is
+  open. "No errors" and "standard axioms" are not a status.
 
-## Checking a kernel against MPFR
+## Testing a kernel
 
 ```bash
 lake build checkrange
@@ -46,33 +55,31 @@ lake build checkrange
 ```
 
 `--oracle=mpfr` compares with MPFR (`c/mpfr_oracle.c`), `--oracle=lean`, the default, with the
-oracle proved in Lean. Inside Lean, a block is certified against MPFR by `native_decide`; see
-`LibcMath/Exhaustive/Run/Native/Mpfr.lean`. Build in the flake shell: the C file needs the headers
-of MPFR and GMP, which `cc` finds there. The evaluation of the kernel, not the oracle, takes most
-of the time of a check.
+oracle proved in Lean. Build in the flake shell: the C file needs the headers of MPFR and GMP,
+which `cc` finds there. `scripts/difftest-expf.sh` compares a kernel with the compiled C++; run
+it after any change to `extract/` or to `LibcMath/Core/`.
 
 ## Where things go
 
 - `LibcMath/Extracted/<Function>/` holds everything about one function: its generated evaluation
   plans, `Plans.lean`, `Examples.lean`, `Statements.lean`, the short paths under `Paths/`, the
-  error analysis of its main path, its instance of the exhaustive reduction, and `Main.lean`.
+  error analysis of its main path, and `Main.lean` with the theorem and what is open.
   `LibcMath/Extracted/<Function>.lean` imports them all; `LibcMath/Extracted/Expf.lean` is the model.
+- Proofs are kept for one evaluation plan of a function. Other plans may be extracted and tested.
 - What does not depend on the function stays outside: `LibcMath/Core/` (the operations of libc),
-  `LibcMath/Functions/` (facts about real functions and rounding), `LibcMath/Exhaustive/` and
-  `LibcMath/Oracle/`.
+  `LibcMath/Functions/` (facts about real functions and rounding), `LibcMath/BitRange.lean` and
+  `LibcMath/Correctness.lean` (statements about ranges of inputs), `LibcMath/Check/` and
+  `LibcMath/Oracle/` (tests).
 
 ## What the theorems do not say
 
-The extracted kernels are total Lean functions, and the statements are about their results only.
-
-- **Undefined behaviour is not tracked.** A conversion to an integer that is out of range gives
-  `0` in `Core.fptosi` and `Core.fptoui`, where C++ gives no meaning. A proof about a kernel does
-  not show that the C++ code stays clear of such a case.
+- **Undefined behaviour is tracked for a fixed list of operations**, given at the head of the
+  section on them in `LibcMath/Core/Ops.lean`. A left shift of a signed value that overflows, and
+  the library types of `LibcMath/Core/Extended.lean`, are not on it.
 - **Effects are dropped.** `ast2lean --drop-effects` removes `errno` and the floating-point
   exception flags, so nothing is proved about them.
 - **The translation is trusted.** `ast2lean` and the definitions in `LibcMath/Core/` are not
-  verified against Clang. `scripts/difftest-expf.sh` compares a kernel with the compiled C++ on
-  many inputs; run it after any change to `extract/` or to `LibcMath/Core/`.
+  verified against Clang; `scripts/difftest-expf.sh` tests them.
 
 ## Proof style
 
@@ -87,7 +94,7 @@ The extracted kernels are total Lean functions, and the statements are about the
   ranges, `SameValue`, `CorrectAt`, and `MathConfig`.
 - When `grind` fails, read the goal it prints; if it stalls on an equation between `fun`
   expressions, unfold the definitions with `simp only` first (`roundReal_towardZero_of_pos` in
-  `LibcMath/Exhaustive/Modes.lean` is such a case).
+  `LibcMath/Functions/RoundingRanges.lean` is such a case).
 - Do **not** put `@[inline]` on multi-call wrappers over FloatLib's `@[macro_inline]` operations
   (`Model.add`, `Model.mul`, `Model.sub`); inlining cascades blow up the LCNF compiler.
 - Keep a proof term where it is one line of composition. Search tactics are for finding it.
@@ -110,24 +117,22 @@ compare evaluation plans directly in Lean:
 From the shell, `ast2lean --dump-config` snapshots the exact preprocessor macros seen by Clang for
 any flag combination without generating Lean.
 
-### When a block check is `false`
+### When a test of a block fails
 
-Every check of a block of bit patterns is `checkBits test first count`
-(`LibcMath/Exhaustive/Range.lean`). Its diagnostics are:
+A test of a block of bit patterns is `checkBits test first count` (`LibcMath/BitRange.lean`). Its
+diagnostics are:
 
 ```lean
-#eval checkRange.firstFailure O.check impl mode first count          -- `some n`: first failing pattern
-#eval Core.Diag.diagnoseKernelRange O.check kernel mode first count -- full report with hex, class, rational value
+#eval checkRange.firstFailure O.check impl mode first count          -- `some n`: first failure
+#eval Core.Diag.diagnoseKernelRange O.check kernel mode first count -- full report
 ```
 
-The `checkrange` CLI (`LibcMath/Exhaustive/Run/Main.lean`) automatically prints
-`Core.Diag.diagnoseBlock` to stderr whenever a block fails while preserving the stdout manifest
-TSV format.
+The program `checkrange` (`LibcMath/Check/Main.lean`) prints `Core.Diag.diagnoseBlock` on stderr
+when a block fails. A kernel that returns `none` is reported as undefined behaviour.
 
 Pass the oracle's test `O.check`, not the oracle: a specification is noncomputable, so a
 definition that takes an `Oracle S` as an argument cannot be compiled at a concrete `S`, and
-`#eval` on it fails with "depends on 'Spec.exp', which is 'noncomputable'". Evaluation in the
-kernel (`decide +kernel`) is not affected.
+`#eval` on it fails with "depends on 'Spec.exp', which is 'noncomputable'".
 
 ### Which closed form covers a bit pattern of `exp`
 

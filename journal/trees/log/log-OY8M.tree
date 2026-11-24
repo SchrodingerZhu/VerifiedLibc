@@ -1,0 +1,18 @@
+\title{\code{\verb~|expf_correctlyRounded~} with its two open lemmas as \code{\verb~|sorry~}, and kernels that return \code{\verb~|Option~}}
+\taxon{Change}
+\date{2026-11-24}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{expf}
+\tag{extraction}
+\import{base-macros}
+
+\p{Implements [dec-US4Q](dec-US4Q). Session [ses-YOB8](ses-YOB8).}
+\ul{
+\li{\strong{The theorem.} \code{\verb~|expf_correctlyRounded : ExpfCorrectlyRounded~} in \code{\verb~|LibcMath/Extracted/Expf/Main.lean~}, for the plan \code{\verb~|double_eval~}. It uses \code{\verb~|Expf.correctAt_main_pos~} and \code{\verb~|Expf.correctAt_main_neg~}, the two ranges of inputs that reach the tables and the polynomial, which end in \code{\verb~|sorry~}; a check records that \code{\verb~|sorryAx~} is among its axioms. \code{\verb~|expf_correct_on_short_paths~} is the part without \code{\verb~|sorry~}, 87.30 \% of the inputs.}
+\li{\strong{\code{\verb~|Option~}.} \code{\verb~|ast2lean~} emits each function in \code{\verb~|do~} notation with result type \code{\verb~|Option~}. A conversion from floating point to an integer, a read of a table, a shift by a variable amount, signed \code{\verb~|+~}, \code{\verb~|-~}, \code{\verb~|*~}, unary \code{\verb~|-~}, and integer division are emitted as checked operations of \code{\verb~|LibcMath/Core/Ops.lean~} (\code{\verb~|fptosi?~}, \code{\verb~|table[i]?~}, \code{\verb~|shiftAmount?~}, \code{\verb~|sadd?~}, …). An operand that C++ evaluates only under a condition gets a \code{\verb~|do~} block of its own. \code{\verb~|CorrectlyRounded~} and \code{\verb~|CorrectAt~} ask for a result and for its value. \code{\verb~|double_eval~} has four checked operations, all after its short paths, so the proofs of the short paths changed only in their statements. This closes the first point of [prob-VR5Z](prob-VR5Z).}
+\li{\strong{Layout.} \code{\verb~|LibcMath/BitRange.lean~} and \code{\verb~|LibcMath/Correctness.lean~} hold \code{\verb~|HoldsOnBits~}, \code{\verb~|CorrectAt~} and \code{\verb~|correctlyRounded_of_holdsOnBits~}. The test of a kernel against an oracle is under \code{\verb~|LibcMath/Check/~}: \code{\verb~|Oracle~}, \code{\verb~|Range~}, \code{\verb~|Block~}, \code{\verb~|Target~}, the program \code{\verb~|Main~}, and examples. \code{\verb~|LibcMath/Exhaustive/~} is gone.}
+\li{\strong{Removed.} The certificate sets under \code{\verb~|Run/Kernel~} and \code{\verb~|Run/Native~}, \code{\verb~|scripts/exhaustive.py~} and its manifests, \code{\verb~|checkBlocks~} and \code{\verb~|correctlyRounded_of_checkBlocks~}, \code{\verb~|checkModesAgree~}, the instance of the reduction for \code{\verb~|expf~}, the statements and the proofs of the plans other than \code{\verb~|double_eval~}.}
+\li{\strong{Verified.} The build completes with two warnings, one for each \code{\verb~|sorry~}. The tests of the extractor pass. The six plans, as \code{\verb~|Option~}, still agree with one another on the inputs of \code{\verb~|Examples.lean~}, and \code{\verb~|double_eval~} and \code{\verb~|integer_eval~} agree with the compiled C++ on the inputs of the differential test, with no \code{\verb~|none~}.}
+}

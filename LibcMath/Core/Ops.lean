@@ -218,18 +218,68 @@ instance {w : Nat} : BitCast (BitVec w) (BitVec w) where
     [h : FmtBitWidth fmt w] (x : Model fmt) :
     (bitCast x : BitVec w) = BitVec.cast h.eq x.toBits := rfl
 
-/-- Signed float-to-integer truncation (`static_cast<intN_t>(x)`).
-Returns `0` on out-of-range / NaN / infinity (total completion for well-defined math paths). -/
-@[inline] def fptosi (width : Nat) (x : Model fmt) : BitVec width :=
-  match ExecDType.convertToInteger (width := width) x .towardZero with
-  | .success n _ => n.bits
-  | .failure _ => 0
+/-! ### Operations that C++ leaves undefined
 
-/-- Unsigned float-to-integer truncation (`static_cast<uintN_t>(x)`). -/
-@[inline] def fptoui (width : Nat) (x : Model fmt) : BitVec width :=
+An extracted function returns `Option`, and `none` stands for an execution that reaches an
+operation to which C++ gives no meaning. The operations below are the places where that can
+happen; `ast2lean` emits them, and reads of a table as `table[i]?`. Everything else in this file
+is total.
+
+Tracked: a conversion from floating point to an integer that is out of range, an index out of
+bounds, a shift by the width or more, overflow of signed `+`, `-`, `*` and unary `-`, and a
+division or remainder by zero or of the least signed value by `-1`. Not tracked: a left shift of a
+signed value that overflows, which is undefined before C++20, and anything inside the definitions
+of `LibcMath/Core/Extended.lean`, which model library types as total. -/
+
+/-- Signed float-to-integer truncation (`static_cast<intN_t>(x)`). `none` when the truncated
+value is out of range, or `x` is a NaN or an infinity. -/
+@[inline] def fptosi? (width : Nat) (x : Model fmt) : Option (BitVec width) :=
+  match ExecDType.convertToInteger (width := width) x .towardZero with
+  | .success n _ => some n.bits
+  | .failure _ => none
+
+/-- Unsigned float-to-integer truncation (`static_cast<uintN_t>(x)`). `none` when the truncated
+value is negative or too large, or `x` is a NaN or an infinity. -/
+@[inline] def fptoui? (width : Nat) (x : Model fmt) : Option (BitVec width) :=
   match ExecDType.convertToInteger (width := width + 1) x .towardZero with
-  | .success n _ => if n.bits.msb then 0 else n.bits.setWidth width
-  | .failure _ => 0
+  | .success n _ => if n.bits.msb then none else some (n.bits.setWidth width)
+  | .failure _ => none
+
+/-- The amount of a shift of a value of `width` bits: `none` from `width` on. -/
+@[inline] def shiftAmount? (width amount : Nat) : Option Nat :=
+  if amount < width then some amount else none
+
+/-- Signed addition: `none` on overflow. -/
+@[inline] def sadd? {w : Nat} (a b : BitVec w) : Option (BitVec w) :=
+  if BitVec.saddOverflow a b then none else some (a + b)
+
+/-- Signed subtraction: `none` on overflow. -/
+@[inline] def ssub? {w : Nat} (a b : BitVec w) : Option (BitVec w) :=
+  if BitVec.ssubOverflow a b then none else some (a - b)
+
+/-- Signed multiplication: `none` on overflow. -/
+@[inline] def smul? {w : Nat} (a b : BitVec w) : Option (BitVec w) :=
+  if BitVec.smulOverflow a b then none else some (a * b)
+
+/-- Signed negation: `none` for the least value, whose negation is not representable. -/
+@[inline] def sneg? {w : Nat} (a : BitVec w) : Option (BitVec w) :=
+  if BitVec.negOverflow a then none else some (-a)
+
+/-- Signed division: `none` for a zero divisor and for the least value divided by `-1`. -/
+@[inline] def sdiv? {w : Nat} (a b : BitVec w) : Option (BitVec w) :=
+  if b == 0 || BitVec.sdivOverflow a b then none else some (BitVec.sdiv a b)
+
+/-- Signed remainder: `none` where `sdiv?` is. -/
+@[inline] def srem? {w : Nat} (a b : BitVec w) : Option (BitVec w) :=
+  if b == 0 || BitVec.sdivOverflow a b then none else some (BitVec.srem a b)
+
+/-- Unsigned division: `none` for a zero divisor. -/
+@[inline] def udiv? {w : Nat} (a b : BitVec w) : Option (BitVec w) :=
+  if b == 0 then none else some (a / b)
+
+/-- Unsigned remainder: `none` for a zero divisor. -/
+@[inline] def urem? {w : Nat} (a b : BitVec w) : Option (BitVec w) :=
+  if b == 0 then none else some (a % b)
 
 /-- Signed integer-to-float conversion (`static_cast<Float>(n)`). -/
 @[inline] def sitofp (dst : FloatFormat) (mode : IEEERoundingMode) {w : Nat} (n : BitVec w) :

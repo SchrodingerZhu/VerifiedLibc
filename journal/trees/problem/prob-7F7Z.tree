@@ -4,7 +4,7 @@
 \author{claude-fable-5-2}
 \contributor{schrodingerzy}
 \tag{exhaustive}
-\meta{status}{open}
+\meta{status}{closed}
 \meta{created}{2026-11-23}
 \meta{updated}{2026-11-24}
 \import{base-macros}
@@ -16,3 +16,4 @@
 \li{\code{\verb~|checkBlocks~} equals \code{\verb~|decide~} of \code{\verb~|List.IsChain~} over \code{\verb~|checkRange~}; this was checked by a proof by induction that was not kept. If it stays, define it that way or record why the recursion by hand reduces better in the kernel.}
 \li{Removing a definition is for the maintainer to decide.}
 }
+\p{\strong{Closed on 2026-11-24.} The parts of the reduction that were not used are removed ([log-OY8M](log-OY8M)).}

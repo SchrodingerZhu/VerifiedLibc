@@ -1,5 +1,5 @@
 import LibcMath.Functions
-import LibcMath.Exhaustive.Interface
+import LibcMath.Check.Oracle
 import LibcMath.Oracle.ExpReduced
 import FloatLib.Floats.Formats.BinaryInterchange.Algebraic.Rounding.DirectedEnclosureProof
 import FloatLib.Floats.Formats.BinaryInterchange.Algebraic.Rounding.DirectedRange

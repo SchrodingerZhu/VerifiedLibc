@@ -3,6 +3,7 @@ module;
 #include <algorithm>
 #include <cstdint>
 #include <format>
+#include <optional>
 #include <ranges>
 #include <span>
 #include <string>
@@ -382,18 +383,134 @@ def kernel : Core.UnaryKernel {} :=
       sig_params.push_back(std::format("({} : {})", leanIdent(p.name), emitType(p.type)));
     }
 
-    out += std::format("def {} {} : {} :=\n", fn.lean_name, joinWith(sig_params, " "),
-                       emitType(fn.return_type));
+    out += std::format("def {} {} : {} := do\n", fn.lean_name, joinWith(sig_params, " "),
+                       optionType(fn.return_type));
     if (fn.lifted_expr) {
       out += emitExprBlock(*fn.lifted_expr, 1);
       out += "\n";
     } else {
-      out += "  Id.run do\n";
+      // A body that was not lifted keeps its loops and mutable variables. Operations in it are
+      // the total ones, so undefined behaviour is not tracked there.
+      out += "  pure <| Id.run do\n";
       for (const auto &st : fn.body_stmts) {
         out += emitDoStmt(st, 2);
       }
     }
     return out;
+  }
+
+  /// The type of a function or join point that returns `t`: `none` stands for an execution that
+  /// reaches an operation C++ gives no meaning to.
+  auto optionType(const TypePtr &t) -> std::string {
+    return std::format("Option ({})", emitType(t));
+  }
+
+  static auto isSignedInt(const TypePtr &t) -> bool {
+    if (!t)
+      return false;
+    const auto *it = std::get_if<IntType>(&t->v);
+    return it && it->is_signed;
+  }
+
+  static auto isIntType(const TypePtr &t) -> bool {
+    return t && std::holds_alternative<IntType>(t->v);
+  }
+
+  static auto isIntConst(const ExprPtr &e) -> bool {
+    if (!e)
+      return false;
+    const auto *ce = std::get_if<ConstExpr>(&e->v);
+    return ce && std::holds_alternative<IntConst>(ce->value.v);
+  }
+
+  /// Whether a binary operation can be undefined in C++, in which case it is emitted as a
+  /// checked operation of `LibcMath.Core` that returns `Option`.
+  static auto isPartialBinary(const BinaryExpr &b, const TypePtr &res_ty) -> bool {
+    bool is_float = (b.lhs && b.lhs->type && b.lhs->type->isFloat()) ||
+                    (b.rhs && b.rhs->type && b.rhs->type->isFloat());
+    if (is_float)
+      return false;
+    switch (b.op) {
+    case BinaryOp::Shl:
+    case BinaryOp::Shr:
+      return !isIntConst(b.rhs);
+    case BinaryOp::Add:
+    case BinaryOp::Sub:
+    case BinaryOp::Mul:
+      return isSignedInt(res_ty) && !(isIntConst(b.lhs) && isIntConst(b.rhs));
+    case BinaryOp::Div:
+    case BinaryOp::Rem:
+      return isIntType(res_ty);
+    default:
+      return false;
+    }
+  }
+
+  /// Whether evaluating `e` can reach an operation that C++ leaves undefined. Used to decide
+  /// whether an operand that C++ evaluates only under a condition (the branches of `?:`, the
+  /// right operand of `&&` and `||`) needs a `do` block of its own.
+  auto hasPartial(const ExprPtr &e) -> bool {
+    if (!e)
+      return false;
+    auto any = [&](const std::vector<ExprPtr> &es) {
+      return std::ranges::any_of(es, [&](const ExprPtr &x) { return hasPartial(x); });
+    };
+    return std::visit(
+        Overloaded{
+            [](const ConstExpr &) { return false; },
+            [](const VarExpr &) { return false; },
+            [](const TableRefExpr &) { return false; },
+            [](const CallJoinExpr &) { return false; },
+            [](const UnsupportedExpr &) { return false; },
+            [&](const UnaryExpr &u) {
+              return (u.op == UnaryOp::Neg && isSignedInt(e->type)) || hasPartial(u.operand);
+            },
+            [&](const BinaryExpr &b) {
+              return isPartialBinary(b, e->type) || hasPartial(b.lhs) || hasPartial(b.rhs);
+            },
+            [&](const CastExpr &c) {
+              return c.kind == CastKind::FloatToInt || hasPartial(c.operand);
+            },
+            [&](const SelectExpr &sl) {
+              return hasPartial(sl.cond) || hasPartial(sl.then_e) || hasPartial(sl.else_e);
+            },
+            [](const IndexExpr &) { return true; },
+            [&](const FieldExpr &f) { return hasPartial(f.base); },
+            [&](const StructLitExpr &sl) {
+              return std::ranges::any_of(sl.fields,
+                                         [&](const auto &f) { return hasPartial(f.second); });
+            },
+            [&](const StructUpdateExpr &su) { return hasPartial(su.base) || hasPartial(su.value); },
+            [&](const CoreCallExpr &cc) { return any(cc.args); },
+            [&](const PolyevalExpr &pe) { return hasPartial(pe.var) || any(pe.coeffs); },
+            [](const FuncCallExpr &) { return true; },
+            [&](const TupleExpr &te) { return any(te.elems); },
+            // A nested block is emitted as a `do` block of its own.
+            [](const auto &) { return true; },
+        },
+        e->v);
+  }
+
+  /// `e` as a `do` block of its own, so that the checked operations inside it run only when the
+  /// block does.
+  auto emitLazy(const ExprPtr &e) -> std::string {
+    return hasPartial(e) ? std::format("(do pure ({}))", emitInlineExpr(e))
+                         : std::format("pure ({})", emitInlineExpr(e));
+  }
+
+  /// If `text` is exactly one nested action `(← action)`, the action.
+  static auto soleAction(std::string_view text) -> std::optional<std::string> {
+    constexpr std::string_view open = "(← ";
+    if (!text.starts_with(open) || !text.ends_with(')'))
+      return std::nullopt;
+    int depth = 0;
+    for (std::size_t k = 0; k < text.size(); ++k) {
+      if (text[k] == '(')
+        ++depth;
+      else if (text[k] == ')' && --depth == 0 && k + 1 != text.size())
+        return std::nullopt;
+    }
+    return std::string(text.substr(open.size(), text.size() - open.size() - 1));
   }
 
   auto emitArg(const ExprPtr &e) -> std::string {
@@ -427,6 +544,8 @@ def kernel : Core.UnaryKernel {} :=
                 if (e->type && e->type->isFloat()) {
                   return std::format("Core.fneg {}", emitArg(u.operand));
                 }
+                if (isSignedInt(e->type))
+                  return std::format("(← Core.sneg? {})", emitArg(u.operand));
                 return std::format("-{}", emitArg(u.operand));
               case UnaryOp::BitNot:
                 return std::format("~~~{}", emitArg(u.operand));
@@ -438,6 +557,10 @@ def kernel : Core.UnaryKernel {} :=
             [&](const BinaryExpr &b) { return emitBinary(b, e->type); },
             [&](const CastExpr &c) { return emitCast(c, e->type); },
             [&](const SelectExpr &s) {
+              if (hasPartial(s.then_e) || hasPartial(s.else_e)) {
+                return std::format("(← if {} then {} else {})", emitInlineExpr(s.cond),
+                                   emitLazy(s.then_e), emitLazy(s.else_e));
+              }
               return std::format("if {} then {} else {}", emitInlineExpr(s.cond),
                                  emitInlineExpr(s.then_e), emitInlineExpr(s.else_e));
             },
@@ -445,10 +568,10 @@ def kernel : Core.UnaryKernel {} :=
               if (const auto *ce = std::get_if<ConstExpr>(&ix.index->v)) {
                 if (const auto *ic = std::get_if<IntConst>(&ce->value.v);
                     ic && ic->fits_i64 && ic->signed_val >= 0) {
-                  return std::format("{}[{}]!", emitArg(ix.base), ic->signed_val);
+                  return std::format("(← {}[{}]?)", emitArg(ix.base), ic->signed_val);
                 }
               }
-              return std::format("{}[{}.toNat]!", emitArg(ix.base), emitArg(ix.index));
+              return std::format("(← {}[{}.toNat]?)", emitArg(ix.base), emitArg(ix.index));
             },
             [&](const FieldExpr &f) {
               return std::format("{}.{}", emitArg(f.base), leanIdent(f.field));
@@ -548,7 +671,7 @@ def kernel : Core.UnaryKernel {} :=
                 parts.emplace_back(currentModeArg());
               for (const auto &a : fc.args)
                 parts.push_back(emitArg(a));
-              return joinWith(parts, " ");
+              return std::format("(← {})", joinWith(parts, " "));
             },
             [&](const TupleExpr &te) {
               std::vector<std::string> parts;
@@ -561,7 +684,7 @@ def kernel : Core.UnaryKernel {} :=
             [&](const UnsupportedExpr &u) {
               return std::format("(Core.unsupported \"{}\")", u.reason);
             },
-            [&](const auto &) { return std::format("(\n{}\n)", emitExprBlock(e, 2)); },
+            [&](const auto &) { return std::format("(← do\n{})", emitExprBlock(e, 2)); },
         },
         e->v);
   }
@@ -598,16 +721,28 @@ def kernel : Core.UnaryKernel {} :=
     }
 
     // Shifts in Lean take `Nat` cleanly regardless of RHS BitVec width!
+    // A shift by a variable amount is undefined from the width of the left operand on.
+    auto shift_amount = [&]() -> std::string {
+      auto amount = emitShiftAmountNat(b.rhs);
+      if (isIntConst(b.rhs))
+        return amount;
+      std::uint32_t width = 32;
+      if (b.lhs && b.lhs->type) {
+        if (const auto *it = std::get_if<IntType>(&b.lhs->type->v))
+          width = it->width;
+      }
+      return std::format("(← Core.shiftAmount? {} {})", width, amount);
+    };
     if (b.op == BinaryOp::Shl) {
-      return std::format("{} <<< {}", emitArg(b.lhs), emitShiftAmountNat(b.rhs));
+      return std::format("{} <<< {}", emitArg(b.lhs), shift_amount());
     }
     if (b.op == BinaryOp::Shr) {
       bool signed_lhs = b.lhs && b.lhs->type && std::holds_alternative<IntType>(b.lhs->type->v) &&
                         std::get<IntType>(b.lhs->type->v).is_signed;
       if (signed_lhs) {
-        return std::format("BitVec.sshiftRight {} {}", emitArg(b.lhs), emitShiftAmountNat(b.rhs));
+        return std::format("BitVec.sshiftRight {} {}", emitArg(b.lhs), shift_amount());
       }
-      return std::format("{} >>> {}", emitArg(b.lhs), emitShiftAmountNat(b.rhs));
+      return std::format("{} >>> {}", emitArg(b.lhs), shift_amount());
     }
 
     if (b.lhs && b.lhs->type) {
@@ -623,9 +758,9 @@ def kernel : Core.UnaryKernel {} :=
           case BinaryOp::Ge:
             return std::format("BitVec.sle {} {}", emitArg(b.rhs), emitArg(b.lhs));
           case BinaryOp::Div:
-            return std::format("BitVec.sdiv {} {}", emitArg(b.lhs), emitArg(b.rhs));
+            return std::format("(← Core.sdiv? {} {})", emitArg(b.lhs), emitArg(b.rhs));
           case BinaryOp::Rem:
-            return std::format("BitVec.srem {} {}", emitArg(b.lhs), emitArg(b.rhs));
+            return std::format("(← Core.srem? {} {})", emitArg(b.lhs), emitArg(b.rhs));
           default:
             break;
           }
@@ -644,6 +779,40 @@ def kernel : Core.UnaryKernel {} :=
           }
         }
       }
+    }
+
+    if (isPartialBinary(b, res_ty)) {
+      bool is_signed = isSignedInt(res_ty);
+      std::string_view checked;
+      switch (b.op) {
+      case BinaryOp::Add:
+        checked = "Core.sadd?";
+        break;
+      case BinaryOp::Sub:
+        checked = "Core.ssub?";
+        break;
+      case BinaryOp::Mul:
+        checked = "Core.smul?";
+        break;
+      case BinaryOp::Div:
+        checked = is_signed ? "Core.sdiv?" : "Core.udiv?";
+        break;
+      case BinaryOp::Rem:
+        checked = is_signed ? "Core.srem?" : "Core.urem?";
+        break;
+      default:
+        break;
+      }
+      if (!checked.empty())
+        return std::format("(← {} {} {})", checked, emitArg(b.lhs), emitArg(b.rhs));
+    }
+
+    // C++ evaluates the right operand of `&&` and `||` only when the left one does not decide.
+    if ((b.op == BinaryOp::LogAnd || b.op == BinaryOp::LogOr) && hasPartial(b.rhs)) {
+      bool is_and = b.op == BinaryOp::LogAnd;
+      return std::format("(← if {} then {} else {})", emitInlineExpr(b.lhs),
+                         is_and ? emitLazy(b.rhs) : std::string("pure true"),
+                         is_and ? std::string("pure false") : emitLazy(b.rhs));
     }
 
     std::string_view sym = "+";
@@ -719,8 +888,8 @@ def kernel : Core.UnaryKernel {} :=
       break;
     case CastKind::FloatToInt:
       if (const auto *it = std::get_if<IntType>(&dst_ty->v)) {
-        return std::format("{} {} {}", it->is_signed ? "Core.fptosi" : "Core.fptoui", it->width,
-                           emitArg(c.operand));
+        return std::format("(← {} {} {})", it->is_signed ? "Core.fptosi?" : "Core.fptoui?",
+                           it->width, emitArg(c.operand));
       }
       break;
     case CastKind::IntToFloat:
@@ -774,10 +943,16 @@ def kernel : Core.UnaryKernel {} :=
       if (std::holds_alternative<IfExpr>(le->value->v) ||
           std::holds_alternative<MatchExpr>(le->value->v) ||
           std::holds_alternative<LetExpr>(le->value->v)) {
-        out += std::format("{}let {} :=\n{}\n", pad, leanIdent(le->name),
+        out += std::format("{}let {} ← do\n{}\n", pad, leanIdent(le->name),
                            emitExprBlock(le->value, ind + 1));
       } else {
-        out += std::format("{}let {} := {}\n", pad, leanIdent(le->name), emitInlineExpr(le->value));
+        // A value that is one checked operation is bound with `←`.
+        auto value = emitInlineExpr(le->value);
+        if (auto action = soleAction(value)) {
+          out += std::format("{}let {} ← {}\n", pad, leanIdent(le->name), *action);
+        } else {
+          out += std::format("{}let {} := {}\n", pad, leanIdent(le->name), value);
+        }
       }
       out += emitExprBlock(le->body, ind);
       return out;
@@ -785,8 +960,8 @@ def kernel : Core.UnaryKernel {} :=
 
     if (const auto *lj = std::get_if<LetJoinExpr>(&e->v)) {
       std::string out =
-          std::format("{}let {} (_ : Unit) : {} :=\n{}\n", pad, leanIdent(lj->name),
-                      emitType(lj->result_type), emitExprBlock(lj->join_body, ind + 1));
+          std::format("{}let {} (_ : Unit) : {} := do\n{}\n", pad, leanIdent(lj->name),
+                      optionType(lj->result_type), emitExprBlock(lj->join_body, ind + 1));
       out += emitExprBlock(lj->body, ind);
       return out;
     }
@@ -799,7 +974,7 @@ def kernel : Core.UnaryKernel {} :=
       if (std::holds_alternative<IfExpr>(lt->value->v) ||
           std::holds_alternative<MatchExpr>(lt->value->v) ||
           std::holds_alternative<LetExpr>(lt->value->v)) {
-        out += std::format("{}let ({}) :=\n{}\n", pad, joinWith(names, ", "),
+        out += std::format("{}let ({}) ← do\n{}\n", pad, joinWith(names, ", "),
                            emitExprBlock(lt->value, ind + 1));
       } else {
         out += std::format("{}let ({}) := {}\n", pad, joinWith(names, ", "),
@@ -836,7 +1011,10 @@ def kernel : Core.UnaryKernel {} :=
       return out;
     }
 
-    return pad + emitInlineExpr(e);
+    // The end of a block: a join point is called as it is, and a value is returned.
+    if (std::holds_alternative<CallJoinExpr>(e->v))
+      return pad + emitInlineExpr(e);
+    return std::format("{}pure ({})", pad, emitInlineExpr(e));
   }
 
   auto emitDoStmt(const Stmt &st, int ind) -> std::string {
