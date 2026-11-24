@@ -1,0 +1,16 @@
+\title{Replace LLVM-IR extractor in \code{\verb~|extract/~} with C++23 module-first \code{\verb~|ast2lean~}}
+\taxon{Change}
+\date{2026-11-24}
+\author{antigravity}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{extract}
+\import{base-macros}
+
+\p{Replaces the legacy LLVM-IR pass and CFG translator (\code{\verb~|MarkCoreOps~} and \code{\verb~|ir2lean~}) in \code{\verb~|extract/~} with \code{\verb~|ast2lean~}, a C++23 module-first (\code{\verb~|.cppm~}) Clang LibTooling extractor that parses LLVM libc C++ sources directly and emits high-level functional Lean models targeting \code{\verb~|LibcMath.Core~} (implementing [dec-03IY](dec-03IY)).}
+\ul{
+\li{Modular C++23 layout under \code{\verb~|extract/src/*.cppm~} (\code{\verb~|core_ops~}, \code{\verb~|ir~}, \code{\verb~|clang_parse~}, \code{\verb~|lift~}, \code{\verb~|emit_lean~}, \code{\verb~|extract~}, \code{\verb~|cli~}) built via CMake \code{\verb~|CXX_MODULES~} and Ninja.}
+\li{Preprocessor snapshotting of active LLVM libc \code{\verb~|LIBC_MATH_*~}, \code{\verb~|LIBC_TARGET_CPU_HAS_*~}, and \code{\verb~|LIBC_TYPES_HAS_INT128~} macros into emitted \code{\verb~|Core.MathConfig~} and \code{\verb~|Core.KernelMeta~} records, with a standalone \code{\verb~|--dump-config~} inspection flag.}
+\li{AST recognition and lifting for LLVM libc math primitives: \code{\verb~|FPBits~}, \code{\verb~|multiply_add~}/\code{\verb~|multiply_sub~}/\code{\verb~|sub_multiply~}, \code{\verb~|nearest_integer~}, \code{\verb~|polyeval~}/\code{\verb~|estrin_polyeval<OFFSET>~}, \code{\verb~|set_overflow~}/\code{\verb~|set_underflow~}, \code{\verb~|Frac64~}, \code{\verb~|NumberPair~} (\code{\verb~|FloatFloat~}/\code{\verb~|DoubleDouble~}), \code{\verb~|DyadicFloat~}, \code{\verb~|ExceptValues~}, constant-branch folding, and bounded constant-trip \code{\verb~|for~}-loop unrolling.}
+\li{Self-contained smoke suite (\code{\verb~|extract/test/run_tests.sh~}) and verified \code{\verb~|--strict~} extraction plus Lean 4.36.0 typechecking across all upstream \code{\verb~|expf~} evaluation plans (\code{\verb~|double_eval~}, FMA \code{\verb~|double_eval~}, \code{\verb~|integer_eval~}, \code{\verb~|static_rounding~}, \code{\verb~|float_eval~}, and \code{\verb~|float_eval_cr_rn~}).}
+}
