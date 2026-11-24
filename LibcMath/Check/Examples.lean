@@ -1,19 +1,19 @@
-import LibcMath.Extracted.Expf.Exhaustive
+import LibcMath.Check.Range
+import LibcMath.Functions
 
 /-!
-# The reduction on small blocks
+# A test against an oracle on small blocks
 
-Worked examples of `LibcMath.Exhaustive.Reduction`, kept in the build so that they stay true:
+Worked examples of `LibcMath.Check.Range`, kept in the build so that they stay true:
 
-* a block check established by evaluation, and the diagnostic for a block that fails;
-* certificates for adjacent ranges joined by `grind`;
-* the passage from block checks directly to `CorrectAt` on a total kernel.
+* a test that passes, a test that fails, and the diagnostic that says where;
+* statements about adjacent ranges joined by `grind`.
 
 The oracle here knows only that `exp` of a NaN is a NaN. It stands in for a real oracle, so that
 the examples depend on nothing outside this directory.
 -/
 
-namespace LibcMath.ReductionExamples
+namespace LibcMath.Check.Examples
 
 open FloatLib.Floats.Formats.BinaryInterchange
 open Model (IEEERoundingMode)
@@ -27,8 +27,8 @@ def nanOracle : Oracle (Spec.exp .binary32) where
     exact .inr ⟨hresult, by simp [Spec.eval, hinput, hnan]⟩
 
 /-- An implementation that returns its argument: right on NaNs, wrong elsewhere. -/
-def idImpl : IEEERoundingMode → Model .binary32 → Model .binary32 :=
-  fun _ x => x
+def idImpl : IEEERoundingMode → Model .binary32 → Option (Model .binary32) :=
+  fun _ x => some x
 
 /-! ### A block that passes
 
@@ -67,16 +67,4 @@ example {P : Model .binary32 → Prop} (h₁ : HoldsOnBits P 16 32) (h₂ : Hold
     HoldsOnBits P 4 30 := by
   grind
 
-/-! ### From block checks directly to correctness of a kernel -/
-
-variable {S : Spec .binary32} {impl : IEEERoundingMode → Model .binary32 → Model .binary32}
-
-example (O : Oracle S)
-    (h₁ : checkRange O impl .up 0x3F800000 0x100 = true)
-    (h₂ : checkRange O impl .up 0x3F800100 0x100 = true) :
-    HoldsOnBits (CorrectAt S impl .up) 0x3F800000 0x3F800200 := by
-  have := holdsOnBits_of_checkRange h₁
-  have := holdsOnBits_of_checkRange h₂
-  grind
-
-end LibcMath.ReductionExamples
+end LibcMath.Check.Examples

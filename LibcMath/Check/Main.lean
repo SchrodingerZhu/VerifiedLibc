@@ -1,5 +1,5 @@
-import LibcMath.Exhaustive.Run.Block
-import LibcMath.Exhaustive.Run.Target
+import LibcMath.Check.Block
+import LibcMath.Check.Target
 import LibcMath.Oracle.Mpfr
 
 /-!
@@ -13,7 +13,7 @@ line per block on stdout:
 
     <mode> <first> <count> <ok|fail> <milliseconds>
 
-* `--oracle=<name>` selects the oracle `O`: `lean` [default] is `Run.oracle`, which is proved
+* `--oracle=<name>` selects the oracle `O`: `lean` [default] is `Check.oracle`, which is proved
   sound in Lean; `mpfr` is `mpfrExpOracle`, which trusts MPFR and is much faster.
 * `--plan=<name>` selects the extracted `expf` evaluation plan (`double_eval` [default],
   `double_eval_fma`, `integer_eval`, `static_rounding`, `float_eval`, `float_eval_cr_rn`).
@@ -23,7 +23,7 @@ line per block on stdout:
   stderr so failures are immediately actionable without changing the stdout manifest format.
 -/
 
-open LibcMath LibcMath.Exhaustive
+open LibcMath LibcMath.Check
 open FloatLib.Floats.Formats.BinaryInterchange.Model (IEEERoundingMode)
 
 def parseMode : String → Option IEEERoundingMode
@@ -48,11 +48,11 @@ def parseOracleFlag (args : List String) : Option (Check × List String) :=
   | flag :: rest =>
       if flag.startsWith "--oracle=" then
         match (flag.drop 9).toString with
-        | "lean" => some (Run.oracle.check, rest)
+        | "lean" => some (Check.oracle.check, rest)
         | "mpfr" => some (mpfrExpOracle.check, rest)
         | _ => none
       else
-        some (Run.oracle.check, args)
+        some (Check.oracle.check, args)
   | [] => none
 
 def parsePlanFlag (args : List String) :
@@ -61,7 +61,7 @@ def parsePlanFlag (args : List String) :
   | flag :: rest =>
       if flag.startsWith "--plan=" then
         let name := (flag.drop 7).toString
-        match Run.planByName? name with
+        match Check.planByName? name with
         | some k => some (name, k, rest)
         | none => none
       else

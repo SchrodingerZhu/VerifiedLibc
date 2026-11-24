@@ -60,7 +60,7 @@ lean_lib LibcMathMpfr where
 -- MPFR and GMP may be built against a newer C library than the one whose symbols the linker of
 -- Lean knows, so their own undefined references are left to the loader.
 lean_exe checkrange where
-  root := `LibcMath.Exhaustive.Run.Main
+  root := `LibcMath.Check.Main
   moreLinkArgs := run_io do
     return (← envLinkArgs) ++ #["-lmpfr", "-lgmp", "-Wl,--allow-shlib-undefined"]
 

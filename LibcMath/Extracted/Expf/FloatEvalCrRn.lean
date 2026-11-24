@@ -42,38 +42,38 @@ def COEFFS : Array Core.FloatFloat :=
 /-- Extracted from `math::float_eval_cr_rn::expf_internal::horner_step`
 (`_ZN11__llvm_libc4math16float_eval_cr_rn13expf_internal11horner_stepEfRKNS_10NumberPairIfEES6_`). -/
 def horner_step (mode : IEEERoundingMode) (x : Model .binary32) (poly : Core.FloatFloat)
-    (coeff : Core.FloatFloat) : Core.FloatFloat :=
+    (coeff : Core.FloatFloat) : Option (Core.FloatFloat) := do
   let hi := madd[config, mode](x, poly.hi, coeff.hi)
   let lo := madd[config, mode](x, poly.hi, Core.fsub mode coeff.hi hi)
   let lo := madd[config, mode](x, poly.lo, Core.fadd mode lo coeff.lo)
-  ({ lo := lo, hi := hi } : Core.FloatFloat)
+  pure (({ lo := lo, hi := hi } : Core.FloatFloat))
 
 /-- Extracted from `math::float_eval_cr_rn::expf_internal::exp_eval`
 (`_ZN11__llvm_libc4math16float_eval_cr_rn13expf_internal8exp_evalERKNS_10NumberPairIfEE`). -/
-def exp_eval (mode : IEEERoundingMode) (u : Core.FloatFloat) : Core.FloatFloat :=
+def exp_eval (mode : IEEERoundingMode) (u : Core.FloatFloat) : Option (Core.FloatFloat) := do
   let tail := horner[config, mode] u.hi [f32(0x39500CC7#32), f32(0x37D00E05#32), f32(0x3639743C#32),
       f32(0x34934A65#32)]
   let poly := ({ lo := f32(0x00000000#32), hi := tail } : Core.FloatFloat)
-  let poly := horner_step mode u.hi poly COEFFS[4]!
-  let poly := horner_step mode u.hi poly COEFFS[3]!
-  let poly := horner_step mode u.hi poly COEFFS[2]!
-  let poly := horner_step mode u.hi poly COEFFS[1]!
-  let poly := horner_step mode u.hi poly COEFFS[0]!
-  let poly := horner_step mode u.hi poly ({ lo := f32(0x00000000#32), hi := f32(0x3F800000#32) } : Core.FloatFloat)
+  let poly ← horner_step mode u.hi poly (← COEFFS[4]?)
+  let poly ← horner_step mode u.hi poly (← COEFFS[3]?)
+  let poly ← horner_step mode u.hi poly (← COEFFS[2]?)
+  let poly ← horner_step mode u.hi poly (← COEFFS[1]?)
+  let poly ← horner_step mode u.hi poly (← COEFFS[0]?)
+  let poly ← horner_step mode u.hi poly ({ lo := f32(0x00000000#32), hi := f32(0x3F800000#32) } : Core.FloatFloat)
   let expm1_u_hi := Core.NumberPair.quickMultScalar config mode u.hi poly
   let exp_u := Core.NumberPair.exactAdd mode f32(0x3F800000#32) expm1_u_hi.hi
   let corr := madd[config, mode](u.lo, exp_u.hi, expm1_u_hi.lo)
   let lo_sum := Core.NumberPair.exactAdd mode exp_u.lo corr
   let lo_sum_u := Core.FPBits.uintval (Core.FPBits.ofVal lo_sum.hi)
   let should_round_to_odd := ((lo_sum_u &&& 0x7FFFFF#32) == 0x0#32) && (Core.fne lo_sum.lo f32(0x00000000#32))
-  let rounding_adj := if ((if Core.fgt lo_sum.hi f32(0x00000000#32) then 0x1#32 else 0x0#32)) == ((if Core.fgt lo_sum.lo f32(0x00000000#32) then 0x1#32 else 0x0#32)) then 0x1#32 else -0x1#32
+  let rounding_adj ← if ((if Core.fgt lo_sum.hi f32(0x00000000#32) then 0x1#32 else 0x0#32)) == ((if Core.fgt lo_sum.lo f32(0x00000000#32) then 0x1#32 else 0x0#32)) then pure (0x1#32) else (do pure ((← Core.sneg? 0x1#32)))
   let lo_sum_u := lo_sum_u + (if should_round_to_odd then rounding_adj else 0x0#32)
-  { exp_u with lo := Core.FPBits.getVal (Core.FPBits.ofBits (fmt := .binary32) lo_sum_u) }
+  pure ({ exp_u with lo := Core.FPBits.getVal (Core.FPBits.ofBits (fmt := .binary32) lo_sum_u) })
 
 /-- Extracted from `math::float_eval_cr_rn::expf_internal::scale_result`
 (`_ZN11__llvm_libc4math16float_eval_cr_rn13expf_internal12scale_resultERKNS_10NumberPairIfEEib`). -/
 def scale_result (mode : IEEERoundingMode) (exp_u : Core.FloatFloat) (k : BitVec 32)
-    (produces_subnormal : Bool) : Model .binary32 :=
+    (produces_subnormal : Bool) : Option (Model .binary32) := do
   let bias_u := if produces_subnormal then (0x1#32 - k) <<< 23 else 0x0#32
   let bias := Core.FPBits.getVal (Core.FPBits.ofBits (fmt := .binary32) bias_u)
   let sum_biased := Core.NumberPair.exactAdd mode bias exp_u.hi
@@ -81,11 +81,11 @@ def scale_result (mode : IEEERoundingMode) (exp_u : Core.FloatFloat) (k : BitVec
   let res_u := Core.FPBits.uintval (Core.FPBits.ofVal sum_rounded)
   let res_mask := if produces_subnormal then 0x7FFFFF#32 else ~~~0x0#32
   let exponent_adj := if produces_subnormal then 0x0#32 else k <<< 23
-  Core.FPBits.getVal (Core.FPBits.ofBits (fmt := .binary32) ((res_u &&& res_mask) + exponent_adj))
+  pure (Core.FPBits.getVal (Core.FPBits.ofBits (fmt := .binary32) ((res_u &&& res_mask) + exponent_adj)))
 
 /-- Extracted from `math::float_eval_cr_rn::expf`
 (`_ZN11__llvm_libc4math16float_eval_cr_rn4expfEf`). -/
-def expf (mode : IEEERoundingMode) (x : Model .binary32) : Model .binary32 :=
+def expf (mode : IEEERoundingMode) (x : Model .binary32) : Option (Model .binary32) := do
   let x_bits := Core.FPBits.ofVal x
   let x_u := Core.FPBits.uintval x_bits
   let x_abs_u := x_u &&& 0x7FFFFFFF#32
@@ -99,17 +99,17 @@ def expf (mode : IEEERoundingMode) (x : Model .binary32) : Model .binary32 :=
   let LOG_2_HI := f32(0x3F317218#32)
   let LOG_2_LO := ({ lo := f32(0xA4CA86C4#32), hi := f32(0xB102E308#32) } : Core.FloatFloat)
   let kf := Core.nearestInt config mode (Core.fmul mode x_safe LOG2_E)
-  let k := Core.fptosi 32 kf
+  let k ← Core.fptosi? 32 kf
   let u_hi := submul[config, mode](x_safe, kf, LOG_2_HI)
   let u_lo := Core.NumberPair.quickMultScalar config mode (Core.fneg kf) LOG_2_LO
   let u := Core.NumberPair.exactAdd mode u_hi u_lo.hi
   let u := { u with lo := Core.fadd mode u.lo u_lo.lo }
-  let exp_u := exp_eval mode u
-  let res := scale_result mode exp_u k produces_subnormal
+  let exp_u ← exp_eval mode u
+  let res ← scale_result mode exp_u k produces_subnormal
   let INF := f32(0x7F800000#32)
   let res := if is_tiny then f32(0x3F800000#32) else res
   let res := if should_overflow then Core.fadd mode x INF else res
-  if should_underflow then if is_neg_nan then x else f32(0x00000000#32) else res
+  pure (if should_underflow then if is_neg_nan then x else f32(0x00000000#32) else res)
 
 /-- Machine-readable provenance and configuration metadata for `expf`. -/
 def kernelMeta : Core.KernelMeta :=

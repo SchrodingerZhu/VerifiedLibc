@@ -3,68 +3,26 @@
 \date{2026-11-23}
 \author{claude-fable-5-2}
 \contributor{schrodingerzy}
+\contributor{claude-fable-5-2}
 \tag{exp}
 \tag{status}
 \meta{updated}{2026-11-24}
 \meta{pr}{17}
 \import{base-macros}
 
-\p{Updated on 2026-11-24 in session [ses-ZHIG](ses-ZHIG) (\pr{14}–\pr{17}, implementing [dec-03IY](dec-03IY)). Replaces the legacy LLVM-IR interpreter and structured-form bridge description from \pr{13} with the direct Clang-AST extraction and multi-plan proof state.}
+\p{Rewritten on 2026-11-24 in session [ses-YOB8](ses-YOB8); the earlier text described hypotheses and certificate sets that no longer exist ([dec-US4Q](dec-US4Q)).}
 
-\subtree[note-expf-status-the-statement]{
-\title{The statements}
-
-\p{\code{\verb~|LibcMath/Extracted/Expf/Statements.lean~} states \code{\verb~|CorrectlyRounded (Spec.exp .binary32)~} directly on total AST-extracted functional Lean kernels (\code{\verb~|LibcMath/Extracted/Expf/*.lean~}, produced by \code{\verb~|ast2lean~} from upstream LLVM libc commit \code{\verb~|e1a5f92db023~} with Clang 23.1.3):}
-
-\ul{
-\li{\code{\verb~|ExpfCorrectlyRounded~} (= \code{\verb~|ExpfDoubleEvalCorrectlyRounded~}): \code{\verb~|math::double_eval::expf~} (default x86-64, \code{\verb~|LIBC_MATH=0~}, no hardware FMA) across all four C rounding directions.}
-\li{\code{\verb~|ExpfDoubleEvalFmaCorrectlyRounded~}: \code{\verb~|math::double_eval::expf~} compiled with \code{\verb~|-mavx2 -mfma~} across all four C rounding directions.}
-\li{\code{\verb~|ExpfStaticRoundingCorrectlyRounded~}: \code{\verb~|math::static_rounding::expf~} (pure integer \code{\verb~|Frac64~}, \code{\verb~|LIBC_MATH=0x0C~}) across all four C rounding directions.}
-\li{\code{\verb~|ExpfIntegerEvalCorrectlyRounded~}: \code{\verb~|math::integer_eval::expf~} (pure integer \code{\verb~|Frac64~}, \code{\verb~|LIBC_MATH=0x2C~}) in \code{\verb~|.nearest~}.}
-\li{\code{\verb~|ExpfFloatEvalCrRnCorrectlyRounded~}: \code{\verb~|math::float_eval_cr_rn::expf~} (GPU \code{\verb~|FloatFloat~} FMA, \code{\verb~|LIBC_MATH=0x3E~}) in \code{\verb~|.nearest~}.}
-}
-
-\p{Additionally, \code{\verb~|Expf.FloatEval~} (\code{\verb~|LIBC_MATH=0x3F~}, fast ~1 ULP single-precision Estrin+Horner) is extracted for cross-plan diagnostics and differential testing.}
-}
-
-\subtree[note-expf-status-what-is-proved]{
-\title{What is proved}
-
-\p{\code{\verb~|LibcMath/Extracted/Expf/Main.lean~} reduces correct rounding directly to the two finite polynomial-evaluation ranges with \strong{zero} \code{\verb~|sorry~}, \strong{zero} interpreter indirection, and \strong{zero} open bridge hypotheses (\code{\verb~|Block15ComputesExpfMain~} in [prob-W1QC](prob-W1QC) is superseded and removed). Every top-level theorem carries a \code{\verb~|#guard_msgs in #print axioms~} check confirming dependence only on \code{\verb~|[propext, Classical.choice, Quot.sound]~}:}
+\p{\strong{The proof is not complete.} \code{\verb~|expf_correctlyRounded~} in \code{\verb~|LibcMath/Extracted/Expf/Main.lean~} states that \code{\verb~|math::double_eval::expf~}, extracted from LLVM libc at \code{\verb~|e1a5f92db023~}, is correctly rounded in the four rounding directions of C and reaches no operation that C++ leaves undefined. Its proof uses two lemmas that end in \code{\verb~|sorry~}.}
 
 \table{
-\tr{\th{plan}\th{positive main range}\th{negative main range}\th{remaining / mode}\th{discharged analytically}}
-\tr{\td{\code{\verb~|DoubleEval~} / \code{\verb~|DoubleEvalFma~}}\td{\code{\verb~|0x32800001~}–\code{\verb~|0x42B17217~}}\td{\code{\verb~|0xB2800001~}–\code{\verb~|0xC2CFF1B4~}}\td{545 350 603}\td{87.30\%}}
-\tr{\td{\code{\verb~|StaticRounding~} / \code{\verb~|IntegerEval~}}\td{\code{\verb~|0x33000000~}–\code{\verb~|0x42B17217~}}\td{\code{\verb~|0xB3000000~}–\code{\verb~|0xC2CFF1B4~}}\td{528 573 389}\td{87.69\%}}
+\tr{\th{Inputs}\th{Bit patterns}\th{Share}\th{State}}
+\tr{\td{Zeros, infinities, NaNs, magnitude at most 2⁻²⁶, overflow, underflow}\td{3 749 616 693}\td{87.30 \%}\td{proved, \code{\verb~|Paths/Ranges.lean~}}}
+\tr{\td{2⁻²⁶ < x < 88.72…}\td{271 675 927}\td{6.33 \%}\td{open, \code{\verb~|Expf.correctAt_main_pos~}}}
+\tr{\td{-103.97… < x < -2⁻²⁶}\td{273 674 676}\td{6.37 \%}\td{open, \code{\verb~|Expf.correctAt_main_neg~}}}
 }
 
-\p{In addition, \code{\verb~|Expf.Paths.integerEval_eq_staticRounding_nearest~} proves pointwise equality of \code{\verb~|IntegerEval.kernel .nearest~} and \code{\verb~|StaticRounding.kernel .nearest~} across all \code{\verb~|2^32~} inputs, so \code{\verb~|expfIntegerEvalCorrectlyRounded_of_staticRounding~} derives RN correctness of \code{\verb~|IntegerEval~} directly from \code{\verb~|StaticRounding~}.}
+\p{\strong{How the open part is to be proved.} By numerical analysis of the computation with the tables and the polynomial: [prob-48KJ](prob-48KJ). One step is done, the distance of the polynomial from the exponential ([log-7DAL](log-7DAL)).}
 
-\p{The supporting library consists of:}
-\ul{
-\li{\code{\verb~|LibcMath/Core/~}: FloatLib-backed LLVM libc core operations, \code{\verb~|MathConfig~}, \code{\verb~|KernelMeta~}, \code{\verb~|UnaryKernel~}, polynomial DSL, and \code{\verb~|Core.Diag~}.}
-\li{\code{\verb~|LibcMath/Functions/ExpRanges.lean~}, \code{\verb~|AddRounding.lean~}, \code{\verb~|AddSpecial.lean~}: closed forms of \code{\verb~|Spec.exp~} and IEEE addition.}
-\li{\code{\verb~|LibcMath/Extracted/Expf/Paths/{Exec,Ranges}.lean~}: direct symbolic simplification of the extracted functions on their short paths.}
-\li{\code{\verb~|LibcMath/Exhaustive/~} and \code{\verb~|LibcMath/Oracle/Exp.lean~}: total-function range reduction and sound \code{\verb~|expOracle~}.}
-}
-}
+\p{\strong{What the statement rests on.} The translation by \code{\verb~|ast2lean~} and the definitions of \code{\verb~|LibcMath/Core/~}, which are tested against the compiled code and not proved; FloatLib's model of IEEE 754 arithmetic. \code{\verb~|errno~} and the exception flags are outside the statement: [prob-VR5Z](prob-VR5Z).}
 
-\subtree[note-expf-status-what-is-left]{
-\title{What is left}
-
-\p{Discharging the remaining polynomial ranges requires checking each main-range block against \code{\verb~|expOracle~} (and generating Lean certificates via \code{\verb~|scripts/exhaustive.py~}), or proving an analytical error bound directly on the extracted functional expressions. Measured costs with the direct AST-extracted kernels ([ins-FH1S](ins-FH1S)):}
-
-\table{
-\tr{\th{method}\th{trust base}\th{measured speed}}
-\tr{\td{compiled \code{\verb~|checkrange~}}\td{report only, not a proof}\td{4–8 ms per 512 inputs (8–16 µs / input)}}
-\tr{\td{\code{\verb~|decide +kernel~} (\code{\verb~|Kernel/Demo~})}\td{Lean kernel only}\td{4.56 s wall / 3.60 s user for 32 inputs incl. startup}}
-}
-}
-
-\subtree[note-expf-status-what-the-theorem-rests-on]{
-\title{What the theorem rests on and empirical validation}
-
-\p{Beyond Lean's kernel and standard Mathlib axioms, the claim that LLVM libc's machine code matches the theorem rests on: (1) \code{\verb~|Spec.exp~} and FloatLib's IEEE 754 semantics; (2) faithful AST lifting of C++ expressions and preprocessor \code{\verb~|LIBC_MATH_*~}/\code{\verb~|LIBC_TARGET_CPU_HAS_*~} macros by \code{\verb~|ast2lean~}; and (3) C++ compiler codegen and hardware IEEE 754 execution.}
-
-\p{\code{\verb~|scripts/difftest-expf.sh~} empirically tests (2) and (3) against compiled Clang x86-64 machine code across all five C++ entrypoint plans. Dense differential runs (\code{\verb~|step=2003~}, 259 704 main-range inputs per mode; plus \code{\verb~|quick~} boundary sweeps) reported \strong{0 mismatches} across 2.85M total evaluations: \code{\verb~|double_eval~} (1 038 816 across 4 modes), \code{\verb~|double_eval_fma~} (1 038 816 across 4 modes), \code{\verb~|integer_eval~} (259 704 in RN), \code{\verb~|float_eval~} (259 704 in RN), and \code{\verb~|float_eval_cr_rn~} (259 704 in RN).}
-}
+\p{\strong{Other plans.} \code{\verb~|double_eval_fma~}, \code{\verb~|integer_eval~}, \code{\verb~|static_rounding~}, \code{\verb~|float_eval~} and \code{\verb~|float_eval_cr_rn~} are extracted and tested. Nothing is stated or proved about them.}

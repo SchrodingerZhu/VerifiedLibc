@@ -148,38 +148,38 @@ def EXP_M2 : Array (Model .binary64) :=
   ]
 
 /-- Extracted from `math::double_eval::expf` (`_ZN11__llvm_libc4math11double_eval4expfEf`). -/
-def expf (mode : IEEERoundingMode) (x : Model .binary32) : Model .binary32 :=
+def expf (mode : IEEERoundingMode) (x : Model .binary32) : Option (Model .binary32) := do
   let xbits := Core.FPBits.ofVal x
   let x_u := Core.FPBits.uintval xbits
   let x_abs := x_u &&& 0x7FFFFFFF#32
   if x_u == 0xC236BD8C#32 then
-    Core.fsub mode f32(0x1E88452C#32) (Core.fmul mode x f32(0x10000000#32))
+    pure (Core.fsub mode f32(0x1E88452C#32) (Core.fmul mode x f32(0x10000000#32)))
   else
-    let cont (_ : Unit) : Model .binary32 :=
+    let cont (_ : Unit) : Option (Model .binary32) := do
       let kf := Core.nearestInt config mode (Core.fmul mode x f32(0x43000000#32))
       let xd := Core.fpCast .binary64 mode (submul[config, mode](x, kf, f32(0x3C000000#32)))
-      let x_hi := Core.fptosi 32 kf
-      let x_hi := x_hi + (0x68#32 <<< 7)
-      let exp_hi := EXP_M1[(BitVec.sshiftRight x_hi 7).toNat]!
-      let exp_mid := EXP_M2[(x_hi &&& 0x7F#32).toNat]!
+      let x_hi ← Core.fptosi? 32 kf
+      let x_hi ← Core.sadd? x_hi (0x68#32 <<< 7)
+      let exp_hi ← EXP_M1[(BitVec.sshiftRight x_hi 7).toNat]?
+      let exp_mid ← EXP_M2[(x_hi &&& 0x7F#32).toNat]?
       let exp_lo := horner[config, mode] xd [f64(0x3FF0000000000000#64), f64(0x3FEFFFFFFFFFF777#64),
           f64(0x3FE000000000071C#64), f64(0x3FC555566668E5E7#64), f64(0x3FA55555555EF243#64)]
-      Core.fpCast .binary32 mode (Core.fmul mode (Core.fmul mode exp_hi exp_mid) exp_lo)
+      pure (Core.fpCast .binary32 mode (Core.fmul mode (Core.fmul mode exp_hi exp_mid) exp_lo))
     if (BitVec.ule 0x42B17218#32 x_abs) || (BitVec.ule x_abs 0x32800000#32) then
       if BitVec.sle (BitVec.setWidth 32 (Core.FPBits.biasedExp xbits)) 0x65#32 then
-        Core.fadd mode f32(0x3F800000#32) x
+        pure (Core.fadd mode f32(0x3F800000#32) x)
       else if BitVec.ule 0xC2CFF1B5#32 (Core.FPBits.uintval xbits) then
         if Core.FPBits.isInf xbits then
-          f32(0x00000000#32)
+          pure (f32(0x00000000#32))
         else if Core.FPBits.isNaN xbits then
-          x
+          pure (x)
         else
-          Core.setUnderflow config mode
+          pure (Core.setUnderflow config mode)
       else if (Core.FPBits.isPos xbits) && (BitVec.ule 0x42B17218#32 (Core.FPBits.uintval xbits)) then
         if BitVec.ult (Core.FPBits.uintval xbits) 0x7F800000#32 then
-          Core.setOverflow config mode
+          pure (Core.setOverflow config mode)
         else
-          Core.fadd mode x (Core.FPBits.getVal (Core.FPBits.inf .binary32))
+          pure (Core.fadd mode x (Core.FPBits.getVal (Core.FPBits.inf .binary32)))
       else
         cont ()
     else

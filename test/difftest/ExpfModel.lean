@@ -59,8 +59,10 @@ def hex32 (x : BitVec 32) : String :=
 
 def resultLine (kernel : UnaryKernel .binary32) (mode : Model.IEEERoundingMode)
     (x : BitVec 32) : String :=
-  let y := kernel.eval mode (.ofBits x)
-  s!"{hex32 x} {hex32 y.toBits}\n"
+  -- `undefined` is not a bit pattern, so the comparison with the compiled code reports it.
+  match kernel.eval mode (.ofBits x) with
+  | some y => s!"{hex32 x} {hex32 y.toBits}\n"
+  | none => s!"{hex32 x} undefined\n"
 
 def main (args : List String) : IO UInt32 := do
   let parsed : Option (UnaryKernel .binary32 × Model.IEEERoundingMode × List Range) := do

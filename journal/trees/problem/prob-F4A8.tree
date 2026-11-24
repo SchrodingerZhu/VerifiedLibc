@@ -19,3 +19,4 @@
 \li{For the interpreter, see [prob-VFZQ](prob-VFZQ).}
 }
 \p{\strong{After the merge of \pr{13}} ([ses-UZN9](ses-UZN9)): \code{\verb~|Reduction.lean~} is merged and builds. Still to do: \code{\verb~|checkBlock~} in \code{\verb~|LibcMath/Exhaustive/Run/Block.lean~} and \code{\verb~|checkBits~} are the same computation, and the runner does not yet report \code{\verb~|checkRange.firstFailure~}.}
+\p{\strong{Closed on 2026-11-24.} \code{\verb~|checkBlock~} is \code{\verb~|checkBits~}, and the certificate runner is removed ([log-OY8M](log-OY8M)).}
