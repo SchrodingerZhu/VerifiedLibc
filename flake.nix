@@ -135,7 +135,7 @@
           cvc5
           bitwuzla
 
-          # The journal under ./journal (see CLAUDE.md).
+          # The journal under ./journal (see AGENTS.md).
           (foresterFor pkgs)
           (journalTools pkgs).build
           (journalTools pkgs).serve

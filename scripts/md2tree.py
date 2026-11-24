@@ -6,7 +6,7 @@ A markdown draft, or the Markdown tables a script prints, becomes the body of a 
 
 Each heading becomes a subtree whose address is the given address followed by a slug of the
 heading. The output is a starting point: add the frontmatter (\\taxon, \\date, \\author, ...)
-by hand as described in CLAUDE.md. Needs the Python package markdown-it-py.
+by hand as described in AGENTS.md. Needs the Python package markdown-it-py.
 """
 
 from __future__ import annotations

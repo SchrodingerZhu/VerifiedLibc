@@ -131,6 +131,6 @@ scripts/difftest-expf.sh <llvm-project>/libc range 3F800000 3FFFFFFF
 
 ## Conventions and journal
 
-`CLAUDE.md` has the conventions for changing proofs and running diagnostics. `journal/` is a
+`AGENTS.md` has the conventions for changing proofs and running diagnostics. `journal/` is a
 [Forester](https://www.forester-notes.org/) forest of dated changes, lessons, open problems,
 decisions, and sessions; build and browse it with `journal-serve` from the flake shell.
