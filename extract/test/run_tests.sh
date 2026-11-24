@@ -21,25 +21,25 @@ check_contains() {
 
 out_expf=$("$bin" "$root/test/expf_sample.cpp" --function=math::expf --name=expf \
   --drop-effects -Wno-undefined-inline -DLIBC_NAMESPACE=__llvm_libc)
-check_contains "expf-config"   "def config : Core.MathConfig :="      "$out_expf"
-check_contains "expf-meta"     "def kernelMeta : Core.KernelMeta :="  "$out_expf"
-check_contains "expf-kernel"   "def kernel : Core.UnaryKernel .binary32 :=" "$out_expf"
+check_contains "expf-config"   "def config : Libc.MathConfig :="      "$out_expf"
+check_contains "expf-meta"     "def kernelMeta : Libc.KernelMeta :="  "$out_expf"
+check_contains "expf-kernel"   "def kernel : Libc.UnaryKernel .binary32 :=" "$out_expf"
 check_contains "expf-table"    "def EXP_M1 : Array (Model .binary64)" "$out_expf"
-check_contains "expf-nearest"  "Core.nearestInt config mode"          "$out_expf"
+check_contains "expf-nearest"  "Libc.nearestInt config mode"          "$out_expf"
 check_contains "expf-poly"     "horner[config, mode] r ["             "$out_expf"
 check_contains "expf-option"   "(x : Model .binary32) : Option (Model .binary32) := do" "$out_expf"
 check_contains "expf-join"     "let cont (_ : Unit) : Option (Model .binary32) := do" "$out_expf"
 # Operations that C++ leaves undefined are emitted as checked ones.
-check_contains "expf-fptosi"   "← Core.fptosi? 32" "$out_expf"
+check_contains "expf-fptosi"   "← Libc.fptosi? 32" "$out_expf"
 check_contains "expf-index"    "← EXP_M1["          "$out_expf"
-check_contains "expf-fpbits"   "Core.FPBits.isInf xbits"              "$out_expf"
+check_contains "expf-fpbits"   "Libc.FPBits.isInf xbits"              "$out_expf"
 
 out_dyadic=$("$bin" "$root/test/dyadic_sample.cpp" --function=accurate_kernel)
 check_contains "dyadic-table"  "0xAAAAAAAAAAAAAAAA5555555555555555#128" "$out_dyadic"
-check_contains "dyadic-dd"     "Core.NumberPair.exactMult config mode"  "$out_dyadic"
+check_contains "dyadic-dd"     "Libc.NumberPair.exactMult config mode"  "$out_dyadic"
 check_contains "dyadic-poly"   "horner[config, mode] dx ["              "$out_dyadic"
-check_contains "dyadic-except" "Core.ExceptValues.lookup config mode MY_EXCEPTS" "$out_dyadic"
-check_contains "dyadic-match"  "match Core.quickGetRound mode with"     "$out_dyadic"
+check_contains "dyadic-except" "Libc.ExceptValues.lookup config mode MY_EXCEPTS" "$out_dyadic"
+check_contains "dyadic-match"  "match Libc.quickGetRound mode with"     "$out_dyadic"
 
 out_horner=$("$bin" "$root/test/dyadic_sample.cpp" --function=manual_horner)
 # The coefficient list is longer than a line, so the emitter breaks it after a comma.

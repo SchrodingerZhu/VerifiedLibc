@@ -6,7 +6,7 @@ is compiled ahead of time (`precompileModules` in `lakefile.lean`), so that the 
 when a module that imports it is elaborated.
 
 Lean knows nothing about these functions beyond their types. What they compute is stated as an
-axiom where they are used (`LibcMath/Oracle/Mpfr.lean`).
+axiom where they are used (`LibcMath/Testing/Oracle/Mpfr.lean`).
 -/
 
 namespace LibcMathMpfr

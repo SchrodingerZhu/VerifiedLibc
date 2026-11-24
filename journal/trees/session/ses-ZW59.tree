@@ -1,0 +1,19 @@
+\title{Completing \code{\verb~|expf_correctlyRounded~}, linearising \code{\verb~|main~}, and restructuring for issue 22}
+\taxon{Session}
+\date{2026-11-24}
+\author{antigravity}
+\contributor{schrodingerzy}
+\tag{expf}
+\tag{tmd}
+\tag{architecture}
+\meta{harness}{Antigravity CLI}
+\meta{model-id}{antigravity}
+\import{base-macros}
+
+\p{The maintainer requested four outcomes on \code{\verb~|main~}: (1) rewind and linearise the history on \code{\verb~|main~}, rename \code{\verb~|CLAUDE.md~} to \code{\verb~|AGENTS.md~}, and enforce linear history going forward; (2) restore the multi-plan statements, short-path proofs, and conditional reductions removed in \pr{21}; (3) close both open \code{\verb~|sorry~} lemmas of \code{\verb~|expf_correctlyRounded~} by numerical analysis rather than exhaustive evaluation; and (4) address issue \issue{22} while generalising the numerical-analysis and TMD machinery for future math kernels. All changes are summarised in [log-I6C0](log-I6C0).}
+\ul{
+\li{\strong{History & multi-plan restoration.} Rewrote \code{\verb~|main~} cleanly without merge commits, enabled GitHub's linear-history ruleset and disabled merge commits on the repository, renamed \code{\verb~|CLAUDE.md~} to \code{\verb~|AGENTS.md~}, and restored the four other plan statements, short-path proofs, \code{\verb~|integerEval_eq_staticRounding_nearest~}, and conditional main theorems adapted to \code{\verb~|Option~}-returning kernels.}
+\li{\strong{Numerical-analysis proof of \code{\verb~|expf_correctlyRounded~}.} Built the end-to-end analytical proof in parallel across specialised subagents: certified table bounds (\code{\verb~|EXP_M1~}, \code{\verb~|EXP_M2~}), binary64 Horner rounding error, exact range reduction (uncovering and carving out the two directed-rounding edge cases \code{\verb~|0x3B7FFFFF~} and \code{\verb~|0xBB7FFFFF~}, recorded in [ins-NHOJ](ins-NHOJ)), all-modes binary64-to-binary32 rounding transfer, combined value error (\code{\verb~|≤ 2 · 10⁻¹⁵ · exp x~}) with analytic closure of 25 256 675 tiny and near-underflow inputs, 103 kernel-checked pointwise exceptions, and 278 619 always-odd Chebyshev-L1 SLZ TMD certificates across 61 Lean chunk files verified by \code{\verb~|decide +kernel~}. All 7 116+ jobs built with zero \code{\verb~|sorry~} and standard axioms \code{\verb~|[propext, Classical.choice, Quot.sound]~}.}
+\li{\strong{Issue \issue{22} layout & generalisation.} Migrated the repository to \code{\verb~|LibcMath/{Expf,Libc,Analysis,Framework,Testing}~} with strict separation of generated files (\code{\verb~|Expf/Generated/~} and \code{\verb~|Expf/MainPath/Tmd/Certs/~}), factored reusable \code{\verb~|Analysis/{RangeReduction,Horner,RoundingTransfer,ChebTmd}.lean~}, updated \code{\verb~|ast2lean~} and freshly re-extracted all six plans from LLVM \code{\verb~|e1a5f92db023~}, added \code{\verb~|scripts/check-open.py~} + \code{\verb~|OPEN.md~} + \code{\verb~|lake run checkOpen~}, added \code{\verb~|templates/FunctionTemplate/~}, and wrote [note-adding-a-function](note-adding-a-function).}
+\li{\strong{Verified.} \code{\verb~|lake build LibcMath checkrange difftest-expf-model~} (10 473 jobs), \code{\verb~|lake run checkOpen~} (0 open obligations), \code{\verb~|bash extract/test/run_tests.sh~}, \code{\verb~|scripts/difftest-expf.sh~} across four plans (0 mismatches), \code{\verb~|checkrange~} with MPFR and Lean oracles, \code{\verb~|journal-build~} (0 diagnostics), and \code{\verb~|git log --merges main~} (empty).}
+}

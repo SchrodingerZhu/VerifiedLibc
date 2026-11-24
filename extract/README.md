@@ -3,7 +3,7 @@
 Module-first C++23 extractor that parses LLVM libc math sources directly from Clang's C++ AST,
 captures the active `LIBC_MATH_*` and target CPU feature macros from Clang's preprocessor, lifts
 C++ control flow and mathematical idioms into a typed High-Level Math IR, and emits clean Lean 4
-modules targeting `LibcMath.Core` and `LibcMath.Core.DSL`.
+modules targeting `LibcMath.Libc` and `LibcMath.Libc.DSL`.
 
 ## Module architecture
 
@@ -26,8 +26,8 @@ All extractor components are C++23 modules (`FILE_SET CXX_MODULES` in `CMakeList
   unrolling, bottom-up Horner recognition, field-update lifting (`{ v with f := ... }`),
   imperative-to-functional lifting with lazy zero-arg join points, and transitive rounding-mode
   analysis.
-- `src/emit_lean.cppm` (`libc_extract.emit_lean`) — Lean 4 emitter (`LibcMath.Core.DSL` notation,
-  `config : Core.MathConfig`, `kernelMeta : Core.KernelMeta`, `kernel : Core.UnaryKernel`),
+- `src/emit_lean.cppm` (`libc_extract.emit_lean`) — Lean 4 emitter (`LibcMath.Libc.DSL` notation,
+  `config : Libc.MathConfig`, `kernelMeta : Libc.KernelMeta`, `kernel : Libc.UnaryKernel`),
   `--emit-ir`, and `--dump-config`.
 - `src/extract.cppm` (`libc_extract`) — Umbrella module.
 - `src/cli.cppm` (`libc_extract.cli`) & `src/main.cpp` — CLI driver.
@@ -59,9 +59,9 @@ extract/build/ast2lean <libc>/src/math/generic/expf.cpp --dump-config \
 
 # Extract different evaluation plans of expf:
 extract/extract.sh <libc> expf math::double_eval::expf expf \
-  --namespace=LibcMath.Extracted.Expf.DoubleEval --out=LibcMath/Extracted/Expf/DoubleEval.lean
+  --namespace=LibcMath.Expf.Generated.DoubleEval --out=LibcMath/Expf/Generated/DoubleEval.lean
 
 extract/extract.sh <libc> expf math::integer_eval::expf expf \
-  --namespace=LibcMath.Extracted.Expf.IntegerEval --out=LibcMath/Extracted/Expf/IntegerEval.lean \
+  --namespace=LibcMath.Expf.Generated.IntegerEval --out=LibcMath/Expf/Generated/IntegerEval.lean \
   -- -DLIBC_MATH_EXPF_IMPL=integer_eval -DLIBC_MATH=0x2C
 ```

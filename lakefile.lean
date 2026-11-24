@@ -60,10 +60,20 @@ lean_lib LibcMathMpfr where
 -- MPFR and GMP may be built against a newer C library than the one whose symbols the linker of
 -- Lean knows, so their own undefined references are left to the loader.
 lean_exe checkrange where
-  root := `LibcMath.Check.Main
+  root := `LibcMath.Testing.Main
   moreLinkArgs := run_io do
     return (← envLinkArgs) ++ #["-lmpfr", "-lgmp", "-Wl,--allow-shlib-undefined"]
 
 lean_exe «difftest-expf-model» where
   srcDir := "test/difftest"
   root := `ExpfModel
+
+/-- Check that `OPEN.md` matches every `sorry` under `LibcMath/` (`lake run checkOpen`). -/
+script checkOpen (args) do
+  let out ← IO.Process.output {
+    cmd := "python3"
+    args := #["scripts/check-open.py"] ++ args.toArray
+  }
+  if !out.stdout.isEmpty then IO.print out.stdout
+  if !out.stderr.isEmpty then IO.eprint out.stderr
+  return out.exitCode

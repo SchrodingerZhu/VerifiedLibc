@@ -910,7 +910,7 @@ private:
           auto lhs_ty = convertType(dre->getType());
           if (lhs_ty->isFrac64() && compound == ir::BinaryOp::Mul) {
             auto mul = ir::Expr::make(ir::CoreCallExpr{CoreOpKind::Frac64Mul,
-                                                       "Core.Frac64.mul",
+                                                       "Libc.Frac64.mul",
                                                        {extractExpr(lhs), std::move(rhs)},
                                                        {},
                                                        false,
@@ -1223,7 +1223,7 @@ private:
       if (lhs->type && lhs->type->isFrac64()) {
         if (op == OO_Star) {
           return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::Frac64Mul,
-                                                 "Core.Frac64.mul",
+                                                 "Libc.Frac64.mul",
                                                  {std::move(lhs), std::move(rhs)},
                                                  {},
                                                  false,
@@ -1240,7 +1240,7 @@ private:
       if (lhs->type && lhs->type->isDyadic()) {
         if (op == OO_Plus) {
           return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::DyadicAdd,
-                                                 "Core.DyadicFloat.quickAdd",
+                                                 "Libc.DyadicFloat.quickAdd",
                                                  {std::move(lhs), std::move(rhs)},
                                                  {},
                                                  false,
@@ -1250,7 +1250,7 @@ private:
         }
         if (op == OO_Star) {
           return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::DyadicMul,
-                                                 "Core.DyadicFloat.quickMul",
+                                                 "Libc.DyadicFloat.quickMul",
                                                  {std::move(lhs), std::move(rhs)},
                                                  {},
                                                  false,
@@ -1296,7 +1296,7 @@ private:
       auto recv = extractExpr(mce->getImplicitObjectArgument());
       if (core_owner == CoreTypeKind::FPBits && ret_ty->isFloat()) {
         return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::FPBitsGetVal,
-                                               "Core.FPBits.getVal",
+                                               "Libc.FPBits.getVal",
                                                {std::move(recv)},
                                                {},
                                                false,
@@ -1317,7 +1317,7 @@ private:
       if (core_owner == CoreTypeKind::DyadicFloat && ret_ty->isFloat()) {
         auto fmt = std::get<ir::FloatType>(ret_ty->v).fmt;
         return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::DyadicAs,
-                                               "Core.DyadicFloat.asFloat",
+                                               "Libc.DyadicFloat.asFloat",
                                                {std::move(recv)},
                                                {std::string(floatFmtLean(fmt))},
                                                true,
@@ -1397,7 +1397,7 @@ private:
         if (args.empty()) {
           auto fmt = std::get<ir::FPBitsType>(ret_ty->v).fmt;
           return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::FPBitsZero,
-                                                 "Core.FPBits.zero",
+                                                 "Libc.FPBits.zero",
                                                  {},
                                                  {std::string(floatFmtLean(fmt))},
                                                  false,
@@ -1407,7 +1407,7 @@ private:
         }
         if (args[0]->type && args[0]->type->isFloat()) {
           return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::FPBitsOfVal,
-                                                 "Core.FPBits.ofVal",
+                                                 "Libc.FPBits.ofVal",
                                                  std::move(args),
                                                  {},
                                                  false,
@@ -1416,7 +1416,7 @@ private:
                                 std::move(ret_ty));
         }
         return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::FPBitsOfBits,
-                                               "Core.FPBits.ofBits",
+                                               "Libc.FPBits.ofBits",
                                                std::move(args),
                                                {},
                                                false,
@@ -1437,7 +1437,7 @@ private:
           }
         }
         return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::Frac64OfBits,
-                                               "Core.Frac64.ofBits",
+                                               "Libc.Frac64.ofBits",
                                                {std::move(arg0)},
                                                {},
                                                false,
@@ -1448,7 +1448,7 @@ private:
       case CoreTypeKind::DyadicFloat: {
         auto bits = std::get<ir::DyadicFloatType>(ret_ty->v).bits;
         return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::DyadicFromFloat,
-                                               "Core.DyadicFloat.ofFloat",
+                                               "Libc.DyadicFloat.ofFloat",
                                                std::move(args),
                                                {std::to_string(bits)},
                                                false,
@@ -1459,7 +1459,7 @@ private:
       case CoreTypeKind::NumberPair:
         if (args.size() == 2) {
           ir::StructLitExpr lit;
-          lit.type_name = "Core.NumberPair _";
+          lit.type_name = "Libc.NumberPair _";
           lit.fields.emplace_back("lo", std::move(args[0]));
           lit.fields.emplace_back("hi", std::move(args[1]));
           return ir::Expr::make(std::move(lit), std::move(ret_ty));
@@ -1506,8 +1506,8 @@ private:
         auto fmt = std::get<ir::NumberPairType>(ret_ty->v).fmt;
         lit.type_name =
             (fmt == FloatFmt::Binary32)
-                ? "Core.FloatFloat"
-                : (fmt == FloatFmt::Binary64 ? "Core.DoubleDouble" : "Core.NumberPair _");
+                ? "Libc.FloatFloat"
+                : (fmt == FloatFmt::Binary64 ? "Libc.DoubleDouble" : "Libc.NumberPair _");
         lit.fields.emplace_back("lo", extractExpr(ile->getInit(0)));
         lit.fields.emplace_back("hi", extractExpr(ile->getInit(1)));
         return ir::Expr::make(std::move(lit), std::move(ret_ty));
@@ -1625,7 +1625,7 @@ private:
         if (kind == CoreOpKind::DyadicQuickMul) {
           bool scalar_lhs = args.size() == 2 && args[0]->type && args[0]->type->isFloat();
           kind = scalar_lhs ? CoreOpKind::DDQuickMultScalar : CoreOpKind::DDQuickMult;
-          lean_name = scalar_lhs ? "Core.NumberPair.quickMultScalar" : "Core.NumberPair.quickMult";
+          lean_name = scalar_lhs ? "Libc.NumberPair.quickMultScalar" : "Libc.NumberPair.quickMult";
           needs_mode = true;
           needs_config = true;
         }
@@ -1633,15 +1633,15 @@ private:
       if (kind == CoreOpKind::DDQuickMult && args.size() == 2 && args[0]->type &&
           args[0]->type->isFloat()) {
         kind = CoreOpKind::DDQuickMultScalar;
-        lean_name = "Core.NumberPair.quickMultScalar";
+        lean_name = "Libc.NumberPair.quickMultScalar";
       }
       if (kind == CoreOpKind::DDAdd && args.size() == 2) {
         if (args[0]->type && args[0]->type->isNumberPair() && args[1]->type &&
             args[1]->type->isFloat()) {
-          lean_name = "Core.NumberPair.addScalar";
+          lean_name = "Libc.NumberPair.addScalar";
         } else if (args[0]->type && args[0]->type->isFloat() && args[1]->type &&
                    args[1]->type->isNumberPair()) {
-          lean_name = "Core.NumberPair.scalarAdd";
+          lean_name = "Libc.NumberPair.scalarAdd";
         }
       }
 

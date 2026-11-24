@@ -1,4 +1,4 @@
-import LibcMath.Extracted.Expf.Plans
+import LibcMath.Expf.Plans
 
 /-!
 # The Lean models of `expf`, run from the command line
@@ -12,8 +12,9 @@ matching `test/difftest/expf_native.cpp`.
 -/
 
 open FloatLib.Floats.Formats.BinaryInterchange
-open LibcMath.Core
-open LibcMath.Extracted.Expf
+open LibcMath.Libc
+open LibcMath.Expf
+open LibcMath.Expf.Generated
 
 def parseMode : String → Option Model.IEEERoundingMode
   | "nearest" => some .nearest

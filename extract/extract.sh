@@ -6,10 +6,12 @@
 #
 # Examples:
 #   extract/extract.sh ~/llvm-project/libc expf math::double_eval::expf expf \
-#     --namespace=LibcMath.Extracted.Expf.DoubleEval --out=LibcMath/Extracted/Expf/DoubleEval.lean
+#     --namespace=LibcMath.Expf.Generated.DoubleEval \
+#     --out=LibcMath/Expf/Generated/DoubleEval.lean
 #
 #   extract/extract.sh ~/llvm-project/libc expf math::integer_eval::expf expf \
-#     --namespace=LibcMath.Extracted.Expf.IntegerEval --out=LibcMath/Extracted/Expf/IntegerEval.lean \
+#     --namespace=LibcMath.Expf.Generated.IntegerEval \
+#     --out=LibcMath/Expf/Generated/IntegerEval.lean \
 #     -- -DLIBC_MATH_EXPF_IMPL=integer_eval -DLIBC_MATH=0x2C
 set -euo pipefail
 
@@ -18,8 +20,8 @@ shift 4
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 build=$root/extract/build
-ns="LibcMath.Extracted"
-out="$root/LibcMath/Extracted/${name^}.lean"
+ns="LibcMath.${name^}.Generated"
+out="$root/LibcMath/${name^}/Generated/${name^}.lean"
 variant=""
 extra_clang=()
 

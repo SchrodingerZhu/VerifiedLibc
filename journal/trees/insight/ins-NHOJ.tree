@@ -1,0 +1,17 @@
+\title{Always-odd Chebyshev SLZ TMD certificates and two directed-rounding range-reduction exceptions in \code{\verb~|expf~}}
+\taxon{Insight}
+\date{2026-11-24}
+\author{antigravity}
+\contributor{schrodingerzy}
+\tag{expf}
+\tag{tmd}
+\tag{error-bound}
+\tag{lean}
+\import{base-macros}
+
+\p{Source: session [ses-ZW59](ses-ZW59), during the complete proof of \code{\verb~|expf_correctlyRounded~} ([log-I6C0](log-I6C0)). Each finding was verified directly in Lean 4.36.0 (\code{\verb~|decide +kernel~} and standard axioms).}
+\ul{
+\li{\strong{Two inexact range-reduction edge cases in directed rounding.} Earlier documentation stated that \code{\verb~|r = submul(x, nearestInt(128 * x), 1/128)~} is always exact on the main ranges. That is false at exactly two inputs: \code{\verb~|0x3B7FFFFF~} (\code{\verb~|2⁻⁸ - 2⁻³²~}) under \code{\verb~|.up~} and \code{\verb~|0xBB7FFFFF~} (\code{\verb~|-(2⁻⁸ - 2⁻³²)~}) under \code{\verb~|.down~}. In \code{\verb~|genericNearestInt false~}, \code{\verb~|128 * x = ±(1/2 - 2⁻²⁵)~}, the shifted sum rounds to \code{\verb~|r0 = ±1~}, and \code{\verb~|diff = y - r0 = ∓(1/2 + 2⁻²⁵)~} rounds in directed mode to \code{\verb~|∓1/2~}, skipping the \code{\verb~|±1~} correction and leaving \code{\verb~|kf = ±1~} and \code{\verb~|r = ∓(1/256 + 2⁻³²)~} (which suffers a \code{\verb~|2⁻³²~} rounding error). Both points are carved out of \code{\verb~|Analysis/RangeReduction.lean~} (which requires \code{\verb~||y| ≥ 1/2 ∨ |y| ≤ 1/2 - 2⁻²⁴~}) and verified directly in \code{\verb~|Expf/MainPath/PointwiseExceptions.lean~} alongside \code{\verb~|0xC236BD8C~}.}
+\li{\strong{One-polynomial always-odd Chebyshev-L1 SLZ certificates.} Rather than carrying resultants, Bézout identities, or root-isolation witnesses, a single integer polynomial \code{\verb~|Q(i, y) ∈ ℤ[i, y]~} of bidegree \code{\verb~|(d, m)~} certifies that an entire interval \code{\verb~|[bc - R, bc + R]~} stays strictly away from every rounding boundary on the unified grid \code{\verb~|u = 2^(E - 24)~} (normal) or \code{\verb~|2⁻¹⁵⁰~} (subnormal) covering all four C rounding modes at once: check four parity conditions so \code{\verb~|Q(i, y) ≡ 1 (mod 2)~} for all \code{\verb~|(i, y) ∈ ℤ²~}, and check \code{\verb~|L1_Cheb(Q(R · t, P(R · t) + E)) < 1~} in pure \code{\verb~|Nat~} arithmetic. Because any integer pair \code{\verb~|(i, k)~} has \code{\verb~||Q(i, k)| ≥ 1~}, strict \code{\verb~|L1 < 1~} rules out every grid hit simultaneously. This generic verifier lives in \code{\verb~|LibcMath/Analysis/ChebTmd.lean~} and closes all 520 093 927 non-analytic main-range inputs of \code{\verb~|expf~} with 278 619 certificates in ~90 seconds of parallel \code{\verb~|lake build~}.}
+\li{\strong{Lean 4.36 \code{\verb~|(2 ^ 64 : ℝ)~} unification pitfall.} Unifying a goal containing \code{\verb~|(2 ^ 64 : ℝ)~} against an application of a lemma with \code{\verb~|2 ^ 64~} causes the kernel unifier to unfold \code{\verb~|npowRec~} 64 times and hit \code{\verb~|maxRecDepth~}. Defining an irreducible/opaque scaling constant \code{\verb~|def S64 : ℝ := (2 : ℝ) ^ (64 : ℕ)~} with a single rewrite lemma \code{\verb~|S64_eq~} avoids the unfolding completely; likewise, avoiding \code{\verb~|nlinarith~} inside proofs with 30+ local hypotheses prevents \code{\verb~|maxRecDepth~} blowups.}
+}
