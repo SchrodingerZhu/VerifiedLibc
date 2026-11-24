@@ -58,7 +58,8 @@ theorem expfDoubleEvalFmaCorrectlyRounded_of_mainRanges
 /-- Under `mode`, the pure-integer kernel `Expf.StaticRounding.kernel` is correct on both main
 polynomial ranges (`528 573 389` inputs). -/
 def ExpfStaticRoundingMainRangesChecked (mode : IEEERoundingMode) : Prop :=
-  HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode) 0x33000000 0x42B17218 ∧
+  HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode)
+      0x33000000 0x42B17218 ∧
   HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode) 0xB3000000 0xC2CFF1B5
 
 /-- `Expf.StaticRounding.kernel` is correctly rounded in all four C rounding directions, provided it

@@ -1,0 +1,16 @@
+\title{The main computation of a function is proved by numerical analysis, not by an exhaustive check}
+\taxon{Decision}
+\date{2026-11-24}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{architecture}
+\tag{error-bound}
+\meta{status}{accepted}
+\import{base-macros}
+
+\p{\strong{Status:} accepted.}
+\p{On 2026-11-24 the maintainer reported the advice of lntue, who maintains the math library of LLVM libc: the correctness of these functions can be established by numerical analysis, and the project should not rely on an exhaustive search over the inputs. The maintainer adopted it.}
+\p{\strong{What changes.} The inputs that a kernel sends to its tables and its polynomial are to be closed by a bound on the error of that computation and an argument that the bound leaves the rounding unchanged, as planned in [prob-48KJ](prob-48KJ), whose first step is proved ([log-7DAL](log-7DAL)). The hypotheses of the form \code{\verb~|ExpfMainRangesChecked~} in \code{\verb~|LibcMath/Extracted/ExpfMain.lean~} are to be discharged that way, not by \code{\verb~|checkRange~} on every input.}
+\p{\strong{Why it is the better route here.} It is the argument the authors of the code make, it is the only one that reaches formats with \code{\verb~|2⁶⁴~} inputs, and it does not need \code{\verb~|native_decide~}, which the exhaustive route needed for all but small ranges.}
+\p{\strong{Set aside.} The exhaustive check as the proof of the main ranges: the plan, run, record and generate steps of \code{\verb~|scripts/exhaustive.py~} and the certificate sets under \code{\verb~|LibcMath/Exhaustive/Run/~}. A compiled pass that was under way when the decision was made was stopped; what it had covered is in [log-WJ3Q](log-WJ3Q).}
+\p{\strong{Not decided.} Whether \code{\verb~|checkrange~}, the oracle and the block certificates stay in the repository as a test of a kernel and for the inputs that an error bound leaves over, or are removed. The inputs near a rounding boundary still have to be treated one by one or by a search for worst cases; [prob-48KJ](prob-48KJ) says what is known.}

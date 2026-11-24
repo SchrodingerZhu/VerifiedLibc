@@ -15,8 +15,7 @@ import libc_extract.core_ops;
 export namespace libc_extract::ir {
 
 /// Overloaded visitor helper for std::visit.
-template <class... Ts>
-struct Overloaded : Ts... {
+template <class... Ts> struct Overloaded : Ts... {
   using Ts::operator()...;
 };
 
@@ -93,24 +92,10 @@ struct OpaqueType {
 };
 
 struct Type {
-  std::variant<
-    VoidType,
-    BoolType,
-    IntType,
-    FloatType,
-    FPBitsType,
-    DyadicFloatType,
-    NumberPairType,
-    TripleDoubleType,
-    Frac64Type,
-    ExceptValuesType,
-    SignType,
-    OptionalType,
-    ArrayType,
-    StructType,
-    PtrType,
-    OpaqueType
-  > v = VoidType{};
+  std::variant<VoidType, BoolType, IntType, FloatType, FPBitsType, DyadicFloatType, NumberPairType,
+               TripleDoubleType, Frac64Type, ExceptValuesType, SignType, OptionalType, ArrayType,
+               StructType, PtrType, OpaqueType>
+      v = VoidType{};
 
   static auto makeVoid() -> TypePtr { return std::make_shared<Type>(Type{VoidType{}}); }
   static auto makeBool() -> TypePtr { return std::make_shared<Type>(Type{BoolType{}}); }
@@ -132,9 +117,7 @@ struct Type {
   static auto makeTripleDouble() -> TypePtr {
     return std::make_shared<Type>(Type{TripleDoubleType{}});
   }
-  static auto makeFrac64() -> TypePtr {
-    return std::make_shared<Type>(Type{Frac64Type{}});
-  }
+  static auto makeFrac64() -> TypePtr { return std::make_shared<Type>(Type{Frac64Type{}}); }
   static auto makeExceptValues(FloatFmt f, std::size_t n) -> TypePtr {
     return std::make_shared<Type>(Type{ExceptValuesType{f, n}});
   }
@@ -213,17 +196,9 @@ struct StructConst {
 };
 
 struct ConstVal {
-  std::variant<
-    BoolConst,
-    SignConst,
-    IntConst,
-    FloatConst,
-    Frac64Const,
-    DyadicConst,
-    NumberPairConst,
-    ArrayConst,
-    StructConst
-  > v = BoolConst{};
+  std::variant<BoolConst, SignConst, IntConst, FloatConst, Frac64Const, DyadicConst,
+               NumberPairConst, ArrayConst, StructConst>
+      v = BoolConst{};
 };
 
 // ============================================================================
@@ -240,10 +215,24 @@ enum class UnaryOp : std::uint8_t {
 };
 
 enum class BinaryOp : std::uint8_t {
-  Add, Sub, Mul, Div, Rem,
-  BitAnd, BitOr, BitXor, Shl, Shr,
-  Eq, Ne, Lt, Le, Gt, Ge,
-  LogAnd, LogOr,
+  Add,
+  Sub,
+  Mul,
+  Div,
+  Rem,
+  BitAnd,
+  BitOr,
+  BitXor,
+  Shl,
+  Shr,
+  Eq,
+  Ne,
+  Lt,
+  Le,
+  Gt,
+  Ge,
+  LogAnd,
+  LogOr,
 };
 
 enum class CastKind : std::uint8_t {
@@ -319,9 +308,10 @@ struct CoreCallExpr {
 struct PolyevalExpr {
   PolyScheme scheme = PolyScheme::Horner;
   ExprPtr var;
-  std::vector<ExprPtr> coeffs; // c0, c1, ..., cn (ascending degree), or single array expr when array_arg
-  std::size_t offset = 0;      // Template OFFSET for array-based polyeval/estrin
-  bool array_arg = false;      // True when `coeffs` holds a single array expression
+  std::vector<ExprPtr>
+      coeffs;             // c0, c1, ..., cn (ascending degree), or single array expr when array_arg
+  std::size_t offset = 0; // Template OFFSET for array-based polyeval/estrin
+  bool array_arg = false; // True when `coeffs` holds a single array expression
 };
 struct FuncCallExpr {
   std::string callee;
@@ -370,34 +360,14 @@ struct UnsupportedExpr {
 };
 
 struct Expr {
-  std::variant<
-    ConstExpr,
-    VarExpr,
-    TableRefExpr,
-    UnaryExpr,
-    BinaryExpr,
-    CastExpr,
-    SelectExpr,
-    IndexExpr,
-    FieldExpr,
-    StructLitExpr,
-    StructUpdateExpr,
-    CoreCallExpr,
-    PolyevalExpr,
-    FuncCallExpr,
-    LetExpr,
-    LetJoinExpr,
-    CallJoinExpr,
-    LetTupleExpr,
-    TupleExpr,
-    IfExpr,
-    MatchExpr,
-    UnsupportedExpr
-  > v;
+  std::variant<ConstExpr, VarExpr, TableRefExpr, UnaryExpr, BinaryExpr, CastExpr, SelectExpr,
+               IndexExpr, FieldExpr, StructLitExpr, StructUpdateExpr, CoreCallExpr, PolyevalExpr,
+               FuncCallExpr, LetExpr, LetJoinExpr, CallJoinExpr, LetTupleExpr, TupleExpr, IfExpr,
+               MatchExpr, UnsupportedExpr>
+      v;
   TypePtr type;
 
-  template <class Node>
-  static auto make(Node &&node, TypePtr ty) -> ExprPtr {
+  template <class Node> static auto make(Node &&node, TypePtr ty) -> ExprPtr {
     return std::make_shared<Expr>(Expr{std::forward<Node>(node), std::move(ty)});
   }
 };
@@ -471,22 +441,10 @@ struct UnsupportedStmt {
 };
 
 struct Stmt {
-  std::variant<
-    VarDeclStmt,
-    TupleDeclStmt,
-    AssignStmt,
-    FieldAssignStmt,
-    ExprStmt,
-    IfStmt,
-    SwitchStmt,
-    WhileStmt,
-    ForStmt,
-    ReturnStmt,
-    BlockStmt,
-    BreakStmt,
-    ContinueStmt,
-    UnsupportedStmt
-  > v;
+  std::variant<VarDeclStmt, TupleDeclStmt, AssignStmt, FieldAssignStmt, ExprStmt, IfStmt,
+               SwitchStmt, WhileStmt, ForStmt, ReturnStmt, BlockStmt, BreakStmt, ContinueStmt,
+               UnsupportedStmt>
+      v;
 };
 
 // ============================================================================

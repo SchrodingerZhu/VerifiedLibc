@@ -280,9 +280,11 @@ def quickAdd {bits : Nat} (a b : DyadicFloat bits) : DyadicFloat bits :=
       else
         normalize { sign := lo.sign, exponent := hi.exponent, mantissa := loShifted - hi.mantissa }
 
-/-- `DyadicFloat::quick_mul`: multiplies mantissas using the upper `bits` of the `2*bits` product. -/
+/-- `DyadicFloat::quick_mul`: multiplies mantissas using the upper `bits` of the `2*bits` product.
+-/
 def quickMul {bits : Nat} (a b : DyadicFloat bits) : DyadicFloat bits :=
-  let prod : BitVec (2 * bits) := a.mantissa.zeroExtend (2 * bits) * b.mantissa.zeroExtend (2 * bits)
+  let prod : BitVec (2 * bits) :=
+    a.mantissa.zeroExtend (2 * bits) * b.mantissa.zeroExtend (2 * bits)
   normalize {
     sign := a.sign.mul b.sign
     exponent := a.exponent + b.exponent + Int.ofNat bits

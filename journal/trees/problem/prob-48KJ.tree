@@ -1,0 +1,27 @@
+\title{A bound on the error of the main path of \code{\verb~|expf~}, to replace most of the computation}
+\taxon{Problem}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{exp}
+\tag{error-bound}
+\tag{scaling}
+\meta{status}{open}
+\meta{created}{2026-11-23}
+\meta{updated}{2026-11-24}
+\import{base-macros}
+
+\p{\strong{Status:} open.}
+\p{The exhaustive computation examines 545 386 931 inputs in each of four rounding directions, and no such computation is possible for a format with \code{\verb~|2⁶⁴~} inputs. The maintainer asked on 2026-11-23 for a proof mechanism that scales further, or that at least reduces the range that has to be examined. The plan is to prove what the designers of the code rely on: the value computed in binary64 is within a small relative error \code{\verb~|ε~} of the exponential, so that the one conversion to binary32 gives the correctly rounded result whenever the exponential is not within \code{\verb~|ε~} of a rounding boundary.}
+\ol{
+\li{\strong{Done.} The polynomial against the exponential, as real functions: [log-7DAL](log-7DAL), at most \code{\verb~|10⁻¹⁵~}.}
+\li{The binary64 evaluation of the polynomial against the real polynomial, in each rounding direction. FloatLib has the bound of one rounding for every direction (\code{\verb~|abs_roundAt_sub_le_mode~} in \code{\verb~|Analysis/MixedError/Attribute.lean~}) and the standard model \code{\verb~|fl(a ∘ b) = (a ∘ b)(1 + δ)~} for rounding to nearest (\code{\verb~|Analysis/StandardModel.lean~}). Whether the operations with an explicit direction, which the semantics of the extracted code uses, have such lemmas was not checked; the branch of \pr{13} proves facts about \code{\verb~|Model.add x y mode~} in \code{\verb~|LibcMath/Functions/AddRounding.lean~}. Gappa expects \code{\verb~|1.12 · 10⁻¹⁶~} to nearest.}
+\li{The tables. Each of the 195 and 128 entries is a binary64 number near \code{\verb~|e ^ hi~} or \code{\verb~|e ^ (mid / 128)~}; the error of each entry is one enclosure, which \code{\verb~|interval~} or the oracle of \pr{10} can give. These are 323 small facts, not one per input.}
+\li{The steps before: that \code{\verb~|k~} is the nearest integer to \code{\verb~|128 x~} in each direction, that \code{\verb~|r = x - k / 128~} is computed without error, and that \code{\verb~||r| ≤ 1 / 256~}. The symbolic execution of the branch of \pr{13} is the tool.}
+\li{The two multiplications of the product, and the sum of all errors into one \code{\verb~|ε~}. An estimate, not a proof: about \code{\verb~|2 · 10⁻¹⁵~}, near \code{\verb~|2⁻⁴⁹~}.}
+\li{The conclusion for one input: if an enclosure of the exponential of width \code{\verb~|ε~} lies between two adjacent rounding boundaries, the code is correct there in every direction. \code{\verb~|roundReal_eq_of_mem_Icc_rat~} in \code{\verb~|LibcMath/Functions/RoundingRanges.lean~} is this step.}
+}
+\p{\strong{What it would save.} With \code{\verb~|ε~} near \code{\verb~|2⁻⁴⁹~} and boundaries \code{\verb~|2⁻²⁴~} apart in relative terms, a few tens of inputs in each direction are expected to be within \code{\verb~|ε~} of a boundary; this is an estimate. For those the interpreter and the oracle are compared as now. For all others the interpreter is not run at all, and one pass of an oracle that only places the exponential between boundaries serves the four directions. That pass still visits each input, so for binary32 the work goes down by a constant factor, not by orders of magnitude.}
+\p{\strong{What it does not solve.} For \code{\verb~|2⁶⁴~} inputs the pass over all inputs is impossible, and the statement that no input comes nearer than \code{\verb~|ε~} to a boundary, except a known list, is the result of a search for worst cases, as CORE-MATH does with BaCSeL. Proving that in Lean means checking certificates of such a search. Nobody has tried this here.}
+\p{\strong{After the migration of [dec-03IY](dec-03IY).} \code{\verb~|Expf.DoubleEval.expf~} is now a Lean expression over the operations of FloatLib, with the polynomial as one \code{\verb~|horner~} call and \code{\verb~|nearestInt~} and \code{\verb~|subMultiply~} as definitions in \code{\verb~|LibcMath/Core/Ops.lean~}. Steps 2 to 5 above are statements about that expression; no symbolic execution of blocks is involved.}
+\p{\strong{Since [dec-K2Q4](dec-K2Q4)} this is the main line of work for the hypotheses of \code{\verb~|LibcMath/Extracted/ExpfMain.lean~}, not an optional reduction of an exhaustive check.}

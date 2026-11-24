@@ -1,0 +1,12 @@
+\title{The polynomial of \code{\verb~|expf~} is within 10⁻¹⁵ of the exponential}
+\taxon{Change}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{exp}
+\tag{error-bound}
+\import{base-macros}
+
+\p{\code{\verb~|LibcMath/Functions/ExpfPolynomial.lean~} proves \code{\verb~|ExpfPoly.abs_poly_sub_exp_le~}: for a real \code{\verb~|r~} with \code{\verb~||r| ≤ 1 / 256~}, the polynomial of degree 4 that the extracted \code{\verb~|expf~} evaluates is within \code{\verb~|1 / 10 ^ 15~} of \code{\verb~|Real.exp r~}. The four constants are rational numbers in the file, and \code{\verb~|toReal_c₁~} to \code{\verb~|toReal_c₄~} prove that they are the values of the binary64 constants of the code. The theorem depends on \code{\verb~|propext~}, \code{\verb~|Classical.choice~} and \code{\verb~|Quot.sound~} only, and the file is checked in about three seconds. Session [ses-HUTO](ses-HUTO).}
+\p{This is the first part of a bound on the error of the whole path through the tables and the polynomial, which would replace most of the exhaustive computation: [prob-48KJ](prob-48KJ). How the proof goes, and what failed first, is in [ins-ZOZE](ins-ZOZE).}

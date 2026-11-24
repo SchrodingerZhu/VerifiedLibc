@@ -103,7 +103,8 @@ variable {fmt : FloatFormat}
 @[inline, simp, grind] def abs (x : FPBits fmt) : FPBits fmt := Model.abs x
 @[inline, simp, grind] def neg (x : FPBits fmt) : FPBits fmt := Model.neg x
 
-/-- Biased exponent field as `BitVec 16`, matching `FPBits<T>::get_biased_exponent()` (`uint16_t`). -/
+/-- Biased exponent field as `BitVec 16`, matching `FPBits<T>::get_biased_exponent()` (`uint16_t`).
+-/
 @[inline, simp, grind] def biasedExp (x : FPBits fmt) : BitVec 16 :=
   BitVec.ofNat 16 x.expField
 
@@ -370,12 +371,11 @@ shifts by `2^fracWidth` and back in the dynamic rounding mode, then corrects by 
 
 /-! ## Exceptional-result helpers (`src/__support/FPUtil/except_value_utils.h`) -/
 
-/-- `fputil::set_overflow<T>(sign)`: returns `±inf` or `±max_normal` according to `mode` and `cfg`. -/
+/-- `fputil::set_overflow<T>(sign)`: returns `±inf` or `±max_normal` according to `mode` and `cfg`.
+-/
 @[inline] def setOverflow {fmt : FloatFormat} (cfg : MathConfig)
     (mode : IEEERoundingMode) (sign : Sign := .pos) : Model fmt :=
-  if cfg.noExcept && cfg.assumeRoundNearestOnly then
-    FPBits.inf fmt sign
-  else if cfg.assumeRoundNearestOnly then
+  if cfg.assumeRoundNearestOnly then
     FPBits.inf fmt sign
   else
     match mode with
@@ -384,12 +384,11 @@ shifts by `2^fracWidth` and back in the dynamic rounding mode, then corrects by 
     | .up => if sign.isNeg then FPBits.maxNormal fmt sign else FPBits.inf fmt sign
     | _ => FPBits.inf fmt sign
 
-/-- `fputil::set_underflow<T>(sign)`: returns `±0.0` or `±min_subnormal` according to `mode` and `cfg`. -/
+/-- `fputil::set_underflow<T>(sign)`: returns `±0.0` or `±min_subnormal` according to `mode` and
+`cfg`. -/
 @[inline] def setUnderflow {fmt : FloatFormat} (cfg : MathConfig)
     (mode : IEEERoundingMode) (sign : Sign := .pos) : Model fmt :=
-  if cfg.noExcept && cfg.assumeRoundNearestOnly then
-    FPBits.zero fmt sign
-  else if cfg.assumeRoundNearestOnly then
+  if cfg.assumeRoundNearestOnly then
     FPBits.zero fmt sign
   else
     match mode with

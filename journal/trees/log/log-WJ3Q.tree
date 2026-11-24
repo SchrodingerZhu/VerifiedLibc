@@ -1,0 +1,21 @@
+\title{The extractor builds in the flake, generated Lean is wrapped, and the main ranges are checked again}
+\taxon{Change}
+\date{2026-11-24}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{extraction}
+\tag{tooling}
+\meta{pr}{18}
+\import{base-macros}
+
+\p{A review of the stack \pr{14} to \pr{18} added the following on top of it. Session [ses-L0FW](ses-L0FW).}
+\ul{
+\li{\strong{Build of the extractor.} \code{\verb~|ast2lean~} did not build in the flake shell. The flake now provides the development libraries of Clang and LLVM and \code{\verb~|clang-scan-deps~}, and sets \code{\verb~|AST2LEAN_CC~}, \code{\verb~|AST2LEAN_CXX~}, \code{\verb~|LLVM_DIR~} and \code{\verb~|Clang_DIR~}; \code{\verb~|extract/extract.sh~} and \code{\verb~|extract/test/run_tests.sh~} use them; \code{\verb~|extract/CMakeLists.txt~} puts the directories of the linked Clang and LLVM libraries first in the run path. Why each was needed is in [ins-79M6](ins-79M6).}
+\li{\strong{Regenerated.} The six plans of \code{\verb~|expf~} were generated again with the toolchain of the flake from the same commit of LLVM, \code{\verb~|e1a5f92db023~}. Apart from the recorded version of Clang, \code{\verb~|23.1.3~} for \code{\verb~|23.1.5~}, the target triple and the wrapping of lines, the files are the same as those of \pr{16}, which had been generated with a compiler of the host.}
+\li{\strong{Format.} The emitter packs table rows up to 100 columns and breaks coefficient lists, headers of definitions and docstrings that are longer; the generated files went from 204 lines over 100 columns to 8. The sources of the extractor are formatted with \code{\verb~|clang-format~} (\code{\verb~|extract/.clang-format~}), the Nix files with \code{\verb~|nix fmt~}, and the Lean files written by hand are within 100 columns except for expected messages and string literals.}
+\li{\strong{Core.} \code{\verb~|Core.setOverflow~} and \code{\verb~|Core.setUnderflow~} had the same branch twice; it is written once.}
+\li{\strong{Error bound.} \code{\verb~|LibcMath/Functions/ExpfPolynomial.lean~} and its trees ([log-7DAL](log-7DAL), [ins-ZOZE](ins-ZOZE), [prob-48KJ](prob-48KJ), [ses-HUTO](ses-HUTO)) come from the branch \code{\verb~|explore/expf-error-bound~}, which was not merged before. The polynomial it bounds is the \code{\verb~|horner~} call of \code{\verb~|Expf.DoubleEval.expf~}.}
+\li{\strong{Main ranges.} The recorded compiled pass over the main ranges, \code{\verb~|scripts/manifests/expf-main.tsv~}, was a result about the interpreter that \pr{17} removed, and is deleted. A new pass on \code{\verb~|Expf.DoubleEval.expf~} was started as a check of the migration and was stopped when [dec-K2Q4](dec-K2Q4) was taken. Before that, \code{\verb~|checkrange~} had accepted every block it reached: all 545 350 603 inputs of both main ranges when rounding to nearest, the same toward zero, and 208 601 088 inputs upward; none downward. It is a compiled check, not a proof, and its result files were not kept.}
+\li{\strong{Documents.} \code{\verb~|CLAUDE.md~} says what the theorems about a kernel do not say, [prob-VR5Z](prob-VR5Z), and that generated files are not edited. The notes of the survey of extraction are marked as describing the tool that was removed.}
+}

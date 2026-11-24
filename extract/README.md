@@ -34,12 +34,21 @@ All extractor components are C++23 modules (`FILE_SET CXX_MODULES` in `CMakeList
 
 ## Build & test
 
+Build inside the flake shell (`nix develop`), which provides Clang 23 with its development
+libraries and sets `AST2LEAN_CC`, `AST2LEAN_CXX`, `LLVM_DIR` and `Clang_DIR`:
+
 ```bash
-cmake -S extract -B extract/build -G Ninja \
-  -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release
-ninja -C extract/build
-extract/test/run_tests.sh
+extract/test/run_tests.sh      # configures and builds extract/build on first use, then tests
 ```
+
+The scripts pass `AST2LEAN_CC` and `AST2LEAN_CXX` to CMake and fall back to `clang` and `clang++`
+when they are unset. Do not rely on that fallback inside the flake shell: the first `clang` in
+`PATH` there is the one bundled with Lean, which cannot compile C++ against the system headers.
+The committed files under `LibcMath/Extracted/` are generated with the toolchain of the flake, and
+they record its version; regenerate them there so that the result is reproducible.
+
+Format the sources with `clang-format -i extract/src/* extract/test/*.cpp` (`extract/.clang-format`).
+The emitter keeps generated Lean within 100 columns where a break is possible.
 
 ## Extracting LLVM libc functions
 

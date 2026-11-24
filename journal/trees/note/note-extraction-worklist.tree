@@ -7,6 +7,9 @@
 \tag{survey}
 \meta{pr}{6}
 \import{base-macros}
+\meta{status}{superseded}
+
+\p{\strong{Describes a tool that was removed.} This survey measured \code{\verb~|ir2lean~}, the extractor from LLVM IR, which \pr{15} replaced with \code{\verb~|ast2lean~} ([dec-03IY](dec-03IY)). Its counts and its work list do not apply to the new extractor; it is kept as the record of why the earlier approach was set aside.}
 
 \p{Part of [the survey of extraction](note-extraction-coverage). The open problem that this list serves is [prob-IW37](prob-IW37).}
 
