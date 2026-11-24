@@ -14,7 +14,7 @@
 \subtree[note-expf-status-the-statement]{
 \title{The statements}
 
-\p{\code{\verb~|LibcMath/Extracted/Statements.lean~} states \code{\verb~|CorrectlyRounded (Spec.exp .binary32)~} directly on total AST-extracted functional Lean kernels (\code{\verb~|LibcMath/Extracted/Expf/*.lean~}, produced by \code{\verb~|ast2lean~} from upstream LLVM libc commit \code{\verb~|e1a5f92db023~} with Clang 23.1.3):}
+\p{\code{\verb~|LibcMath/Extracted/Expf/Statements.lean~} states \code{\verb~|CorrectlyRounded (Spec.exp .binary32)~} directly on total AST-extracted functional Lean kernels (\code{\verb~|LibcMath/Extracted/Expf/*.lean~}, produced by \code{\verb~|ast2lean~} from upstream LLVM libc commit \code{\verb~|e1a5f92db023~} with Clang 23.1.3):}
 
 \ul{
 \li{\code{\verb~|ExpfCorrectlyRounded~} (= \code{\verb~|ExpfDoubleEvalCorrectlyRounded~}): \code{\verb~|math::double_eval::expf~} (default x86-64, \code{\verb~|LIBC_MATH=0~}, no hardware FMA) across all four C rounding directions.}
@@ -30,7 +30,7 @@
 \subtree[note-expf-status-what-is-proved]{
 \title{What is proved}
 
-\p{\code{\verb~|LibcMath/Extracted/ExpfMain.lean~} reduces correct rounding directly to the two finite polynomial-evaluation ranges with \strong{zero} \code{\verb~|sorry~}, \strong{zero} interpreter indirection, and \strong{zero} open bridge hypotheses (\code{\verb~|Block15ComputesExpfMain~} in [prob-W1QC](prob-W1QC) is superseded and removed). Every top-level theorem carries a \code{\verb~|#guard_msgs in #print axioms~} check confirming dependence only on \code{\verb~|[propext, Classical.choice, Quot.sound]~}:}
+\p{\code{\verb~|LibcMath/Extracted/Expf/Main.lean~} reduces correct rounding directly to the two finite polynomial-evaluation ranges with \strong{zero} \code{\verb~|sorry~}, \strong{zero} interpreter indirection, and \strong{zero} open bridge hypotheses (\code{\verb~|Block15ComputesExpfMain~} in [prob-W1QC](prob-W1QC) is superseded and removed). Every top-level theorem carries a \code{\verb~|#guard_msgs in #print axioms~} check confirming dependence only on \code{\verb~|[propext, Classical.choice, Quot.sound]~}:}
 
 \table{
 \tr{\th{plan}\th{positive main range}\th{negative main range}\th{remaining / mode}\th{discharged analytically}}
@@ -38,13 +38,13 @@
 \tr{\td{\code{\verb~|StaticRounding~} / \code{\verb~|IntegerEval~}}\td{\code{\verb~|0x33000000~}–\code{\verb~|0x42B17217~}}\td{\code{\verb~|0xB3000000~}–\code{\verb~|0xC2CFF1B4~}}\td{528 573 389}\td{87.69\%}}
 }
 
-\p{In addition, \code{\verb~|ExpfPaths.integerEval_eq_staticRounding_nearest~} proves pointwise equality of \code{\verb~|IntegerEval.kernel .nearest~} and \code{\verb~|StaticRounding.kernel .nearest~} across all \code{\verb~|2^32~} inputs, so \code{\verb~|expfIntegerEvalCorrectlyRounded_of_staticRounding~} derives RN correctness of \code{\verb~|IntegerEval~} directly from \code{\verb~|StaticRounding~}.}
+\p{In addition, \code{\verb~|Expf.Paths.integerEval_eq_staticRounding_nearest~} proves pointwise equality of \code{\verb~|IntegerEval.kernel .nearest~} and \code{\verb~|StaticRounding.kernel .nearest~} across all \code{\verb~|2^32~} inputs, so \code{\verb~|expfIntegerEvalCorrectlyRounded_of_staticRounding~} derives RN correctness of \code{\verb~|IntegerEval~} directly from \code{\verb~|StaticRounding~}.}
 
 \p{The supporting library consists of:}
 \ul{
 \li{\code{\verb~|LibcMath/Core/~}: FloatLib-backed LLVM libc core operations, \code{\verb~|MathConfig~}, \code{\verb~|KernelMeta~}, \code{\verb~|UnaryKernel~}, polynomial DSL, and \code{\verb~|Core.Diag~}.}
 \li{\code{\verb~|LibcMath/Functions/ExpRanges.lean~}, \code{\verb~|AddRounding.lean~}, \code{\verb~|AddSpecial.lean~}: closed forms of \code{\verb~|Spec.exp~} and IEEE addition.}
-\li{\code{\verb~|LibcMath/Extracted/ExpfPaths/{Exec,Ranges}.lean~}: direct symbolic simplification of the extracted functions on their short paths.}
+\li{\code{\verb~|LibcMath/Extracted/Expf/Paths/{Exec,Ranges}.lean~}: direct symbolic simplification of the extracted functions on their short paths.}
 \li{\code{\verb~|LibcMath/Exhaustive/~} and \code{\verb~|LibcMath/Oracle/Exp.lean~}: total-function range reduction and sound \code{\verb~|expOracle~}.}
 }
 }

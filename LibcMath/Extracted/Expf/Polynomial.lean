@@ -11,10 +11,10 @@ degree 4 in a remainder `r` with `|r| ≤ 1 / 256` (the `horner` call of
 `LibcMath/Extracted/Expf/DoubleEval.lean`). This file bounds the distance between
 that polynomial, as a function of a real variable, and the exponential:
 
-* `ExpfPoly.poly r` is the polynomial with the constants of the code as rational numbers, and
-  `ExpfPoly.toReal_c₁` … `ExpfPoly.toReal_c₄` state that these are the values of the four
+* `Poly.poly r` is the polynomial with the constants of the code as rational numbers, and
+  `Poly.toReal_c₁` … `Poly.toReal_c₄` state that these are the values of the four
   binary64 constants of the code;
-* `ExpfPoly.abs_poly_sub_exp_le`: `|poly r - exp r| ≤ 10⁻¹⁵` for `|r| ≤ 1 / 256`.
+* `Poly.abs_poly_sub_exp_le`: `|poly r - exp r| ≤ 10⁻¹⁵` for `|r| ≤ 1 / 256`.
 
 Sollya reports `9.50 · 10⁻¹⁶` for the supremum, so the bound has little slack.
 
@@ -33,7 +33,7 @@ operations that evaluate it, nor about the tables; the journal tree `prob-48KJ` 
 left.
 -/
 
-namespace LibcMath.ExpfPoly
+namespace LibcMath.Extracted.Expf.Poly
 
 open FloatLib.Floats.Formats.BinaryInterchange Model
 
@@ -108,9 +108,9 @@ theorem abs_poly_sub_exp_le {r : ℝ} (hr : r ∈ Set.Icc (-(1 / 256 : ℝ)) (1 
   norm_num
 
 /--
-info: 'LibcMath.ExpfPoly.abs_poly_sub_exp_le' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: 'LibcMath.Extracted.Expf.Poly.abs_poly_sub_exp_le' depends on axioms: [propext, Classical.choice, Quot.sound]
 -/
 #guard_msgs in
 #print axioms abs_poly_sub_exp_le
 
-end LibcMath.ExpfPoly
+end LibcMath.Extracted.Expf.Poly

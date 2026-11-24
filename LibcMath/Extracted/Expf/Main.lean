@@ -1,12 +1,12 @@
-import LibcMath.Exhaustive.Expf
-import LibcMath.Extracted.ExpfPaths.Ranges
+import LibcMath.Extracted.Expf.Exhaustive
+import LibcMath.Extracted.Expf.Paths.Ranges
 
 /-!
 # Correct rounding of extracted `expf` kernels, up to their main computation
 
 Every extracted `expf` plan evaluates a polynomial on two bounded finite intervals and handles
 every remaining bit pattern on a short path whose correctness is proved for whole ranges in
-`LibcMath/Extracted/ExpfPaths/Ranges.lean`.
+`LibcMath/Extracted/Expf/Paths/Ranges.lean`.
 
 Because `ast2lean` extracts high-level functional Lean models directly over `LibcMath.Core`, this
 file reduces `CorrectlyRounded` directly to those two main intervals with **zero** interpreter
@@ -36,7 +36,7 @@ its two polynomial ranges. -/
 theorem expfCorrectlyRounded_of_mainRanges (h : ∀ mode ∈ cModes, ExpfMainRangesChecked mode) :
     ExpfCorrectlyRounded := by
   refine correctlyRounded_of_holdsOnBits fun mode hmode => ?_
-  obtain ⟨low, middle, high⟩ := ExpfPaths.holdsOnBits_short_paths hmode
+  obtain ⟨low, middle, high⟩ := Expf.Paths.holdsOnBits_short_paths hmode
   obtain ⟨positive, negative⟩ := h mode hmode
   exact (((low.append positive).append middle).append negative).append high
 
@@ -51,7 +51,7 @@ theorem expfDoubleEvalFmaCorrectlyRounded_of_mainRanges
     (h : ∀ mode ∈ cModes, ExpfFmaMainRangesChecked mode) :
     ExpfDoubleEvalFmaCorrectlyRounded := by
   refine correctlyRounded_of_holdsOnBits fun mode hmode => ?_
-  obtain ⟨low, middle, high⟩ := ExpfPaths.holdsOnBits_short_paths_fma hmode
+  obtain ⟨low, middle, high⟩ := Expf.Paths.holdsOnBits_short_paths_fma hmode
   obtain ⟨positive, negative⟩ := h mode hmode
   exact (((low.append positive).append middle).append negative).append high
 
@@ -68,7 +68,7 @@ theorem expfStaticRoundingCorrectlyRounded_of_mainRanges
     (h : ∀ mode ∈ cModes, ExpfStaticRoundingMainRangesChecked mode) :
     ExpfStaticRoundingCorrectlyRounded := by
   refine correctlyRounded_of_holdsOnBits fun mode hmode => ?_
-  obtain ⟨low, middle, high⟩ := ExpfPaths.holdsOnBits_short_paths_staticRounding hmode
+  obtain ⟨low, middle, high⟩ := Expf.Paths.holdsOnBits_short_paths_staticRounding hmode
   obtain ⟨positive, negative⟩ := h mode hmode
   exact (((low.append positive).append middle).append negative).append high
 
@@ -82,7 +82,7 @@ theorem expfIntegerEvalCorrectlyRounded_of_mainRanges
     ExpfIntegerEvalCorrectlyRounded := by
   refine correctlyRounded_of_holdsOnBits fun mode hmode => ?_
   rcases hmode with rfl
-  obtain ⟨low, middle, high⟩ := ExpfPaths.holdsOnBits_short_paths_integerEval
+  obtain ⟨low, middle, high⟩ := Expf.Paths.holdsOnBits_short_paths_integerEval
   exact (((low.append hpos).append middle).append hneg).append high
 
 /-- `ExpfStaticRoundingCorrectlyRounded` immediately implies `ExpfIntegerEvalCorrectlyRounded`. -/
@@ -91,7 +91,7 @@ theorem expfIntegerEvalCorrectlyRounded_of_staticRounding
     ExpfIntegerEvalCorrectlyRounded := by
   intro mode hmode x
   rcases hmode with rfl
-  rw [ExpfPaths.integerEval_eq_staticRounding_nearest]
+  rw [Expf.Paths.integerEval_eq_staticRounding_nearest]
   exact h .nearest (by simp [cModes]) x
 
 /-! ### Axiom guards -/

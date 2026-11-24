@@ -1,5 +1,5 @@
 import LibcMath.Exhaustive.Reduction
-import LibcMath.Extracted.ExpfPaths.Exec
+import LibcMath.Extracted.Expf.Paths.Exec
 import LibcMath.Functions.AddRounding
 import LibcMath.Functions.AddSpecial
 import LibcMath.Functions.ExpRanges
@@ -30,7 +30,7 @@ short-path range of:
   `[0xB3000000, 0xC2CFF1B5)`).
 -/
 
-namespace LibcMath.Extracted.ExpfPaths
+namespace LibcMath.Extracted.Expf.Paths
 
 open FloatLib.Floats.Formats.BinaryInterchange Model
 open LibcMath.Core.DSL
@@ -353,4 +353,4 @@ theorem holdsOnBits_short_paths_integerEval :
       exact hx
   exact ⟨tr h1, tr h2, tr h3⟩
 
-end LibcMath.Extracted.ExpfPaths
+end LibcMath.Extracted.Expf.Paths

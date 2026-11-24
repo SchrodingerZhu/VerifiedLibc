@@ -24,9 +24,12 @@ lake build             # must end with "Build completed successfully"
 
 - No `sorry`, no new `axiom`, and no `native_decide` outside files whose name or directory says
   so. Top-level theorems carry a `#guard_msgs in #print axioms …` check (see
-  `LibcMath/Exhaustive/Expf.lean` and `LibcMath/Extracted/ExpfMain.lean`); add one for each new
+  `LibcMath/Extracted/Expf/Exhaustive.lean` and `LibcMath/Extracted/Expf/Main.lean`); add one for each new
   top-level result, so that a regression fails the build instead of relying on a claim in a pull
   request.
+- An oracle that trusts an external library states that trust as one named axiom, as
+  `MpfrOracle.mpfrExpf_sameValue` does for MPFR, and the theorems that use it carry a check of
+  their axioms. `expOracle` is proved in Lean and is the default.
 - Files named `…Examples.lean` are part of the build. They are the tests: put a small worked case
   there for every new definition that is meant to be evaluated.
 - Files under `LibcMath/Extracted/Expf/` other than `Plans.lean` and `Examples.lean` are generated.
@@ -34,6 +37,29 @@ lake build             # must end with "Build completed successfully"
   in the flake shell, at the commit of LLVM that the files record.
 - Lean, C++ and Nix sources stay within 100 columns. The exceptions are expected messages under
   `#guard_msgs` and string literals, which cannot be broken.
+
+## Checking a kernel against MPFR
+
+```bash
+lake build checkrange
+.lake/build/bin/checkrange --oracle=mpfr --plan=double_eval nearest 1065353216 65536
+```
+
+`--oracle=mpfr` compares with MPFR (`c/mpfr_oracle.c`), `--oracle=lean`, the default, with the
+oracle proved in Lean. Inside Lean, a block is certified against MPFR by `native_decide`; see
+`LibcMath/Exhaustive/Run/Native/Mpfr.lean`. Build in the flake shell: the C file needs the headers
+of MPFR and GMP, which `cc` finds there. The evaluation of the kernel, not the oracle, takes most
+of the time of a check.
+
+## Where things go
+
+- `LibcMath/Extracted/<Function>/` holds everything about one function: its generated evaluation
+  plans, `Plans.lean`, `Examples.lean`, `Statements.lean`, the short paths under `Paths/`, the
+  error analysis of its main path, its instance of the exhaustive reduction, and `Main.lean`.
+  `LibcMath/Extracted/<Function>.lean` imports them all; `LibcMath/Extracted/Expf.lean` is the model.
+- What does not depend on the function stays outside: `LibcMath/Core/` (the operations of libc),
+  `LibcMath/Functions/` (facts about real functions and rounding), `LibcMath/Exhaustive/` and
+  `LibcMath/Oracle/`.
 
 ## What the theorems do not say
 
