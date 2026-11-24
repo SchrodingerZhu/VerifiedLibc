@@ -1,0 +1,19 @@
+\title{An oracle that trusts MPFR, usable by \code{\verb~|native_decide~}, and one directory for \code{\verb~|expf~}}
+\taxon{Change}
+\date{2026-11-24}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{oracle}
+\tag{tooling}
+\import{base-macros}
+
+\p{Session [ses-7MUY](ses-7MUY).}
+\ul{
+\li{\strong{MPFR.} \code{\verb~|c/mpfr_oracle.c~} computes the correctly rounded binary32 exponential with MPFR in the four rounding directions of C. \code{\verb~|LibcMathMpfr/Basic.lean~} declares it, in a library of its own that is compiled ahead of time so that the C code runs during elaboration. \code{\verb~|LibcMath/Oracle/Mpfr.lean~} builds the oracle \code{\verb~|mpfrExpOracle~} on it.}
+\li{\strong{Trust.} What MPFR computes is one axiom, \code{\verb~|MpfrOracle.mpfrExpf_sameValue~}. Every theorem that uses the oracle shows it under \code{\verb~|#print axioms~}, next to the axiom of \code{\verb~|native_decide~}. The oracle \code{\verb~|expOracle~}, which is proved in Lean, stays the default.}
+\li{\strong{Use.} \code{\verb~|checkrange --oracle=mpfr~} in the compiled runner; \code{\verb~|LibcMath/Exhaustive/Run/Native/Mpfr.lean~} has two blocks of 4096 inputs certified against MPFR by \code{\verb~|native_decide~}, and four blocks on which the result of MPFR is accepted by \code{\verb~|expOracle~}, also by \code{\verb~|native_decide~}.}
+\li{\strong{Build.} \code{\verb~|lakefile.toml~} became \code{\verb~|lakefile.lean~}, which compiles the C file with the C compiler of the environment and passes the library directories of MPFR and GMP to the linker of Lean. What that took is in [ins-PNAI](ins-PNAI).}
+\li{\strong{Measured.} On 65 536 inputs from \code{\verb~|1~}, the compiled check takes 0.83 s against MPFR and 1.02 s against \code{\verb~|expOracle~} when rounding to nearest, and 3.4 s against 3.6 s upward. The oracle is a small part of the time; the evaluation of the extracted kernel with the operations of FloatLib is the rest, about 12 microseconds for an input to nearest and 50 upward.}
+\li{\strong{Layout.} The statements, the short paths, the main theorem, the instance of the exhaustive reduction and the bound on the polynomial of \code{\verb~|expf~} moved under \code{\verb~|LibcMath/Extracted/Expf/~}, and \code{\verb~|LibcMath/Extracted/Expf.lean~} imports them. A new function gets a directory of the same shape.}
+}

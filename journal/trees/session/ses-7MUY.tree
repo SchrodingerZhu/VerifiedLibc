@@ -1,0 +1,17 @@
+\title{An MPFR oracle, the layout of \code{\verb~|expf~}, and a correction of the decision on exhaustive checks}
+\taxon{Session}
+\date{2026-11-24}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{oracle}
+\tag{layout}
+\meta{harness}{Claude Code}
+\meta{model-id}{claude-fable-5-2}
+\import{base-macros}
+
+\p{After the merge of [ses-L0FW](ses-L0FW) the maintainer asked for three things and then a fourth: to state again that no undefined behaviour is reached ([prob-VR5Z](prob-VR5Z)); to write a decider that runs natively against MPFR, numerical analysis being preferred for the main ranges but not required; to make sure that what is proved in the tree is proved by analysis; and to keep everything about \code{\verb~|expf~} in one directory.}
+\ul{
+\li{\strong{Done.} The MPFR oracle and the layout: [log-5KG8](log-5KG8), [ins-PNAI](ins-PNAI). [dec-K2Q4](dec-K2Q4) was corrected to say that a check against MPFR is an accepted way to close a range.}
+\li{\strong{Audit.} Every statement about a whole range in the tree is proved symbolically or by analysis: the short paths, the closed forms of the specification, the bound on the polynomial. Where \code{\verb~|decide +kernel~} occurs in those proofs it evaluates a closed constant, such as a table entry or the rounding of one rational, not a list of inputs. Proofs that enumerate inputs are in three places only: the certificate sets under \code{\verb~|LibcMath/Exhaustive/Run/~}, the agreement of the plans on a few inputs in \code{\verb~|LibcMath/Extracted/Expf/Examples.lean~}, and the examples of the oracles. The hypotheses on the main ranges are not proved by anything yet.}
+\li{\strong{Not done.} The statement about undefined behaviour. It needs the extractor to emit, for each function, when its operations are defined, and the short-path proofs to show it; [prob-VR5Z](prob-VR5Z) has the plan.}
+}

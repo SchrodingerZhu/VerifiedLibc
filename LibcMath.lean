@@ -19,4 +19,6 @@ import LibcMath.Oracle.Exp
 import LibcMath.Oracle.ExpExamples
 import LibcMath.Exhaustive.Run.Kernel.Demo
 import LibcMath.Exhaustive.Run.Native.Demo
+import LibcMath.Exhaustive.Run.Native.Mpfr
+import LibcMath.Oracle.Mpfr
 import LibcMath.Extracted.Expf
