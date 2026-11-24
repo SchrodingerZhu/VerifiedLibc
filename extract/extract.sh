@@ -1,31 +1,62 @@
 #!/usr/bin/env bash
-# Extract one LLVM libc math function to Lean.
+# Extract one LLVM libc math function to Lean using the C++23 Clang-AST extractor (`ast2lean`).
 #
-#   extract/extract.sh <llvm-project>/libc <entrypoint> <function> <lean-name>
+#   extract/extract.sh <llvm-project>/libc <entrypoint> <function> <lean-name> \
+#     [--namespace=<ns>] [--out=<file>] [--variant=<name>] [-- <extra-clang-flags...>]
 #
-# <entrypoint> names the source file src/math/generic/<entrypoint>.cpp, and <function> is the
-# function to export, relative to the libc namespace. Example:
+# Examples:
+#   extract/extract.sh ~/llvm-project/libc expf math::double_eval::expf expf \
+#     --namespace=LibcMath.Extracted.Expf.DoubleEval --out=LibcMath/Extracted/Expf/DoubleEval.lean
 #
-#   extract/extract.sh ~/llvm-project/libc expf math::double_eval::expf expf
-#
-# The entrypoint is compiled for x86-64 with libc's default configuration, which includes the
-# accurate passes, and at the optimization level of a release build.
+#   extract/extract.sh ~/llvm-project/libc expf math::integer_eval::expf expf \
+#     --namespace=LibcMath.Extracted.Expf.IntegerEval --out=LibcMath/Extracted/Expf/IntegerEval.lean \
+#     -- -DLIBC_MATH_EXPF_IMPL=integer_eval -DLIBC_MATH=0x2C
 set -euo pipefail
 
 libc=$1 entrypoint=$2 function=$3 name=$4
+shift 4
+
 root=$(cd "$(dirname "$0")/.." && pwd)
 build=$root/extract/build
+ns="LibcMath.Extracted"
+out="$root/LibcMath/Extracted/${name^}.lean"
+variant=""
+extra_clang=()
 
-cmake -S "$root/extract" -B "$build" -G Ninja -DCMAKE_BUILD_TYPE=Release >/dev/null
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --namespace=*) ns="${1#--namespace=}"; shift ;;
+    --out=*)       out="${1#--out=}"; shift ;;
+    --variant=*)   variant="${1#--variant=}"; shift ;;
+    --)            shift; extra_clang=("$@"); break ;;
+    *)             extra_clang+=("$1"); shift ;;
+  esac
+done
+
+if [[ ! -x "$build/ast2lean" ]]; then
+  cmake -S "$root/extract" -B "$build" -G Ninja \
+    -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release >/dev/null
+fi
 ninja --quiet -C "$build"
 
-# The vectorizers are off because vector instructions are outside the exported fragment.
-clang++ -std=gnu++17 -O3 -fno-vectorize -fno-slp-vectorize \
-  -I "$libc" -DLIBC_NAMESPACE=__llvm_libc \
-  -fpass-plugin="$build/MarkCoreOps.so" \
-  -S -emit-llvm -o "$build/$entrypoint.ll" "$libc/src/math/generic/$entrypoint.cpp"
+commit=$(git -C "$libc" rev-parse --short=12 HEAD 2>/dev/null || echo "unknown")
+src_rel="src/math/generic/$entrypoint.cpp"
 
-origin="llvm-project $(git -C "$libc" rev-parse --short=12 HEAD), $(clang++ --version | head -n1), x86-64"
-"$build/ir2lean" "$build/$entrypoint.ll" --function="$function" --name="$name" \
-  --origin="$origin" \
-  > "$root/LibcMath/Extracted/${name^}.lean"
+cmd=(
+  "$build/ast2lean" "$libc/$src_rel"
+  --function="$function"
+  --name="$name"
+  --namespace="$ns"
+  --source-label="$src_rel"
+  --source-commit="$commit"
+  --drop-effects
+  --follow-helpers
+  --strict
+)
+if [[ -n "$variant" ]]; then
+  cmd+=(--variant="$variant")
+fi
+cmd+=(-- -std=gnu++17 -I "$libc" -DLIBC_NAMESPACE=__llvm_libc "${extra_clang[@]}")
+
+mkdir -p "$(dirname "$out")"
+"${cmd[@]}" > "$out"
