@@ -1,0 +1,24 @@
+\title{Replace LLVM IR CFG extraction and interpreter with Clang AST CoreOp extraction}
+\taxon{Decision}
+\date{2026-11-24}
+\author{antigravity}
+\contributor{schrodingerzy}
+\tag{architecture}
+\tag{extraction}
+\tag{ir}
+\meta{status}{accepted}
+\import{base-macros}
+
+\p{\strong{Status:} accepted.}
+\p{The repository shifts its extraction boundary from optimized LLVM IR (basic-block CFG interpreted in Lean via \code{\verb~|LibcMath/IR/~}) to the Clang C++ AST lifted directly to typed, total functional Lean terms over a curated library of LLVM libc math core operations (\code{\verb~|LibcMath/Core/~}).}
+\p{\strong{Why the LLVM IR interpreter route was set aside:}}
+\ul{
+\li{The untyped CFG interpreter (\code{\verb~|LibcMath/IR/Interp.lean~}) imposed heavy evaluation cost in Lean's kernel (about 0.4 s per \code{\verb~|expf~} input) and required a separate bridge proof from the interpreter to a direct Lean function (\code{\verb~|expfStructured~}), whose main-block proof did not finish kernel checking ([prob-W1QC](prob-W1QC)).}
+\li{Low-level LLVM IR erased high-level mathematical structure (polynomial schemes, \code{\verb~|FPBits~}, \code{\verb~|NumberPair~}, \code{\verb~|Frac64~}, \code{\verb~|DyadicFloat~}, \code{\verb~|ExceptValues~}) and introduced optimizer artifacts (\code{\verb~|nsw~}/\code{\verb~|nuw~}, \code{\verb~|nnan~}/\code{\verb~|ninf~} fast-math flags, pointer GEPs, volatile locals) that blocked over two thirds of single-precision entrypoints and all half- and double-precision entrypoints ([prob-IW37](prob-IW37), [prob-ZWH4](prob-ZWH4)).}
+}
+\p{\strong{Alternatives considered and set aside:}}
+\ul{
+\li{\strong{VAST / ClangIR (CIR):} VAST is C-focused on older LLVM and leaves C++ template abstractions intact; local Clang 23 builds without \code{\verb~|CLANG_ENABLE_CIR~}, and CIR still leaves inlining and constant folding to LLVM IR.}
+\li{\strong{Rust \code{\verb~|clang-sys~} (\code{\verb~|libclang~}):} the C API hides implicit casts, constructor calls, \code{\verb~|if constexpr~} branches, and exact \code{\verb~|APValue~}/\code{\verb~|APFloat~} constant-table evaluation.}
+}
+\p{\strong{Consequence for the trusted base:} we trust Clang's C++ frontend, the C++23 module-first AST extractor (\code{\verb~|extract/~}), and the semantics of \code{\verb~|LibcMath/Core/~} (including preprocessor-captured \code{\verb~|LIBC_MATH_*~} and target CPU feature flags) rather than the LLVM optimizer, \code{\verb~|ir2lean~}, and the IR semantics. Differential testing against compiled LLVM libc C++ checks this boundary empirically.}

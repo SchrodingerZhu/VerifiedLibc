@@ -1,0 +1,19 @@
+\title{Add \code{\verb~|LibcMath/Core/~}: common kernel notion, LLVM libc core ops, DSL, and diagnostics}
+\taxon{Change}
+\date{2026-11-24}
+\author{antigravity}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{core}
+\tag{dsl}
+\import{base-macros}
+
+\p{Introduces \code{\verb~|LibcMath/Core/~}, the shared Lean 4 library and notation layer for math kernels extracted directly from LLVM libc's Clang AST (see [dec-03IY](dec-03IY)):}
+\ul{
+\li{\code{\verb~|LibcMath/Core/Config.lean~}: \code{\verb~|MathConfig~} capturing LLVM libc's \code{\verb~|LIBC_MATH_*~} bitflags and \code{\verb~|LIBC_TARGET_CPU_HAS_*~} / \code{\verb~|LIBC_TYPES_HAS_INT128~} features, \code{\verb~|KernelMeta~} provenance metadata, and the common \code{\verb~|UnaryKernel~} bundle.}
+\li{\code{\verb~|LibcMath/Core/Ops.lean~}: FloatLib-backed IEEE 754 operations, zero-overhead \code{\verb~|FPBits~} alias over \code{\verb~|Model~}, config-aware \code{\verb~|multiplyAdd~} / \code{\verb~|multiplySub~} / \code{\verb~|subMultiply~} (matching \code{\verb~|multiply_add.h~} for FMA vs unfused directed rounding), \code{\verb~|nearestInt~} (hardware vs \code{\verb~|generic::nearest_integer~}), rounding-mode queries, and \code{\verb~|setOverflow~}/\code{\verb~|setUnderflow~}.}
+\li{\code{\verb~|LibcMath/Core/Extended.lean~}: \code{\verb~|Frac64~} (both 128-bit and 32-bit split \code{\verb~|quick_mul_hi~}), \code{\verb~|NumberPair~} (\code{\verb~|DoubleDouble~}, \code{\verb~|FloatFloat~}), \code{\verb~|TripleDouble~}, \code{\verb~|DyadicFloat~}, and \code{\verb~|ExceptValues~}.}
+\li{\code{\verb~|LibcMath/Core/Poly.lean~} and \code{\verb~|LibcMath/Core/DSL.lean~}: polymorphic \code{\verb~|PolyElem~} Horner (\code{\verb~|horner[...]~}), alternating Horner (\code{\verb~|althorner[...]~}), and right-heavy Estrin (\code{\verb~|estrin[...]~}) polynomial evaluation plus exact bit-pattern float literals (\code{\verb~|f16(...)~}, \code{\verb~|f32(...)~}, \code{\verb~|f64(...)~}, \code{\verb~|frac64(...)~}).}
+\li{\code{\verb~|LibcMath/Core/Diag.lean~}: agent-friendly inspection and diffing diagnostics (\code{\verb~|describeFloat~}, \code{\verb~|ulpDiff?~}, \code{\verb~|diagnoseInput~}, \code{\verb~|diagnoseBlock~}, \code{\verb~|compareKernels~}, \code{\verb~|inspectKernel~}).}
+\li{\code{\verb~|LibcMath/CoreExamples.lean~}: worked kernel checks (\code{\verb~|decide +kernel~}), \code{\verb~|grind~} examples, \code{\verb~|#guard_msgs~} diagnostic checks, and axiom guards.}
+}
