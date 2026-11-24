@@ -74,7 +74,7 @@ The six extracted `expf` evaluation plans under `LibcMath/Extracted/Expf/` are:
 ## Exhaustive checking
 
 binary32 has `2^32` bit patterns, few enough to examine each one under each rounding direction.
-`LibcMath/Extracted/ExpfMain.lean` analytically discharges 87.30% of all inputs for `DoubleEval` /
+`LibcMath/Extracted/Expf/Main.lean` analytically discharges 87.30% of all inputs for `DoubleEval` /
 `DoubleEvalFma` (leaving `545,350,603` inputs per mode) and 87.69% for `StaticRounding` /
 `IntegerEval` (leaving `528,573,389` inputs per mode), with zero open bridge hypotheses.
 

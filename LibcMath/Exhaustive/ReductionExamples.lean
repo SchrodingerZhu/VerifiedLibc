@@ -1,4 +1,4 @@
-import LibcMath.Exhaustive.Expf
+import LibcMath.Extracted.Expf.Exhaustive
 
 /-!
 # The reduction on small blocks

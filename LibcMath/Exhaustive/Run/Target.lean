@@ -1,5 +1,5 @@
 import LibcMath.Oracle.Exp
-import LibcMath.Exhaustive.Expf
+import LibcMath.Extracted.Expf.Exhaustive
 
 /-!
 # The implementation and oracle being checked
