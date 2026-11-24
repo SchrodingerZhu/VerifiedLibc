@@ -30,13 +30,13 @@ void printUsage(std::string_view prog) {
        {0} <source.cpp> --list-functions [clang-args...]
        {0} <source.cpp> --dump-config [clang-args...]
 
-High-level C++23 Clang-AST to Lean 4 math extractor referencing LibcMath.Core.
+High-level C++23 Clang-AST to Lean 4 math extractor referencing LibcMath.Libc.
 
 Options:
   --function=<name>      Target function (qualified name, suffix, or mangled name)
   --name=<lean_name>     Override Lean definition name
-  --namespace=<ns>       Lean namespace (default: LibcMath.Extracted)
-  --import=<mod>         Lean import module (default: LibcMath.Core)
+  --namespace=<ns>       Lean namespace (default: LibcMath)
+  --import=<mod>         Lean import module (default: LibcMath.Libc)
   --source-label=<path>  Relative source path recorded in KernelMeta
   --source-commit=<sha>  Upstream llvm-project commit recorded in KernelMeta
   --variant=<name>       Override MathConfig.implVariant
@@ -46,7 +46,7 @@ Options:
   --no-fold-poly         Disable automatic Horner polynomial lifting
   --no-unroll-loops      Disable small constant-bound loop unrolling
   --no-lift-functional   Keep imperative `Id.run do` form instead of functional lifting
-  --no-kernel-bundle     Omit `kernelMeta` and `kernel : Core.UnaryKernel` wrapper
+  --no-kernel-bundle     Omit `kernelMeta` and `kernel : Libc.UnaryKernel` wrapper
   --float-comments       Annotate hex float literals with decimal comments
   --emit-ir              Print the lifted High-Level Math IR instead of Lean code
   --dump-config          Print captured LIBC_MATH_* and target CPU flags and exit

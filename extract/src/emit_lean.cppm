@@ -20,13 +20,13 @@ import libc_extract.ir;
 export namespace libc_extract {
 
 struct EmitOptions {
-  std::string lean_namespace = "LibcMath.Extracted";
-  std::string core_import = "LibcMath.Core";
+  std::string lean_namespace = "LibcMath";
+  std::string core_import = "LibcMath.Libc";
   bool emit_float_comments = false; // Append /- 0.5 -/ next to hex float literals.
-  bool emit_kernel_bundle = true;   // Emit `config`, `kernelMeta`, and `kernel : Core.UnaryKernel`.
+  bool emit_kernel_bundle = true;   // Emit `config`, `kernelMeta`, and `kernel : Libc.UnaryKernel`.
 };
 
-/// Emit clean, statically-typed Lean 4 code referencing `LibcMath.Core` and `LibcMath.Core.DSL`.
+/// Emit clean, statically-typed Lean 4 code referencing `LibcMath.Libc` and `LibcMath.Libc.DSL`.
 auto emitLean(const ir::Module &mod, const EmitOptions &opts) -> std::string;
 
 /// Emit a compact human-readable dump of the lifted High-Level Math IR (`--emit-ir`).
@@ -92,26 +92,26 @@ auto emitType(const TypePtr &ty) -> std::string {
           [](const BoolType &) { return std::string("Bool"); },
           [](const IntType &i) { return std::format("BitVec {}", i.width); },
           [](const FloatType &f) { return std::format("Model {}", floatFmtLean(f.fmt)); },
-          [](const FPBitsType &f) { return std::format("Core.FPBits {}", floatFmtLean(f.fmt)); },
-          [](const DyadicFloatType &d) { return std::format("Core.DyadicFloat {}", d.bits); },
+          [](const FPBitsType &f) { return std::format("Libc.FPBits {}", floatFmtLean(f.fmt)); },
+          [](const DyadicFloatType &d) { return std::format("Libc.DyadicFloat {}", d.bits); },
           [](const NumberPairType &np) {
             if (np.fmt == FloatFmt::Binary32)
-              return std::string("Core.FloatFloat");
+              return std::string("Libc.FloatFloat");
             if (np.fmt == FloatFmt::Binary64)
-              return std::string("Core.DoubleDouble");
-            return std::format("Core.NumberPair (Model {})", floatFmtLean(np.fmt));
+              return std::string("Libc.DoubleDouble");
+            return std::format("Libc.NumberPair (Model {})", floatFmtLean(np.fmt));
           },
-          [](const TripleDoubleType &) { return std::string("Core.TripleDouble"); },
-          [](const Frac64Type &) { return std::string("Core.Frac64"); },
+          [](const TripleDoubleType &) { return std::string("Libc.TripleDouble"); },
+          [](const Frac64Type &) { return std::string("Libc.Frac64"); },
           [](const ExceptValuesType &e) {
-            return std::format("Core.ExceptValues {}", floatFmtLean(e.fmt));
+            return std::format("Libc.ExceptValues {}", floatFmtLean(e.fmt));
           },
-          [](const SignType &) { return std::string("Core.Sign"); },
+          [](const SignType &) { return std::string("Libc.Sign"); },
           [](const OptionalType &o) { return std::format("Option {}", emitTypeArg(o.elem)); },
           [](const ArrayType &a) { return std::format("Array {}", emitTypeArg(a.elem)); },
           [](const StructType &s) { return s.name; },
           [](const PtrType &p) { return emitType(p.pointee); },
-          [](const OpaqueType &o) { return std::format("Core.Opaque /- {} -/", o.cpp_name); },
+          [](const OpaqueType &o) { return std::format("Libc.Opaque /- {} -/", o.cpp_name); },
       },
       ty->v);
 }
@@ -121,7 +121,7 @@ auto emitConst(const ConstVal &cv, bool float_comments, int ind = 0) -> std::str
       Overloaded{
           [](const BoolConst &b) { return std::string(b.value ? "true" : "false"); },
           [](const SignConst &s) {
-            return std::string(s.is_neg ? "Core.Sign.neg" : "Core.Sign.pos");
+            return std::string(s.is_neg ? "Libc.Sign.neg" : "Libc.Sign.pos");
           },
           [](const IntConst &i) { return std::format("0x{}#{}", i.hex_bits, i.width); },
           [float_comments](const FloatConst &f) {
@@ -137,14 +137,14 @@ auto emitConst(const ConstVal &cv, bool float_comments, int ind = 0) -> std::str
           [](const Frac64Const &fc) { return std::format("frac64(0x{}#64)", fc.hex_bits); },
           [](const DyadicConst &d) {
             return std::format("{{ sign := {}, exponent := {}, mantissa := 0x{}#{} }}",
-                               d.sign_neg ? "Core.Sign.neg" : "Core.Sign.pos", d.exponent,
+                               d.sign_neg ? "Libc.Sign.neg" : "Libc.Sign.pos", d.exponent,
                                d.mantissa_hex, d.bits);
           },
           [](const NumberPairConst &np) {
             auto bits = floatFmtBits(np.fmt);
             auto hex_w = bits / 4;
             auto tag = floatFmtShort(np.fmt);
-            auto ty = (np.fmt == FloatFmt::Binary32) ? "Core.FloatFloat" : "Core.DoubleDouble";
+            auto ty = (np.fmt == FloatFmt::Binary32) ? "Libc.FloatFloat" : "Libc.DoubleDouble";
             return std::format("({{ lo := {}(0x{:0{}X}#{}), hi := {}(0x{:0{}X}#{}) }} : {})", tag,
                                np.lo_bits, hex_w, bits, tag, np.hi_bits, hex_w, bits, ty);
           },
@@ -229,12 +229,12 @@ public:
     std::string out;
     out += std::format("import {}\n\n", opts_.core_import);
     out += std::format("/-! Generated by `{}`.\n", mod.origin);
-    out += "High-level lifted Lean model referencing `LibcMath.Core`. Do not edit. -/\n\n";
+    out += "High-level lifted Lean model referencing `LibcMath.Libc`. Do not edit. -/\n\n";
     out += std::format("namespace {}\n\n", opts_.lean_namespace);
     out += "open FloatLib.Floats.Formats.BinaryInterchange\n";
     out += "open Model (IEEERoundingMode)\n";
     out += "open LibcMath\n";
-    out += "open LibcMath.Core.DSL\n\n";
+    out += "open LibcMath.Libc.DSL\n\n";
 
     // Emit active LLVM libc MathConfig snapshot captured from Clang's preprocessor.
     out += emitMathConfigDef(mod.config);
@@ -265,7 +265,7 @@ private:
   auto emitMathConfigDef(const MathConfig &cfg) -> std::string {
     return std::format(
         R"(/-- Active LLVM libc `LIBC_MATH_*` and target CPU configuration captured by `ast2lean`. -/
-def config : Core.MathConfig :=
+def config : Libc.MathConfig :=
   {{ skipAccuratePass := {}
     smallTables := {}
     noErrno := {}
@@ -301,7 +301,7 @@ def config : Core.MathConfig :=
 
     std::string out = std::format(
         R"(/-- Machine-readable provenance and configuration metadata for `{}`. -/
-def kernelMeta : Core.KernelMeta :=
+def kernelMeta : Libc.KernelMeta :=
   {{ name := "{}"
     cppFunction := "{}"
     mangledName := "{}"
@@ -327,7 +327,7 @@ def kernelMeta : Core.KernelMeta :=
                                     : std::format("fun _ x => {} x", main_fn.lean_name);
         out += std::format(
             R"(/-- Extracted unary kernel bundle carrying metadata and executable implementation. -/
-def kernel : Core.UnaryKernel {} :=
+def kernel : Libc.UnaryKernel {} :=
   {{ info := kernelMeta
     eval := {} }}
 
@@ -343,12 +343,12 @@ def kernel : Core.UnaryKernel {} :=
       if (in_fmt == out_fmt) {
         std::string eval_expr =
             main_fn.uses_rounding_mode
-                ? std::format("fun mode x => {} mode x (Core.quickGetRound mode)",
+                ? std::format("fun mode x => {} mode x (Libc.quickGetRound mode)",
                               main_fn.lean_name)
-                : std::format("fun mode x => {} x (Core.quickGetRound mode)", main_fn.lean_name);
+                : std::format("fun mode x => {} x (Libc.quickGetRound mode)", main_fn.lean_name);
         out += std::format(
             R"(/-- Extracted unary kernel bundle adapting static `FE_*` rounding to `IEEERoundingMode`. -/
-def kernel : Core.UnaryKernel {} :=
+def kernel : Libc.UnaryKernel {} :=
   {{ info := kernelMeta
     eval := {} }}
 
@@ -424,7 +424,7 @@ def kernel : Core.UnaryKernel {} :=
   }
 
   /// Whether a binary operation can be undefined in C++, in which case it is emitted as a
-  /// checked operation of `LibcMath.Core` that returns `Option`.
+  /// checked operation of `LibcMath.Libc` that returns `Option`.
   static auto isPartialBinary(const BinaryExpr &b, const TypePtr &res_ty) -> bool {
     bool is_float = (b.lhs && b.lhs->type && b.lhs->type->isFloat()) ||
                     (b.rhs && b.rhs->type && b.rhs->type->isFloat());
@@ -542,10 +542,10 @@ def kernel : Core.UnaryKernel {} :=
               switch (u.op) {
               case UnaryOp::Neg:
                 if (e->type && e->type->isFloat()) {
-                  return std::format("Core.fneg {}", emitArg(u.operand));
+                  return std::format("Libc.fneg {}", emitArg(u.operand));
                 }
                 if (isSignedInt(e->type))
-                  return std::format("(← Core.sneg? {})", emitArg(u.operand));
+                  return std::format("(← Libc.sneg? {})", emitArg(u.operand));
                 return std::format("-{}", emitArg(u.operand));
               case UnaryOp::BitNot:
                 return std::format("~~~{}", emitArg(u.operand));
@@ -592,7 +592,7 @@ def kernel : Core.UnaryKernel {} :=
                                  leanIdent(su.field), emitInlineExpr(su.value));
             },
             [&](const CoreCallExpr &cc) {
-              // Use clean Core.DSL syntax for multiply_add / multiply_sub / sub_multiply.
+              // Use clean Libc.DSL syntax for multiply_add / multiply_sub / sub_multiply.
               if (cc.op == CoreOpKind::MultiplyAdd && cc.args.size() == 3) {
                 return std::format("madd[config, {}]({}, {}, {})", currentModeArg(),
                                    emitInlineExpr(cc.args[0]), emitInlineExpr(cc.args[1]),
@@ -609,13 +609,13 @@ def kernel : Core.UnaryKernel {} :=
                                    emitInlineExpr(cc.args[2]));
               }
               if (cc.op == CoreOpKind::BitCast && cc.args.size() == 1) {
-                return std::format("(Core.bitCast {} : {})", emitArg(cc.args[0]),
+                return std::format("(Libc.bitCast {} : {})", emitArg(cc.args[0]),
                                    emitType(e->type));
               }
               if (cc.op == CoreOpKind::FPBitsOfBits && cc.args.size() == 1) {
                 if (e->type) {
                   if (const auto *ft = std::get_if<FPBitsType>(&e->type->v)) {
-                    return std::format("Core.FPBits.ofBits (fmt := {}) {}", floatFmtLean(ft->fmt),
+                    return std::format("Libc.FPBits.ofBits (fmt := {}) {}", floatFmtLean(ft->fmt),
                                        emitArg(cc.args[0]));
                   }
                 }
@@ -647,12 +647,12 @@ def kernel : Core.UnaryKernel {} :=
                 std::vector<std::string> cs;
                 for (const auto &c : pe.coeffs)
                   cs.push_back(emitInlineExpr(c));
-                return std::format("Core.estrinList config {} {} [{}]", m, emitArg(pe.var),
+                return std::format("Libc.estrinList config {} {} [{}]", m, emitArg(pe.var),
                                    joinWith(cs, ", "));
               }
               if (pe.array_arg && pe.coeffs.size() == 1) {
                 auto fn_name =
-                    (pe.scheme == PolyScheme::AltHorner) ? "Core.altpolyeval" : "Core.polyeval";
+                    (pe.scheme == PolyScheme::AltHorner) ? "Libc.altpolyeval" : "Libc.polyeval";
                 return std::format("{} config {} {} {} {}", fn_name, m, emitArg(pe.var),
                                    emitArg(pe.coeffs[0]), pe.offset);
               }
@@ -682,7 +682,7 @@ def kernel : Core.UnaryKernel {} :=
             },
             [&](const CallJoinExpr &cj) { return std::format("{} ()", leanIdent(cj.name)); },
             [&](const UnsupportedExpr &u) {
-              return std::format("(Core.unsupported \"{}\")", u.reason);
+              return std::format("(Libc.unsupported \"{}\")", u.reason);
             },
             [&](const auto &) { return std::format("(← do\n{})", emitExprBlock(e, 2)); },
         },
@@ -696,25 +696,25 @@ def kernel : Core.UnaryKernel {} :=
       auto m = currentModeArg();
       switch (b.op) {
       case BinaryOp::Add:
-        return std::format("Core.fadd {} {} {}", m, emitArg(b.lhs), emitArg(b.rhs));
+        return std::format("Libc.fadd {} {} {}", m, emitArg(b.lhs), emitArg(b.rhs));
       case BinaryOp::Sub:
-        return std::format("Core.fsub {} {} {}", m, emitArg(b.lhs), emitArg(b.rhs));
+        return std::format("Libc.fsub {} {} {}", m, emitArg(b.lhs), emitArg(b.rhs));
       case BinaryOp::Mul:
-        return std::format("Core.fmul {} {} {}", m, emitArg(b.lhs), emitArg(b.rhs));
+        return std::format("Libc.fmul {} {} {}", m, emitArg(b.lhs), emitArg(b.rhs));
       case BinaryOp::Div:
-        return std::format("Core.fdiv {} {} {}", m, emitArg(b.lhs), emitArg(b.rhs));
+        return std::format("Libc.fdiv {} {} {}", m, emitArg(b.lhs), emitArg(b.rhs));
       case BinaryOp::Eq:
-        return std::format("Core.feq {} {}", emitArg(b.lhs), emitArg(b.rhs));
+        return std::format("Libc.feq {} {}", emitArg(b.lhs), emitArg(b.rhs));
       case BinaryOp::Ne:
-        return std::format("Core.fne {} {}", emitArg(b.lhs), emitArg(b.rhs));
+        return std::format("Libc.fne {} {}", emitArg(b.lhs), emitArg(b.rhs));
       case BinaryOp::Lt:
-        return std::format("Core.flt {} {}", emitArg(b.lhs), emitArg(b.rhs));
+        return std::format("Libc.flt {} {}", emitArg(b.lhs), emitArg(b.rhs));
       case BinaryOp::Le:
-        return std::format("Core.fle {} {}", emitArg(b.lhs), emitArg(b.rhs));
+        return std::format("Libc.fle {} {}", emitArg(b.lhs), emitArg(b.rhs));
       case BinaryOp::Gt:
-        return std::format("Core.fgt {} {}", emitArg(b.lhs), emitArg(b.rhs));
+        return std::format("Libc.fgt {} {}", emitArg(b.lhs), emitArg(b.rhs));
       case BinaryOp::Ge:
-        return std::format("Core.fge {} {}", emitArg(b.lhs), emitArg(b.rhs));
+        return std::format("Libc.fge {} {}", emitArg(b.lhs), emitArg(b.rhs));
       default:
         break;
       }
@@ -731,7 +731,7 @@ def kernel : Core.UnaryKernel {} :=
         if (const auto *it = std::get_if<IntType>(&b.lhs->type->v))
           width = it->width;
       }
-      return std::format("(← Core.shiftAmount? {} {})", width, amount);
+      return std::format("(← Libc.shiftAmount? {} {})", width, amount);
     };
     if (b.op == BinaryOp::Shl) {
       return std::format("{} <<< {}", emitArg(b.lhs), shift_amount());
@@ -758,9 +758,9 @@ def kernel : Core.UnaryKernel {} :=
           case BinaryOp::Ge:
             return std::format("BitVec.sle {} {}", emitArg(b.rhs), emitArg(b.lhs));
           case BinaryOp::Div:
-            return std::format("(← Core.sdiv? {} {})", emitArg(b.lhs), emitArg(b.rhs));
+            return std::format("(← Libc.sdiv? {} {})", emitArg(b.lhs), emitArg(b.rhs));
           case BinaryOp::Rem:
-            return std::format("(← Core.srem? {} {})", emitArg(b.lhs), emitArg(b.rhs));
+            return std::format("(← Libc.srem? {} {})", emitArg(b.lhs), emitArg(b.rhs));
           default:
             break;
           }
@@ -786,19 +786,19 @@ def kernel : Core.UnaryKernel {} :=
       std::string_view checked;
       switch (b.op) {
       case BinaryOp::Add:
-        checked = "Core.sadd?";
+        checked = "Libc.sadd?";
         break;
       case BinaryOp::Sub:
-        checked = "Core.ssub?";
+        checked = "Libc.ssub?";
         break;
       case BinaryOp::Mul:
-        checked = "Core.smul?";
+        checked = "Libc.smul?";
         break;
       case BinaryOp::Div:
-        checked = is_signed ? "Core.sdiv?" : "Core.udiv?";
+        checked = is_signed ? "Libc.sdiv?" : "Libc.udiv?";
         break;
       case BinaryOp::Rem:
-        checked = is_signed ? "Core.srem?" : "Core.urem?";
+        checked = is_signed ? "Libc.srem?" : "Libc.urem?";
         break;
       default:
         break;
@@ -882,13 +882,13 @@ def kernel : Core.UnaryKernel {} :=
       return emitInlineExpr(c.operand);
     case CastKind::FloatToFloat:
       if (const auto *ft = std::get_if<FloatType>(&dst_ty->v)) {
-        return std::format("Core.fpCast {} {} {}", floatFmtLean(ft->fmt), currentModeArg(),
+        return std::format("Libc.fpCast {} {} {}", floatFmtLean(ft->fmt), currentModeArg(),
                            emitArg(c.operand));
       }
       break;
     case CastKind::FloatToInt:
       if (const auto *it = std::get_if<IntType>(&dst_ty->v)) {
-        return std::format("(← {} {} {})", it->is_signed ? "Core.fptosi?" : "Core.fptoui?",
+        return std::format("(← {} {} {})", it->is_signed ? "Libc.fptosi?" : "Libc.fptoui?",
                            it->width, emitArg(c.operand));
       }
       break;
@@ -897,7 +897,7 @@ def kernel : Core.UnaryKernel {} :=
         bool src_signed = c.operand && c.operand->type &&
                           std::holds_alternative<IntType>(c.operand->type->v) &&
                           std::get<IntType>(c.operand->type->v).is_signed;
-        return std::format("{} {} {} {}", src_signed ? "Core.sitofp" : "Core.uitofp",
+        return std::format("{} {} {} {}", src_signed ? "Libc.sitofp" : "Libc.uitofp",
                            floatFmtLean(ft->fmt), currentModeArg(), emitArg(c.operand));
       }
       break;
@@ -920,7 +920,7 @@ def kernel : Core.UnaryKernel {} :=
       }
       break;
     case CastKind::BitCast:
-      return std::format("(Core.bitCast {} : {})", emitArg(c.operand), emitType(dst_ty));
+      return std::format("(Libc.bitCast {} : {})", emitArg(c.operand), emitType(dst_ty));
     case CastKind::ToBool:
       return std::format("({} != 0)", emitInlineExpr(c.operand));
     case CastKind::BoolToInt:

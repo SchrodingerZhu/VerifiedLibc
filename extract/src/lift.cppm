@@ -661,7 +661,7 @@ auto simplifyExpr(ExprPtr e, const LiftOptions &opts) -> ExprPtr {
     }
   }
 
-  // Rewrite `Core.FPBits.getVal (Core.FPBits.ofVal x)` -> `x`.
+  // Rewrite `Libc.FPBits.getVal (Libc.FPBits.ofVal x)` -> `x`.
   if (auto *cc = std::get_if<CoreCallExpr>(&e->v);
       cc && cc->op == CoreOpKind::FPBitsGetVal && cc->args.size() == 1) {
     if (auto *inner = std::get_if<CoreCallExpr>(&cc->args[0]->v);

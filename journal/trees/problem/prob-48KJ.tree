@@ -6,12 +6,12 @@
 \tag{exp}
 \tag{error-bound}
 \tag{scaling}
-\meta{status}{open}
+\meta{status}{closed}
 \meta{created}{2026-11-23}
 \meta{updated}{2026-11-24}
 \import{base-macros}
 
-\p{\strong{Status:} open.}
+\p{\strong{Status:} closed. Completed in [log-I6C0](log-I6C0) (session [ses-ZW59](ses-ZW59)): \code{\verb~|expf_correctlyRounded~} in \code{\verb~|LibcMath/Expf.lean~} is proved with zero \code{\verb~|sorry~} and only the three standard Lean axioms, using numerical error analysis (\code{\verb~|≤ 2 · 10⁻¹⁵ · exp x~}), analytic closure on tiny and near-underflow ranges, 103 pointwise exceptions, and 278 619 always-odd Chebyshev-L1 SLZ TMD certificates verified in Lean's kernel ([ins-NHOJ](ins-NHOJ)).}
 \p{The exhaustive computation examines 545 386 931 inputs in each of four rounding directions, and no such computation is possible for a format with \code{\verb~|2⁶⁴~} inputs. The maintainer asked on 2026-11-23 for a proof mechanism that scales further, or that at least reduces the range that has to be examined. The plan is to prove what the designers of the code rely on: the value computed in binary64 is within a small relative error \code{\verb~|ε~} of the exponential, so that the one conversion to binary32 gives the correctly rounded result whenever the exponential is not within \code{\verb~|ε~} of a rounding boundary.}
 \ol{
 \li{\strong{Done.} The polynomial against the exponential, as real functions: [log-7DAL](log-7DAL), at most \code{\verb~|10⁻¹⁵~}.}

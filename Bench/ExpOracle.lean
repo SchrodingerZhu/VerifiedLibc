@@ -1,4 +1,4 @@
-import LibcMath.Oracle.Exp
+import LibcMath.Testing.Oracle.Exp
 
 /-!
 # Timing of `expOracle` on binary32
