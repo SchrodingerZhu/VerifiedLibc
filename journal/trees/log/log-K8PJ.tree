@@ -1,0 +1,20 @@
+\title{Extract \code{\verb~|expf~} across six upstream LLVM libc evaluation plans}
+\taxon{Change}
+\date{2026-11-24}
+\author{antigravity}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{expf}
+\tag{extract}
+\import{base-macros}
+
+\p{Extracts six upstream LLVM libc \code{\verb~|binary32~} \code{\verb~|expf~} evaluation plans (commit \code{\verb~|e1a5f92db023~}) into \code{\verb~|LibcMath/Extracted/Expf/~} using \code{\verb~|ast2lean~} and adds a one-command regeneration script (\code{\verb~|extract/extract-expf-plans.sh~}):}
+\ul{
+\li{\code{\verb~|DoubleEval~}: default x86-64 double-precision table+Horner plan (all 4 IEEE rounding modes, correctly rounded, software \code{\verb~|nearestInt~} and unfused multiply-sub).}
+\li{\code{\verb~|DoubleEvalFma~}: \code{\verb~|double_eval~} compiled with \code{\verb~|-mavx2 -mfma~} (hardware FMA and \code{\verb~|roundss~}/\code{\verb~|nearestInt~}).}
+\li{\code{\verb~|IntegerEval~}: pure integer \code{\verb~|Frac64~} plan (\code{\verb~|LIBC_MATH_EXPF_IMPL=integer_eval~}, \code{\verb~|LIBC_MATH=0x2C~}, RN-only, correctly rounded).}
+\li{\code{\verb~|StaticRounding~}: four-mode pure integer \code{\verb~|Frac64~} plan (\code{\verb~|math::static_rounding::expf~}, \code{\verb~|LIBC_MATH=0x0C~}, adapted to \code{\verb~|IEEERoundingMode~} via \code{\verb~|Core.quickGetRound~}).}
+\li{\code{\verb~|FloatEval~}: fast single-precision Estrin+Horner plan (\code{\verb~|LIBC_MATH_EXPF_IMPL=float_eval~}, \code{\verb~|LIBC_MATH=0x3F~}, RN-only, ~1 ULP).}
+\li{\code{\verb~|FloatEvalCrRn~}: GPU-oriented \code{\verb~|FloatFloat~} FMA plan (\code{\verb~|LIBC_MATH_EXPF_IMPL=float_eval_cr_rn~}, \code{\verb~|LIBC_MATH=0x3E~}, RN-only, correctly rounded).}
+}
+\p{Adds \code{\verb~|LibcMath/Extracted/Expf/Plans.lean~} and \code{\verb~|LibcMath/Extracted/Expf/Examples.lean~} with kernel-checked (\code{\verb~|decide +kernel~}) cross-plan agreement proofs across all five correctly-rounded plans in RN (including the hard-to-round point \code{\verb~|0xC236BD8C~} and a 64-input slice around \code{\verb~|1.0~}), four-mode agreement across \code{\verb~|DoubleEval~}/\code{\verb~|DoubleEvalFma~}/\code{\verb~|StaticRounding~}, and \code{\verb~|#guard_msgs~} diagnostic examples demonstrating \code{\verb~|Core.Diag.inspectKernel~} and \code{\verb~|Core.Diag.compareKernels~} (including pinpointing the 1-ULP difference of fast \code{\verb~|FloatEval~} at \code{\verb~|1.0~}).}
