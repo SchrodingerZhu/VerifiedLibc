@@ -1,5 +1,5 @@
 import LibcMath.Exhaustive.Modes
-import LibcMath.Extracted.Statements
+import LibcMath.Extracted.Expf.Statements
 
 /-!
 # The reduction for `expf`
