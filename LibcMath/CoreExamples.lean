@@ -88,6 +88,13 @@ example (cfg : MathConfig) (h : cfg.hasFmaFloat = false) (mode : IEEERoundingMod
 example (x : Model .binary32) : FPBits.getVal (FPBits.ofVal x) = x := by
   grind
 
+/-- Concrete width resolution via `FmtBitWidth` allows direct `BitVec 32` ops and `bitCast`. -/
+example : ((FPBits.uintval (FPBits.ofVal f32(0xBF800000#32))) &&& 0x7FFFFFFF#32) = 0x3F800000#32 := by
+  decide +kernel
+
+example : (Core.bitCast (Core.bitCast f32(0x3F800000#32) : BitVec 32) : Model .binary32) = f32(0x3F800000#32) := by
+  decide +kernel
+
 /-! ### Agent-friendly diagnostics -/
 
 /--

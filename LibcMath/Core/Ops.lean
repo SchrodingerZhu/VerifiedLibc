@@ -57,6 +57,18 @@ namespace Sign
 
 end Sign
 
+/-- Resolves standard IEEE `FloatFormat` bit widths to concrete numerals (`16`, `32`, `64`, `128`)
+at reducible transparency so `BitVec` operators (`&&&`, `+`, `Core.bitCast`) synthesize directly
+without explicit width casts. -/
+class FmtBitWidth (fmt : FloatFormat) (w : outParam Nat) where
+  eq : fmt.bitWidth = w
+
+instance : FmtBitWidth .binary16 16 := ⟨rfl⟩
+instance : FmtBitWidth .binary32 32 := ⟨rfl⟩
+instance : FmtBitWidth .binary64 64 := ⟨rfl⟩
+instance : FmtBitWidth .binary128 128 := ⟨rfl⟩
+instance (priority := low) {fmt : FloatFormat} : FmtBitWidth fmt fmt.bitWidth := ⟨rfl⟩
+
 /-! ## `fputil::FPBits<T>`
 
 `FPBits fmt` is a transparent alias for FloatLib's `Model fmt`, avoiding any wrapper overhead
@@ -69,9 +81,11 @@ namespace FPBits
 variable {fmt : FloatFormat}
 
 @[inline, simp, grind] def ofVal (x : Model fmt) : FPBits fmt := x
-@[inline, simp, grind] def ofBits (b : BitVec fmt.bitWidth) : FPBits fmt := Model.ofBits b
+@[inline, simp, grind] def ofBits {w : Nat} [h : FmtBitWidth fmt w] (b : BitVec w) : FPBits fmt :=
+  Model.ofBits (BitVec.cast h.eq.symm b)
 @[inline, simp, grind] def getVal (x : FPBits fmt) : Model fmt := x
-@[inline, simp, grind] def uintval (x : FPBits fmt) : BitVec fmt.bitWidth := x.toBits
+@[inline, simp, grind] def uintval {w : Nat} [h : FmtBitWidth fmt w] (x : FPBits fmt) : BitVec w :=
+  BitVec.cast h.eq x.toBits
 
 @[inline, simp, grind] def isNeg (x : FPBits fmt) : Bool := x.signBit
 @[inline, simp, grind] def isPos (x : FPBits fmt) : Bool := !x.signBit
@@ -93,9 +107,9 @@ variable {fmt : FloatFormat}
 @[inline, simp, grind] def biasedExp (x : FPBits fmt) : BitVec 16 :=
   BitVec.ofNat 16 x.expField
 
-/-- Fraction / mantissa bits as `BitVec fmt.bitWidth`, matching `FPBits<T>::get_mantissa()`. -/
-@[inline, simp, grind] def mantissa (x : FPBits fmt) : BitVec fmt.bitWidth :=
-  BitVec.ofNat fmt.bitWidth x.fracField
+/-- Fraction / mantissa bits as `BitVec w`, matching `FPBits<T>::get_mantissa()`. -/
+@[inline, simp, grind] def mantissa {w : Nat} [FmtBitWidth fmt w] (x : FPBits fmt) : BitVec w :=
+  BitVec.ofNat w x.fracField
 
 /-- Explicit unbiased exponent (`int`), matching `FPBits<T>::get_explicit_exponent()`. -/
 @[inline] def explicitExponent (x : FPBits fmt) : BitVec 32 :=
@@ -184,20 +198,24 @@ class BitCast (α : Type) (β : Type) where
 
 export BitCast (bitCast)
 
-instance {fmt : FloatFormat} : BitCast (BitVec fmt.bitWidth) (Model fmt) where
-  bitCast := Model.ofBits
+instance {fmt : FloatFormat} {w : Nat} [h : FmtBitWidth fmt w] :
+    BitCast (BitVec w) (Model fmt) where
+  bitCast b := Model.ofBits (BitVec.cast h.eq.symm b)
 
-instance {fmt : FloatFormat} : BitCast (Model fmt) (BitVec fmt.bitWidth) where
-  bitCast := Model.toBits
+instance {fmt : FloatFormat} {w : Nat} [h : FmtBitWidth fmt w] :
+    BitCast (Model fmt) (BitVec w) where
+  bitCast x := BitVec.cast h.eq x.toBits
 
 instance {w : Nat} : BitCast (BitVec w) (BitVec w) where
   bitCast := id
 
-@[simp, grind =] theorem bitCast_bits_to_model {fmt : FloatFormat} (b : BitVec fmt.bitWidth) :
-    (bitCast b : Model fmt) = Model.ofBits b := rfl
+@[simp, grind =] theorem bitCast_bits_to_model {fmt : FloatFormat} {w : Nat}
+    [h : FmtBitWidth fmt w] (b : BitVec w) :
+    (bitCast b : Model fmt) = Model.ofBits (BitVec.cast h.eq.symm b) := rfl
 
-@[simp, grind =] theorem bitCast_model_to_bits {fmt : FloatFormat} (x : Model fmt) :
-    (bitCast x : BitVec fmt.bitWidth) = x.toBits := rfl
+@[simp, grind =] theorem bitCast_model_to_bits {fmt : FloatFormat} {w : Nat}
+    [h : FmtBitWidth fmt w] (x : Model fmt) :
+    (bitCast x : BitVec w) = BitVec.cast h.eq x.toBits := rfl
 
 /-- Signed float-to-integer truncation (`static_cast<intN_t>(x)`).
 Returns `0` on out-of-range / NaN / infinity (total completion for well-defined math paths). -/
