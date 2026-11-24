@@ -1,25 +1,23 @@
 import LibcMath.Exhaustive.Run.Block
 import LibcMath.Exhaustive.Run.Target
-import LibcMath.Extracted.ExpfStructured
 
 /-!
 # `checkrange`: compiled evaluation of `checkRange`
 
-    checkrange [--structured] <mode> <first> <count> [<block>]
+    checkrange [--plan=<name>] <mode> <first> <count> [<block>]
 
-evaluates `checkRange Run.oracle Run.run mode b block` (through `checkBlock`) for the consecutive
-blocks `b = first, first + block, …` that cover `count` bit patterns (one block when `block` is
-omitted), and prints one tab-separated line per block:
+evaluates `checkRange Run.oracle impl mode b block` (through `checkBlock`) for the consecutive
+blocks `b = first, first + block, …` covering `count` bit patterns, printing one tab-separated
+line per block on stdout:
 
     <mode> <first> <count> <ok|fail> <milliseconds>
 
-`mode` is `nearest`, `towardZero`, `up` or `down`. The exit status is 0 when every block is `ok`.
-With `--structured` the blocks are checked on `Extracted.expfStructured` instead of the
-interpreter (`Extracted.checkBlockMain`); this is meant for blocks inside the two ranges on which
-`expf` evaluates its polynomial.
-
-A line `ok` is the compiled program's answer and proves nothing by itself. It tells which
-certificates are worth generating (see `scripts/exhaustive.py`) and what they will cost.
+* `--plan=<name>` selects the extracted `expf` evaluation plan (`double_eval` [default],
+  `double_eval_fma`, `integer_eval`, `static_rounding`, `float_eval`, `float_eval_cr_rn`).
+* `mode` is `nearest`, `towardZero`, `up`, or `down`.
+* On any failing block, prints a detailed diagnostic of the first failing bit pattern (hex bits,
+  float classification, exact rational value, and kernel output) via `Core.Diag.diagnoseBlock` to
+  stderr so failures are immediately actionable without changing the stdout manifest format.
 -/
 
 open LibcMath LibcMath.Exhaustive
@@ -33,14 +31,26 @@ def parseMode : String → Option IEEERoundingMode
   | _ => none
 
 def usage : String :=
-  "usage: checkrange [--structured] <nearest|towardZero|up|down> <first> <count> [<block>]"
+  "usage: checkrange [--plan=double_eval|double_eval_fma|integer_eval|static_rounding|float_eval|float_eval_cr_rn] <nearest|towardZero|up|down> <first> <count> [<block>]"
+
+def parsePlanFlag (args : List String) : Option (String × Core.UnaryKernel .binary32 × List String) :=
+  match args with
+  | flag :: rest =>
+      if flag.startsWith "--plan=" then
+        let name := (flag.drop 7).toString
+        match Run.planByName? name with
+        | some k => some (name, k, rest)
+        | none => none
+      else
+        some ("double_eval", Extracted.Expf.DoubleEval.kernel, args)
+  | [] => none
 
 def main (args : List String) : IO UInt32 := do
-  let (run, args) := match args with
-    | "--structured" :: rest => (Extracted.expfStructured, rest)
-    | _ => (Run.run, args)
+  let some (planName, kernel, restArgs) := parsePlanFlag args
+    | IO.eprintln usage
+      return 2
   let parsed : Option (String × IEEERoundingMode × Nat × Nat × Nat) := do
-    let name :: first :: count :: rest := args | none
+    let name :: first :: count :: rest := restArgs | none
     let mode ← parseMode name
     let first ← first.toNat?
     let count ← count.toNat?
@@ -58,8 +68,10 @@ def main (args : List String) : IO UInt32 := do
   while start < first + count do
     let size := min block (first + count - start)
     let t0 ← IO.monoMsNow
-    let ok := checkBlock Run.oracle.check run mode start size
+    let ok := checkBlock Run.oracle.check kernel.eval mode start size
     let t1 ← IO.monoMsNow
+    if !ok then
+      IO.eprintln (Core.Diag.diagnoseBlock Run.oracle.check kernel.eval mode start size s!"expf/{planName}")
     allOk := allOk && ok
     stdout.putStrLn s!"{name}\t{start}\t{size}\t{if ok then "ok" else "fail"}\t{t1 - t0}"
     stdout.flush

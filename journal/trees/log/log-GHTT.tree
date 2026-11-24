@@ -1,0 +1,17 @@
+\title{Remove legacy IR/interpreter/structured bridge and rework \code{\verb~|expf~} proofs onto direct kernels}
+\taxon{Change}
+\date{2026-11-24}
+\author{antigravity}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{expf}
+\tag{proof}
+\import{base-macros}
+
+\p{Removes the legacy LLVM-IR DSL, CFG interpreter, and relational structured-form bridge (\code{\verb~|LibcMath/IR/*~}, \code{\verb~|LibcMath/Exhaustive/ExpfInterp.lean~}, \code{\verb~|LibcMath/Extracted/ExpfStructured*.lean~}, legacy IR stubs \code{\verb~|Expf.lean~}/\code{\verb~|Cospif.lean~}/\code{\verb~|Sinpif.lean~}, and \code{\verb~|scripts/survey-extraction.py~}) and reworks the proof infrastructure, runners, and differential tests directly onto AST-extracted \code{\verb~|LibcMath.Core~} kernels (completing the transition of [dec-03IY](dec-03IY)).}
+\ul{
+\li{Simplifies \code{\verb~|SpecLemmas.lean~}, \code{\verb~|Exhaustive/Interface.lean~}, \code{\verb~|Exhaustive/Reduction.lean~}, \code{\verb~|Exhaustive/Modes.lean~}, \code{\verb~|Exhaustive/Expf.lean~}, and \code{\verb~|Exhaustive/Run/Block.lean~} to work directly on total implementations \code{\verb~|IEEERoundingMode -> Model fmt -> Model fmt~}, merging \code{\verb~|checkBlock~} onto \code{\verb~|checkBits~} and removing \code{\verb~|IR.Func.IsComputedBy~} and \code{\verb~|RunsCorrectlyAt~}.}
+\li{Rewrites \code{\verb~|Extracted/Statements.lean~}, \code{\verb~|Extracted/ExpfPaths/{Exec,Ranges}.lean~}, and \code{\verb~|Extracted/ExpfMain.lean~} directly on \code{\verb~|Expf.DoubleEval.expf~}, \code{\verb~|Expf.DoubleEvalFma.expf~}, \code{\verb~|Expf.StaticRounding.kernel~}, and \code{\verb~|Expf.IntegerEval.kernel~}, eliminating the open \code{\verb~|Block15ComputesExpfMain~} bridge hypothesis and proving \code{\verb~|integerEval_eq_staticRounding_nearest~} across all \code{\verb~|2^32~} inputs. Upstream \code{\verb~|DoubleEval~} tightens the overflow threshold to \code{\verb~|0x42B17218~} (leaving 545 350 603 inputs per mode, 87.30\% discharged analytically); integer \code{\verb~|StaticRounding~} covers \code{\verb~||x| < 2^-25~} analytically (leaving 528 573 389 inputs per mode, 87.69\% discharged).}
+\li{Upgrades \code{\verb~|checkrange~} (\code{\verb~|Exhaustive/Run/Main.lean~}) with \code{\verb~|--plan=<name>~} across all six extracted \code{\verb~|expf~} plans and automatic stderr diagnostics via \code{\verb~|Core.Diag.diagnoseBlock~} on any failing block; kernel checking of \code{\verb~|Kernel/Demo/Nearest3F800000.lean~} (32 inputs under \code{\verb~|decide +kernel~}) drops to 4.56s wall time (3.60s user, including Lean startup), over 70x faster than the old CFG interpreter.}
+\li{Reworks \code{\verb~|test/difftest/ExpfModel.lean~} and \code{\verb~|scripts/difftest-expf.sh~} to support \code{\verb~|--plan=<name>~} without \code{\verb~|MarkCoreOps.so~}; dense differential testing against real compiled Clang C++ LLVM libc across all five C++ plans (\code{\verb~|double_eval~}, \code{\verb~|double_eval_fma~}, \code{\verb~|integer_eval~}, \code{\verb~|float_eval~}, \code{\verb~|float_eval_cr_rn~}; 2.85M total evaluations) reports 0 mismatches.}
+}

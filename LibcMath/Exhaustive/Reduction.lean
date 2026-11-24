@@ -1,64 +1,30 @@
 import LibcMath.Exhaustive.Interface
-import LibcMath.Exhaustive.Range
-import LibcMath.IR.Semantics
 import LibcMath.SpecLemmas
 
 /-!
 # From checks of finitely many blocks to correct rounding
 
-This file turns checks of blocks of consecutive bit patterns into the statement that an extracted
-function is correctly rounded.
+This file turns checks of blocks of consecutive bit patterns into `CorrectlyRounded` for any
+total unary implementation `impl : IEEERoundingMode → Model fmt → Model fmt` (including any
+extracted `Core.UnaryKernel`).
 
 ## The pieces
 
-* `RunsCorrectlyAt S run mode x`: the executable implementation `run` produces on the input `x` a
-  result with the value `S` prescribes. A successful `checkRange` gives this for every input of
-  its block (`RunsCorrectlyAt.of_checkRange`).
-* `IR.Func.IsComputedBy f run`: the hypothesis that `run` is a sound interpreter for the extracted
-  function `f`. Where `run` produces a result, it is the value of every result of `f`, and no
-  execution of `f` goes wrong.
-* `IR.Func.CorrectAt f S mode x`: `f` is correctly rounded on the single input `x`. It is the
-  statement of `IR.Func.CorrectlyRounded` for one rounding direction and one input, and it follows
-  from `RunsCorrectlyAt` when `run` is sound (`IR.Func.IsComputedBy.correctAt`).
-* `IR.Func.correctlyRounded_of_holdsOnBits`: `f` is correctly rounded if, for each rounding
-  direction, `CorrectAt` holds on the range `[0, 2 ^ fmt.bitWidth)` in the sense of
-  `HoldsOnBits`.
-
-## How a proof for a whole format is assembled
-
-For one rounding direction `mode`, the goal is
-`HoldsOnBits (f.CorrectAt S mode) 0 (2 ^ fmt.bitWidth)`. It is obtained from statements
-`HoldsOnBits (f.CorrectAt S mode) lo hi` for smaller ranges with `HoldsOnBits.append`, or
-`HoldsOnBits.of_isChain` for a list of boundaries. Adjacent ranges share a boundary syntactically,
-so no side condition about coverage has to be evaluated. A statement for one range can come from
-
-* a block check: `IR.Func.IsComputedBy.holdsOnBits_of_checkRange` for one block, and
-  `IR.Func.IsComputedBy.holdsOnBits_of_checkBlocks` for consecutive blocks given by a list of
-  boundaries;
-* a description of the prescribed results proved by other means, together with a run of the
-  implementation alone: `IR.Func.IsComputedBy.holdsOnBits_of_checkRangeResult`;
-* any proof of `f.CorrectAt S mode` for the inputs of the range, for instance one that reasons
-  about `f.Returns` and `f.GoesWrong` directly.
-
-## How a block check is established
-
-The hypotheses of the theorems here have the form `checkRange O run mode first count = true`
-(likewise for `checkBlocks` and `checkRangeResult`). This file does not fix how such an equation
-is proved. It is a closed Boolean computation, so the possibilities are evaluation in the kernel
-(`decide +kernel`), which needs `run` and `O.check` to reduce well there and adds nothing to the
-trusted base; `native_decide`, which trusts the compiler and should stay in files that are
-clearly separated from the rest; or a checker outside Lean whose verdicts enter as explicit
-hypotheses. `checkRange_add` splits a block, so the block size can be chosen to suit the method.
+* `CorrectAt S impl mode x`: `impl mode x` has the same IEEE value as `S.eval mode x`. A
+  successful `checkRange` gives this for every input of its block (`CorrectAt.of_checkRange`,
+  `holdsOnBits_of_checkRange`).
+* `correctlyRounded_of_holdsOnBits`: `impl` is correctly rounded if, for each rounding direction,
+  `CorrectAt` holds on `[0, 2 ^ fmt.bitWidth)` in the sense of `HoldsOnBits`.
+* `checkBlocks` / `holdsOnBits_of_checkBlocks`: check consecutive blocks along a list of
+  boundaries.
+* `checkRangeResult` / `holdsOnBits_of_checkRangeResult`: check against a proved closed form
+  without calling an oracle.
 
 ## When a block check fails
 
-Each check is `checkBits` of a test on one input (`checkRange_eq_checkBits`, and the definitions
-of `checkRangeResult` and `checkModesAgree`). If a check evaluates to `false`, evaluate
-`checkRange.firstFailure O.check run mode first count` (or `firstFailingBits` with the test of the
-check at hand): it returns the first bit pattern of the block that fails, and
-`checkRange.firstFailure_eq_none_iff` says it returns `none` exactly when the check passes.
-`LibcMath/Exhaustive/ReductionExamples.lean` shows the whole route on a small block, including a
-failing one.
+`checkRange.firstFailure O.check impl mode first count` returns the first failing bit pattern
+(compilable for `#eval` and CLI diagnostics; see `Core.Diag.diagnoseBlock` for rich formatting),
+and `checkRange.firstFailure_eq_none_iff` proves it returns `none` iff `checkRange` returns `true`.
 -/
 
 namespace LibcMath
@@ -67,81 +33,77 @@ open FloatLib.Floats.Formats.BinaryInterchange
 open Model (IEEERoundingMode)
 
 variable {fmt : FloatFormat} {S : Spec fmt}
-  {run : IEEERoundingMode → Model fmt → Option (Model fmt)}
-  {mode : IEEERoundingMode} {x y : Model fmt} {first count lo hi : ℕ}
+  {impl : IEEERoundingMode → Model fmt → Model fmt}
+  {mode : IEEERoundingMode} {x : Model fmt} {first count lo hi : ℕ}
 
-/-- The implementation `run` produces on the input `x` a result with the value `S` prescribes. -/
-def RunsCorrectlyAt (S : Spec fmt) (run : IEEERoundingMode → Model fmt → Option (Model fmt))
+/-- Under `mode`, the implementation `impl` produces the result `S` prescribes on `x`. -/
+@[grind]
+def CorrectAt (S : Spec fmt) (impl : IEEERoundingMode → Model fmt → Model fmt)
     (mode : IEEERoundingMode) (x : Model fmt) : Prop :=
-  ∃ y, run mode x = some y ∧ SameValue y (S.eval mode x)
+  SameValue (impl mode x) (S.eval mode x)
+
+theorem correctlyRounded_iff_forall_correctAt {modes : Set IEEERoundingMode} :
+    CorrectlyRounded S modes impl ↔ ∀ mode ∈ modes, ∀ x, CorrectAt S impl mode x :=
+  Iff.rfl
 
 /-! ### Blocks checked against an oracle -/
 
-/-- The test `checkRange` applies to one input. It takes the oracle's test as a plain function:
-specifications are noncomputable, so a definition that receives an `Oracle S` cannot be compiled
-at a concrete `S`, while one that receives `O.check` can. -/
+/-- Single-input predicate used by `checkRange`, taking the oracle's test as a plain function so
+diagnostics and native runners can compile at concrete `S`. -/
 def checkRange.test (check : IEEERoundingMode → Model fmt → Model fmt → Bool)
-    (run : IEEERoundingMode → Model fmt → Option (Model fmt))
+    (impl : IEEERoundingMode → Model fmt → Model fmt)
     (mode : IEEERoundingMode) (input : Model fmt) : Bool :=
-  match run mode input with
-  | some result => check mode input result
-  | none => false
+  check mode input (impl mode input)
 
 theorem checkRange_eq_checkBits (O : Oracle S)
-    (run : IEEERoundingMode → Model fmt → Option (Model fmt)) (mode : IEEERoundingMode)
+    (impl : IEEERoundingMode → Model fmt → Model fmt) (mode : IEEERoundingMode)
     (first count : ℕ) :
-    checkRange O run mode first count = checkBits (checkRange.test O.check run mode) first count :=
+    checkRange O impl mode first count = checkBits (checkRange.test O.check impl mode) first count :=
   rfl
 
-/-- The first bit pattern of a block on which `checkRange` fails: either `run` produces no
-result there, or the oracle's test `check` does not accept it. Compilable, so it can be used with
-`#eval` as `checkRange.firstFailure O.check run mode first count`. -/
+/-- First bit pattern of `[first, first + count)` rejected by `check`. Compilable for `#eval`. -/
 def checkRange.firstFailure (check : IEEERoundingMode → Model fmt → Model fmt → Bool)
-    (run : IEEERoundingMode → Model fmt → Option (Model fmt)) (mode : IEEERoundingMode)
+    (impl : IEEERoundingMode → Model fmt → Model fmt) (mode : IEEERoundingMode)
     (first count : ℕ) : Option ℕ :=
-  firstFailingBits (checkRange.test check run mode) first count
+  firstFailingBits (checkRange.test check impl mode) first count
 
 theorem checkRange.firstFailure_eq_none_iff {O : Oracle S} :
-    checkRange.firstFailure O.check run mode first count = none ↔
-      checkRange O run mode first count = true :=
+    checkRange.firstFailure O.check impl mode first count = none ↔
+      checkRange O impl mode first count = true :=
   firstFailingBits_eq_none_iff
 
 @[grind =]
 theorem checkRange_eq_true_iff {O : Oracle S} :
-    checkRange O run mode first count = true ↔
-      ∀ i < count, ∃ y, run mode (.ofNatBits (first + i)) = some y ∧
-        O.check mode (.ofNatBits (first + i)) y = true := by
-  rw [checkRange_eq_checkBits, checkBits_eq_true_iff]
-  refine forall₂_congr fun i _ => ?_
-  cases h : run mode (.ofNatBits (first + i)) <;> simp [checkRange.test, h]
+    checkRange O impl mode first count = true ↔
+      ∀ i < count, O.check mode (.ofNatBits (first + i)) (impl mode (.ofNatBits (first + i))) = true :=
+  checkBits_eq_true_iff
 
 /-- A block is checked by checking an initial part and the rest. -/
-theorem checkRange_add (O : Oracle S) (run : IEEERoundingMode → Model fmt → Option (Model fmt))
+theorem checkRange_add (O : Oracle S) (impl : IEEERoundingMode → Model fmt → Model fmt)
     (mode : IEEERoundingMode) (first m n : ℕ) :
-    checkRange O run mode first (m + n) =
-      (checkRange O run mode first m && checkRange O run mode (first + m) n) :=
-  checkBits_add (checkRange.test O.check run mode) first m n
+    checkRange O impl mode first (m + n) =
+      (checkRange O impl mode first m && checkRange O impl mode (first + m) n) :=
+  checkBits_add (checkRange.test O.check impl mode) first m n
 
-/-- A checked block: on each of its inputs, `run` produces the prescribed result. -/
-theorem RunsCorrectlyAt.of_checkRange {O : Oracle S}
-    (h : checkRange O run mode first count = true) {i : ℕ} (hi : i < count) :
-    RunsCorrectlyAt S run mode (.ofNatBits (first + i)) :=
-  let ⟨y, hy, hcheck⟩ := checkRange_eq_true_iff.1 h i hi
-  ⟨y, hy, O.sound _ _ _ hcheck⟩
+/-- A checked block establishes `CorrectAt` on every input in the block. -/
+theorem CorrectAt.of_checkRange {O : Oracle S}
+    (h : checkRange O impl mode first count = true) {i : ℕ} (hi : i < count) :
+    CorrectAt S impl mode (.ofNatBits (first + i)) :=
+  O.sound _ _ _ (checkRange_eq_true_iff.1 h i hi)
 
-theorem holdsOnBits_of_checkRange {O : Oracle S} (h : checkRange O run mode first count = true) :
-    HoldsOnBits (RunsCorrectlyAt S run mode) first (first + count) :=
-  HoldsOnBits.iff_forall_lt.2 fun _ => RunsCorrectlyAt.of_checkRange h
+theorem holdsOnBits_of_checkRange {O : Oracle S} (h : checkRange O impl mode first count = true) :
+    HoldsOnBits (CorrectAt S impl mode) first (first + count) :=
+  HoldsOnBits.iff_forall_lt.2 fun _ => CorrectAt.of_checkRange h
 
 /-- `checkRange` on each block between two consecutive entries of a list of boundaries. -/
-def checkBlocks (O : Oracle S) (run : IEEERoundingMode → Model fmt → Option (Model fmt))
+def checkBlocks (O : Oracle S) (impl : IEEERoundingMode → Model fmt → Model fmt)
     (mode : IEEERoundingMode) : List ℕ → Bool
-  | a :: b :: bounds => checkRange O run mode a (b - a) && checkBlocks O run mode (b :: bounds)
+  | a :: b :: bounds => checkRange O impl mode a (b - a) && checkBlocks O impl mode (b :: bounds)
   | _ => true
 
 theorem isChain_of_checkBlocks {O : Oracle S} :
-    ∀ {bounds : List ℕ}, checkBlocks O run mode bounds = true →
-      bounds.IsChain (HoldsOnBits (RunsCorrectlyAt S run mode))
+    ∀ {bounds : List ℕ}, checkBlocks O impl mode bounds = true →
+      bounds.IsChain (HoldsOnBits (CorrectAt S impl mode))
   | [], _ => .nil
   | [_], _ => .singleton _
   | a :: b :: bounds, h => by
@@ -151,136 +113,55 @@ theorem isChain_of_checkBlocks {O : Oracle S} :
     · simpa [Nat.add_sub_cancel' hab] using holdsOnBits_of_checkRange h.1
     · exact .of_le hab
 
-/-- Checked consecutive blocks: `run` produces the prescribed result on every input between the
-first and the last boundary. -/
+/-- Checked consecutive blocks establish `CorrectAt` from the first boundary to the last. -/
 theorem holdsOnBits_of_checkBlocks {O : Oracle S} {bounds : List ℕ}
-    (h : checkBlocks O run mode bounds = true) (hlo : lo ∈ bounds.head?)
-    (hhi : hi ∈ bounds.getLast?) : HoldsOnBits (RunsCorrectlyAt S run mode) lo hi :=
+    (h : checkBlocks O impl mode bounds = true) (hlo : lo ∈ bounds.head?)
+    (hhi : hi ∈ bounds.getLast?) : HoldsOnBits (CorrectAt S impl mode) lo hi :=
   .of_isChain (isChain_of_checkBlocks h) hlo hhi
 
 /-! ### Blocks checked against given results -/
 
-/-- The implementation `run` produces a result with the same value as `expected input` on each of
-the `count` bit patterns starting at `first`. No oracle is involved: this is the check to use when
-the prescribed results on a range are known by proof. -/
-def checkRangeResult (run : IEEERoundingMode → Model fmt → Option (Model fmt))
+/-- Check that `impl mode x` has the same value as `expected x` on `[first, first + count)`. -/
+def checkRangeResult (impl : IEEERoundingMode → Model fmt → Model fmt)
     (mode : IEEERoundingMode) (expected : Model fmt → Model fmt) (first count : ℕ) : Bool :=
   checkBits (first := first) (count := count) fun input =>
-    match run mode input with
-    | some result => decide (SameValue result (expected input))
-    | none => false
+    decide (SameValue (impl mode input) (expected input))
 
 @[grind =]
 theorem checkRangeResult_eq_true_iff {expected : Model fmt → Model fmt} :
-    checkRangeResult run mode expected first count = true ↔
-      ∀ i < count, ∃ y, run mode (.ofNatBits (first + i)) = some y ∧
-        SameValue y (expected (.ofNatBits (first + i))) := by
-  rw [checkRangeResult, checkBits_eq_true_iff]
-  refine forall₂_congr fun i _ => ?_
-  cases run mode (.ofNatBits (first + i)) <;> simp
+    checkRangeResult impl mode expected first count = true ↔
+      ∀ i < count, SameValue (impl mode (.ofNatBits (first + i)))
+        (expected (.ofNatBits (first + i))) := by
+  simp [checkRangeResult, checkBits_eq_true_iff]
 
-/-- If `expected` describes the prescribed results on a block and `run` produces them, then `run`
-produces the prescribed result on each input of the block. -/
+/-- If `expected` describes the prescribed results on a block and `impl` produces them, then
+`impl` is correct on that block. -/
 theorem holdsOnBits_of_checkRangeResult {expected : Model fmt → Model fmt}
     (hexpected : HoldsOnBits (fun x => SameValue (expected x) (S.eval mode x))
       first (first + count))
-    (h : checkRangeResult run mode expected first count = true) :
-    HoldsOnBits (RunsCorrectlyAt S run mode) first (first + count) :=
+    (h : checkRangeResult impl mode expected first count = true) :
+    HoldsOnBits (CorrectAt S impl mode) first (first + count) :=
   HoldsOnBits.iff_forall_lt.2 fun i hi =>
-    let ⟨y, hy, hsame⟩ := checkRangeResult_eq_true_iff.1 h i hi
-    ⟨y, hy, hsame.trans (HoldsOnBits.iff_forall_lt.1 hexpected i hi)⟩
+    (checkRangeResult_eq_true_iff.1 h i hi).trans (HoldsOnBits.iff_forall_lt.1 hexpected i hi)
 
-namespace IR.Func
+/-! ### Whole-format assembly -/
 
-variable {f : Func} {modes : Set IEEERoundingMode}
-
-/-- `run` is a sound interpreter for the unary function `f`: whenever it produces a result, `f`
-can return on that input, everything `f` can return encodes that result, and no execution of `f`
-on that input goes wrong. -/
-def IsComputedBy (f : Func) (run : IEEERoundingMode → Model fmt → Option (Model fmt)) : Prop :=
-  ∀ mode x y, run mode x = some y →
-    (∃ r, f.Returns mode [.ofModel x] r) ∧
-      (∀ r, f.Returns mode [.ofModel x] r → r.Encodes y) ∧ ¬f.GoesWrong mode [.ofModel x]
-
-/-- Under the rounding direction `mode`, the unary function `f` has a result on the input `x`,
-every result it can have is the one `S` prescribes, and no execution on `x` goes wrong. -/
-def CorrectAt (f : Func) (S : Spec fmt) (mode : IEEERoundingMode) (x : Model fmt) : Prop :=
-  (∃ r, f.Returns mode [.ofModel x] r) ∧
-    (∀ r, f.Returns mode [.ofModel x] r → r.Encodes (S.eval mode x)) ∧
-    ¬f.GoesWrong mode [.ofModel x]
-
-theorem correctlyRounded_iff_forall_correctAt :
-    f.CorrectlyRounded S modes ↔ ∀ mode ∈ modes, ∀ x, f.CorrectAt S mode x :=
-  Iff.rfl
-
-namespace IsComputedBy
-
-/-- A result of a sound interpreter that has the prescribed value makes `f` correct on that
-input. -/
-theorem correctAt_of_sameValue (hrun : f.IsComputedBy run) (hy : run mode x = some y)
-    (h : SameValue y (S.eval mode x)) : f.CorrectAt S mode x :=
-  let ⟨hex, hall, hsafe⟩ := hrun mode x y hy
-  ⟨hex, fun r hr => (hall r hr).of_sameValue h, hsafe⟩
-
-theorem correctAt (hrun : f.IsComputedBy run) (h : RunsCorrectlyAt S run mode x) :
-    f.CorrectAt S mode x :=
-  let ⟨_, hy, hsame⟩ := h
-  hrun.correctAt_of_sameValue hy hsame
-
-/-- Conversely, where `f` is correct, any result of a sound interpreter has the prescribed
-value. -/
-theorem sameValue_of_correctAt (hrun : f.IsComputedBy run) (h : f.CorrectAt S mode x)
-    (hy : run mode x = some y) : SameValue y (S.eval mode x) :=
-  let ⟨⟨r, hr⟩, hall, _⟩ := hrun mode x y hy
-  (hall r hr).sameValue (h.2.1 r hr)
-
-theorem holdsOnBits_correctAt (hrun : f.IsComputedBy run)
-    (h : HoldsOnBits (RunsCorrectlyAt S run mode) lo hi) :
-    HoldsOnBits (f.CorrectAt S mode) lo hi :=
-  h.imp fun _ => hrun.correctAt
-
-/-- A block checked against an oracle. -/
-theorem holdsOnBits_of_checkRange (hrun : f.IsComputedBy run) {O : Oracle S}
-    (h : checkRange O run mode first count = true) :
-    HoldsOnBits (f.CorrectAt S mode) first (first + count) :=
-  hrun.holdsOnBits_correctAt (LibcMath.holdsOnBits_of_checkRange h)
-
-/-- Consecutive blocks checked against an oracle. -/
-theorem holdsOnBits_of_checkBlocks (hrun : f.IsComputedBy run) {O : Oracle S} {bounds : List ℕ}
-    (h : checkBlocks O run mode bounds = true) (hlo : lo ∈ bounds.head?)
-    (hhi : hi ∈ bounds.getLast?) : HoldsOnBits (f.CorrectAt S mode) lo hi :=
-  hrun.holdsOnBits_correctAt (LibcMath.holdsOnBits_of_checkBlocks h hlo hhi)
-
-/-- A block on which the prescribed results are described by `expected`, checked without an
-oracle. -/
-theorem holdsOnBits_of_checkRangeResult (hrun : f.IsComputedBy run)
-    {expected : Model fmt → Model fmt}
-    (hexpected : HoldsOnBits (fun x => SameValue (expected x) (S.eval mode x))
-      first (first + count))
-    (h : checkRangeResult run mode expected first count = true) :
-    HoldsOnBits (f.CorrectAt S mode) first (first + count) :=
-  hrun.holdsOnBits_correctAt (LibcMath.holdsOnBits_of_checkRangeResult hexpected h)
-
-end IsComputedBy
-
-/-- A function that is correct on every bit pattern of the format, under each rounding direction
-in `modes`, is correctly rounded. -/
-theorem correctlyRounded_of_holdsOnBits
-    (h : ∀ mode ∈ modes, HoldsOnBits (f.CorrectAt S mode) 0 (2 ^ fmt.bitWidth)) :
-    f.CorrectlyRounded S modes :=
+/-- An implementation that is correct on every bit pattern of the format under every mode in
+`modes` is correctly rounded. -/
+theorem correctlyRounded_of_holdsOnBits {modes : Set IEEERoundingMode}
+    (h : ∀ mode ∈ modes, HoldsOnBits (CorrectAt S impl mode) 0 (2 ^ fmt.bitWidth)) :
+    CorrectlyRounded S modes impl :=
   fun mode hmode => (h mode hmode).forall
 
-/-- Correct rounding by computation alone: for each rounding direction, a list of boundaries from
-`0` to `2 ^ fmt.bitWidth` all of whose blocks pass `checkRange`. -/
-theorem IsComputedBy.correctlyRounded_of_checkBlocks (hrun : f.IsComputedBy run) (O : Oracle S)
+/-- Correct rounding by computation alone: for each mode in `modes`, a list of boundaries from
+`0` to `2 ^ fmt.bitWidth` whose consecutive blocks all pass `checkRange`. -/
+theorem correctlyRounded_of_checkBlocks {modes : Set IEEERoundingMode} (O : Oracle S)
     (bounds : IEEERoundingMode → List ℕ)
-    (h : ∀ mode ∈ modes, checkBlocks O run mode (bounds mode) = true ∧
+    (h : ∀ mode ∈ modes, checkBlocks O impl mode (bounds mode) = true ∧
       0 ∈ (bounds mode).head? ∧ 2 ^ fmt.bitWidth ∈ (bounds mode).getLast?) :
-    f.CorrectlyRounded S modes :=
+    CorrectlyRounded S modes impl :=
   correctlyRounded_of_holdsOnBits fun mode hmode =>
     let ⟨hcheck, hlo, hhi⟩ := h mode hmode
-    hrun.holdsOnBits_of_checkBlocks hcheck hlo hhi
-
-end IR.Func
+    holdsOnBits_of_checkBlocks hcheck hlo hhi
 
 end LibcMath
