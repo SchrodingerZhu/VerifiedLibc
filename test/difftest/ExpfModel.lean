@@ -1,27 +1,34 @@
-import LibcMath.Extracted.Expf
-import LibcMath.IR.Interp
+import LibcMath.Extracted.Expf.Plans
 
 /-!
-# The Lean model of `expf`, run from the command line
+# The Lean models of `expf`, run from the command line
 
-    difftest-expf-model <mode> (<first> <step> <count>)...
+    difftest-expf-model [--plan=<name>] <mode> (<first> <step> <count>)...
 
-evaluates the extracted `expf` with the interpreter under the rounding direction `<mode>`
-(`nearest`, `up`, `down` or `zero`) at the binary32 bit patterns `first + i * step` modulo `2 ^ 32`
-for `i < count`, for each triple in turn. `first` is hexadecimal, `step` and `count` are decimal.
-Each line of output is an input and its result as eight hexadecimal digits each, or `none` in
-place of the result where the interpreter gives no answer. `test/difftest/expf_native.cpp` prints
-the results of the compiled function in the same form.
+evaluates the selected AST-extracted `expf` evaluation plan under `<mode>` (`nearest`, `up`,
+`down`, or `zero`) at binary32 bit patterns `first + i * step` modulo `2 ^ 32` for `i < count`.
+`first` is hexadecimal; `step` and `count` are decimal. Output lines are `<input_hex> <output_hex>`,
+matching `test/difftest/expf_native.cpp`.
 -/
 
 open FloatLib.Floats.Formats.BinaryInterchange
-open LibcMath.Extracted (expf)
+open LibcMath.Core
+open LibcMath.Extracted.Expf
 
 def parseMode : String → Option Model.IEEERoundingMode
   | "nearest" => some .nearest
   | "up" => some .up
   | "down" => some .down
   | "zero" => some .towardZero
+  | _ => none
+
+def lookupPlan : String → Option (UnaryKernel .binary32)
+  | "double_eval" => some DoubleEval.kernel
+  | "double_eval_fma" => some DoubleEvalFma.kernel
+  | "integer_eval" => some IntegerEval.kernel
+  | "static_rounding" => some StaticRounding.kernel
+  | "float_eval" => some FloatEval.kernel
+  | "float_eval_cr_rn" => some FloatEvalCrRn.kernel
   | _ => none
 
 def parseHex (s : String) : Option Nat :=
@@ -50,20 +57,29 @@ def hex32 (x : BitVec 32) : String :=
   let digits := Nat.toDigits 16 x.toNat
   String.ofList (List.replicate (8 - digits.length) '0' ++ digits)
 
-def resultLine (mode : Model.IEEERoundingMode) (x : BitVec 32) : String :=
-  let result := match expf.runUnary (fmt := .binary32) mode (.ofBits x) with
-    | some y => hex32 y.toBits
-    | none => "none"
-  s!"{hex32 x} {result}\n"
+def resultLine (kernel : UnaryKernel .binary32) (mode : Model.IEEERoundingMode)
+    (x : BitVec 32) : String :=
+  let y := kernel.eval mode (.ofBits x)
+  s!"{hex32 x} {hex32 y.toBits}\n"
 
 def main (args : List String) : IO UInt32 := do
-  let some (mode, ranges) := (do
-      let mode :: rest := args | none
-      pure (← parseMode mode, ← parseRanges rest) : Option _)
-    | IO.eprintln "usage: difftest-expf-model nearest|up|down|zero (<first> <step> <count>)..."
+  let parsed : Option (UnaryKernel .binary32 × Model.IEEERoundingMode × List Range) := do
+    let (kernel, rest) ← match args with
+      | flag :: rest =>
+          if flag.startsWith "--plan=" then
+            match lookupPlan (flag.drop 7).toString with
+            | some k => some (k, rest)
+            | none => none
+          else
+            some (DoubleEval.kernel, args)
+      | [] => none
+    let mode :: rest := rest | none
+    pure (kernel, ← parseMode mode, ← parseRanges rest)
+  let some (kernel, mode, ranges) := parsed
+    | IO.eprintln "usage: difftest-expf-model [--plan=double_eval|double_eval_fma|integer_eval|static_rounding|float_eval|float_eval_cr_rn] nearest|up|down|zero (<first> <step> <count>)..."
       return 2
   let stdout ← IO.getStdout
   for range in ranges do
     for i in [0:range.count] do
-      stdout.putStr (resultLine mode (BitVec.ofNat 32 (range.first + i * range.step)))
+      stdout.putStr (resultLine kernel mode (BitVec.ofNat 32 (range.first + i * range.step)))
   return 0

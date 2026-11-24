@@ -1,12 +1,13 @@
 import LibcMath.Oracle.Exp
-import LibcMath.Exhaustive.ExpfInterp
+import LibcMath.Exhaustive.Expf
 
 /-!
 # The implementation and oracle being checked
 
-The exhaustive check of `expf` runs `checkRange Run.oracle Run.run` over blocks of bit patterns.
-Every certificate file, the `checkrange` executable and the generator in `scripts/` refer to the
-definitions below and to nothing else.
+The exhaustive check of `expf` runs `checkRange Run.oracle Run.run` directly on the AST-extracted
+functional kernel `Extracted.Expf.DoubleEval.expf` (with no interpreter or relational bridge).
+Certificate files, the `checkrange` executable, and `scripts/exhaustive.py` all target these
+definitions.
 -/
 
 namespace LibcMath.Exhaustive.Run
@@ -14,16 +15,25 @@ namespace LibcMath.Exhaustive.Run
 open FloatLib.Floats.Formats.BinaryInterchange
 open Model (IEEERoundingMode)
 
-/-- The oracle certificates are stated for. -/
+/-- The sound oracle certificates are stated for. -/
 abbrev oracle : Oracle (Spec.exp .binary32) := expOracle .binary32
 
-/-- The implementation certificates are stated for: the interpreter on the extracted `expf`. -/
-abbrev run : IEEERoundingMode → Model .binary32 → Option (Model .binary32) :=
-  Extracted.expf.runUnary
+/-- The default extracted implementation certificates are stated for (`math::double_eval::expf`). -/
+abbrev run : IEEERoundingMode → Model .binary32 → Model .binary32 :=
+  Extracted.Expf.DoubleEval.expf
 
-/-- Under `mode`, `run` produces the result `exp` prescribes on every bit pattern from `lo` up to
-but excluding `hi`. This is what a certificate file concludes for the range it covers. -/
+/-- Under `mode`, `run` produces the result `exp` prescribes on every bit pattern in `[lo, hi)`. -/
 abbrev CheckedOn (mode : IEEERoundingMode) (lo hi : ℕ) : Prop :=
-  HoldsOnBits (RunsCorrectlyAt (Spec.exp .binary32) run mode) lo hi
+  HoldsOnBits (CorrectAt (Spec.exp .binary32) run mode) lo hi
+
+/-- Look up any extracted `expf` evaluation plan by variant name (for `checkrange --plan=...`). -/
+def planByName? : String → Option (Core.UnaryKernel .binary32)
+  | "double_eval" => some Extracted.Expf.DoubleEval.kernel
+  | "double_eval_fma" => some Extracted.Expf.DoubleEvalFma.kernel
+  | "integer_eval" => some Extracted.Expf.IntegerEval.kernel
+  | "static_rounding" => some Extracted.Expf.StaticRounding.kernel
+  | "float_eval" => some Extracted.Expf.FloatEval.kernel
+  | "float_eval_cr_rn" => some Extracted.Expf.FloatEvalCrRn.kernel
+  | _ => none
 
 end LibcMath.Exhaustive.Run
