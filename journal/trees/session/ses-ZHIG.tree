@@ -1,0 +1,22 @@
+\title{Five-PR stack migrating from LLVM-IR interpretation to direct Clang-AST kernels}
+\taxon{Session}
+\date{2026-11-24}
+\author{antigravity}
+\contributor{schrodingerzy}
+\tag{core}
+\tag{extract}
+\tag{expf}
+\tag{proof}
+\meta{harness}{Antigravity}
+\meta{model-id}{antigravity}
+\import{base-macros}
+
+\p{Replaced the legacy LLVM-IR extraction, CFG interpreter, and unfinished structured-form equivalence bridge with direct C++23 Clang-AST extraction (\code{\verb~|ast2lean~}) targeting a shared \code{\verb~|LibcMath.Core~} kernel library, delivered as a five-PR stack implementing [dec-03IY](dec-03IY):}
+\ul{
+\li{\strong{\pr{14} (\code{\verb~|stack/1-core-dsl~}, [log-HVD1](log-HVD1)).} Added \code{\verb~|LibcMath/Core/~} (\code{\verb~|MathConfig~}, \code{\verb~|KernelMeta~}, \code{\verb~|UnaryKernel~}, FloatLib-backed \code{\verb~|FPBits~}, \code{\verb~|FmtBitWidth~}, config-aware \code{\verb~|multiplyAdd~}/\code{\verb~|multiplySub~}/\code{\verb~|subMultiply~}/\code{\verb~|nearestInt~}/\code{\verb~|setOverflow~}/\code{\verb~|setUnderflow~}, \code{\verb~|Frac64~}, \code{\verb~|NumberPair~}, \code{\verb~|TripleDouble~}, \code{\verb~|DyadicFloat~}, \code{\verb~|ExceptValues~}, polymorphic \code{\verb~|horner~}/\code{\verb~|althorner~}/\code{\verb~|estrin~} DSL, and \code{\verb~|Core.Diag~}) plus \code{\verb~|LibcMath/CoreExamples.lean~}.}
+\li{\strong{\pr{15} (\code{\verb~|stack/2-ast-extractor~}, [log-852W](log-852W)).} Replaced \code{\verb~|MarkCoreOps~} and \code{\verb~|ir2lean~} in \code{\verb~|extract/~} with the C++23 module-first (\code{\verb~|.cppm~}) \code{\verb~|ast2lean~} Clang LibTooling extractor, capturing \code{\verb~|LIBC_MATH_*~} and \code{\verb~|LIBC_TARGET_CPU_HAS_*~} preprocessor flags (\code{\verb~|--dump-config~}) and passing smoke tests (\code{\verb~|extract/test/run_tests.sh~}).}
+\li{\strong{\pr{16} (\code{\verb~|stack/3-extract-expf-plans~}, [log-K8PJ](log-K8PJ)).} Extracted six upstream LLVM libc \code{\verb~|expf~} evaluation plans (\code{\verb~|DoubleEval~}, \code{\verb~|DoubleEvalFma~}, \code{\verb~|IntegerEval~}, \code{\verb~|StaticRounding~}, \code{\verb~|FloatEval~}, \code{\verb~|FloatEvalCrRn~}) under \code{\verb~|LibcMath/Extracted/Expf/~} with \code{\verb~|extract/extract-expf-plans.sh~} and kernel-checked cross-plan agreement proofs in \code{\verb~|LibcMath/Extracted/Expf/Examples.lean~}.}
+\li{\strong{\pr{17} (\code{\verb~|stack/4-remove-ir-rework-proofs~}, [log-GHTT](log-GHTT)).} Deleted 18 legacy files (\code{\verb~|LibcMath/IR/*~}, \code{\verb~|ExpfInterp.lean~}, \code{\verb~|ExpfStructured*.lean~}, legacy IR stubs, \code{\verb~|scripts/survey-extraction.py~}), simplified \code{\verb~|Exhaustive/*~} to total functions, proved short-path reductions directly on four \code{\verb~|expf~} plans with zero \code{\verb~|sorry~} and zero open bridge hypotheses, upgraded \code{\verb~|checkrange~} with \code{\verb~|--plan~} and automatic stderr diagnostics, and empirically verified 0 mismatches across 2.85M differential evaluations against compiled Clang C++ LLVM libc.}
+\li{\strong{PR 5 (\code{\verb~|stack/5-docs-journal-diagnostics~}, [log-TL9V](log-TL9V)).} Added \code{\verb~|Core.Diag.diagnosePlanMatrix~} and \code{\verb~|diagnoseKernelRange~}, updated \code{\verb~|README.md~}, \code{\verb~|CLAUDE.md~}, and [note-expf-status](note-expf-status), reconciled problem statuses, and recorded verified lessons [ins-WILP](ins-WILP), [ins-9ZCR](ins-9ZCR), and [ins-FH1S](ins-FH1S).}
+}
+\p{Verified: \code{\verb~|lake build LibcMath checkrange difftest-expf-model~}, \code{\verb~|bash extract/test/run_tests.sh~}, \code{\verb~|scripts/difftest-expf.sh~} across all five C++ plans, and \code{\verb~|journal-build~} all succeed cleanly with 0 errors and 0 \code{\verb~|sorry~}.}

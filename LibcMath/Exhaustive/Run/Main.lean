@@ -33,7 +33,8 @@ def parseMode : String → Option IEEERoundingMode
 def usage : String :=
   "usage: checkrange [--plan=double_eval|double_eval_fma|integer_eval|static_rounding|float_eval|float_eval_cr_rn] <nearest|towardZero|up|down> <first> <count> [<block>]"
 
-def parsePlanFlag (args : List String) : Option (String × Core.UnaryKernel .binary32 × List String) :=
+def parsePlanFlag (args : List String) :
+    Option (String × Core.UnaryKernel .binary32 × List String) :=
   match args with
   | flag :: rest =>
       if flag.startsWith "--plan=" then
@@ -71,7 +72,8 @@ def main (args : List String) : IO UInt32 := do
     let ok := checkBlock Run.oracle.check kernel.eval mode start size
     let t1 ← IO.monoMsNow
     if !ok then
-      IO.eprintln (Core.Diag.diagnoseBlock Run.oracle.check kernel.eval mode start size s!"expf/{planName}")
+      IO.eprintln
+        (Core.Diag.diagnoseBlock Run.oracle.check kernel.eval mode start size s!"expf/{planName}")
     allOk := allOk && ok
     stdout.putStrLn s!"{name}\t{start}\t{size}\t{if ok then "ok" else "fail"}\t{t1 - t0}"
     stdout.flush

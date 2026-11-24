@@ -1,0 +1,19 @@
+\title{Bounding a polynomial against the exponential with \code{\verb~|interval~} of FloatLib}
+\taxon{Insight}
+\date{2026-11-23}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{automation}
+\tag{error-bound}
+\tag{floatlib}
+\import{base-macros}
+
+\p{Source: session [ses-HUTO](ses-HUTO). Lean 4.36.0, FloatLib 4.1.0. Each item was compiled, and the proof was confirmed to fail when a constant or the bound is changed.}
+\ul{
+\li{FloatLib has a tactic \code{\verb~|interval~} (\code{\verb~|FloatLib/Tactic/Interval.lean~}) that proves real inequalities from rational bounds by interval evaluation with subdivision, and the kernel checks the result. It knows \code{\verb~|exp~}, \code{\verb~|log~}, the trigonometric and hyperbolic functions and \code{\verb~|sqrt~}. Building the module for the first time takes about two minutes of processor time.}
+\li{It does not prove \code{\verb~||p r - Real.exp r| ≤ 1 / 10 ^ 15~} on \code{\verb~||r| ≤ 1 / 256~} directly. The enclosures of \code{\verb~|p r~} and of \code{\verb~|Real.exp r~} are each as wide as the interval of \code{\verb~|r~}, and the difference of two intervals does not see that the two move together. The tactic says so: it reports an enclosure of width \code{\verb~|0.008~} and advises tighter bounds. Subdividing until the width is \code{\verb~|10⁻¹⁵~} would take some \code{\verb~|2⁴³~} pieces.}
+\li{Go through a Taylor polynomial \code{\verb~|T~} of a degree high enough that its remainder is negligible, here 7. \code{\verb~||T r - Real.exp r|~} is one application of \code{\verb~|Real.exp_bound~}. \code{\verb~|p r - T r~} is a polynomial; write it with its coefficients combined, by a lemma proved with \code{\verb~|ring~}, and \code{\verb~|interval~} then bounds it at once with the default settings. The target is the statement \code{\verb~|∀ r ∈ Set.Icc lo hi, |…| ≤ c~}: use \code{\verb~|revert r~} to bring a goal into that form.}
+\li{With that form the tactic first tries the bound that the coefficients alone give and then falls back to boxes. A bound below the true supremum fails with the message that a sharp bound takes a sum-of-squares certificate, which \code{\verb~|scripts/coeff_cert.py~} of FloatLib finds; this was not needed for a slack of one percent.}
+\li{The value of a binary64 constant as a rational is \code{\verb~|Algebraic.toReal_of_toRat?_eq_some (by decide +kernel)~}, as for binary32 in \code{\verb~|LibcMath/Functions/ExpRanges.lean~}.}
+\li{Sollya and Gappa are in the flake and are useful as advisers before a bound is stated. For this polynomial Sollya's \code{\verb~|supnorm~} gave \code{\verb~|9.50 · 10⁻¹⁶~} for the distance to the exponential, and Gappa gave \code{\verb~|1.12 · 10⁻¹⁶~} for the error of the binary64 evaluation when rounding to nearest. Neither result is used by the proof.}
+}

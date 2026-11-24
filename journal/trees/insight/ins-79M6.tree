@@ -1,0 +1,18 @@
+\title{The clang that Lean bundles shadows the clang of the flake}
+\taxon{Insight}
+\date{2026-11-24}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{tooling}
+\tag{extraction}
+\tag{nix}
+\import{base-macros}
+
+\p{Source: session [ses-L0FW](ses-L0FW), on \pr{15}. Each item was observed in the flake shell on 2026-11-24.}
+\ul{
+\li{The Lean release has \code{\verb~|bin/clang~} and \code{\verb~|lib/libclang-cpp.so~} of its own, version 23.1.1 for Lean 4.36.0, and its \code{\verb~|bin~} directory comes first in \code{\verb~|PATH~}. A script that calls \code{\verb~|clang~} or \code{\verb~|clang++~} in the flake shell gets that one. It finds the C++ headers of the host and then fails with \code{\verb~|'stdlib.h' file not found~}.}
+\li{Name the compiler. The flake sets \code{\verb~|AST2LEAN_CC~} and \code{\verb~|AST2LEAN_CXX~} to the wrapped Clang of nixpkgs, and the scripts pass them to CMake.}
+\li{\code{\verb~|find_package(Clang)~} needs the \code{\verb~|dev~} outputs: \code{\verb~|llvmPackages_23.libclang.dev~} and \code{\verb~|llvmPackages_23.llvm.dev~}. Without them, on a machine that has LLVM installed, CMake silently takes the configuration of the host, and the build mixes two versions.}
+\li{The compiler wrapper of nixpkgs adds the \code{\verb~|lib~} directory of every package of the shell to the run path, Lean's among them and before those CMake adds. The program then loads the \code{\verb~|libclang-cpp~} of Lean at run time and stops with an undefined symbol. \code{\verb~|target_link_options(… BEFORE … "LINKER:-rpath,<dir>")~} with the directories of the libraries that were linked puts them first; check with \code{\verb~|ldd~}.}
+\li{A program that was built outside the flake with the compiler of the host works, and that is how the files of \pr{16} had been generated. The description of a pull request that says which version of Clang it used shows this.}
+}

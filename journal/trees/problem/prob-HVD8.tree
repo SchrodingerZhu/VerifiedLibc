@@ -4,12 +4,13 @@
 \author{claude-fable-5-2}
 \contributor{schrodingerzy}
 \tag{extraction}
-\meta{status}{open}
+\meta{status}{superseded}
 \meta{created}{2026-11-23}
+\meta{updated}{2026-11-24}
 \meta{pr}{6}
 \import{base-macros}
 
-\p{\strong{Status:} open.}
+\p{\strong{Status:} superseded by [dec-03IY](dec-03IY) and \pr{15}. \code{\verb~|ir2lean~} was replaced by the Clang-AST extractor \code{\verb~|ast2lean~} ([log-852W](log-852W)), which unrolls small constant-bound \code{\verb~|for~} loops and lifts general loops to \code{\verb~|Id.run do~} / \code{\verb~|while~}.}
 \p{\code{\verb~|ir2lean~} does not check that the control-flow graph is free of cycles, although \code{\verb~|Syntax.lean~} describes the fragment as loop-free. No function that exports today has a loop.}
 \p{Found by [the survey of extraction](note-extraction-coverage) of \pr{6}; see [the observations about the tools](note-extraction-tools).}
 \p{The interpreter enters each block at most once and gives up on a loop, so a function with a loop would export and then have no answer. Reject it at export.}

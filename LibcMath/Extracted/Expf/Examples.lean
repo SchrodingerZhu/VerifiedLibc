@@ -77,40 +77,46 @@ theorem crNearestPlans_agree_near_one :
 /-! ### Config & provenance diagnostics -/
 
 /--
-info: "Kernel: expf\n  C++ function : math::double_eval::expf\n  Source       : src/math/generic/expf.cpp (e1a5f92db023)\n  Clang        : 23.1.5\n  Config       : variant=double_eval target=x86_64-pc-linux-gnu LIBC_MATH=[none (LIBC_MATH=0)] cpu=[INT128]\n  Tables       : [EXP_M1, EXP_M2]"
+info: "Kernel: expf\n  C++ function : math::double_eval::expf\n  Source       : src/math/generic/expf.cpp (e1a5f92db023)\n  Clang        : 23.1.3\n  Config       : variant=double_eval target=x86_64-unknown-linux-gnu LIBC_MATH=[none (LIBC_MATH=0)] cpu=[INT128]\n  Tables       : [EXP_M1, EXP_M2]"
 -/
 #guard_msgs in
 #eval Diag.inspectKernel DoubleEval.kernel
 
 /--
-info: "Kernel: expf\n  C++ function : math::double_eval::expf\n  Source       : src/math/generic/expf.cpp (e1a5f92db023)\n  Clang        : 23.1.5\n  Config       : variant=double_eval_fma target=x86_64-pc-linux-gnu LIBC_MATH=[none (LIBC_MATH=0)] cpu=[FMA_FLOAT,FMA_DOUBLE,NEAREST_INT,INT128]\n  Tables       : [EXP_M1, EXP_M2]"
+info: "Kernel: expf\n  C++ function : math::double_eval::expf\n  Source       : src/math/generic/expf.cpp (e1a5f92db023)\n  Clang        : 23.1.3\n  Config       : variant=double_eval_fma target=x86_64-unknown-linux-gnu LIBC_MATH=[none (LIBC_MATH=0)] cpu=[FMA_FLOAT,FMA_DOUBLE,NEAREST_INT,INT128]\n  Tables       : [EXP_M1, EXP_M2]"
 -/
 #guard_msgs in
 #eval Diag.inspectKernel DoubleEvalFma.kernel
 
 /--
-info: "Kernel: expf\n  C++ function : math::integer_eval::expf\n  Source       : src/math/generic/expf.cpp (e1a5f92db023)\n  Clang        : 23.1.5\n  Config       : variant=integer_eval target=x86_64-pc-linux-gnu LIBC_MATH=[NO_ERRNO|NO_EXCEPT|ASSUME_ROUND_NEAREST_ONLY] cpu=[INT128]\n  Tables       : [LOG2_E, EXP2F_COEFFS]"
+info: "Kernel: expf\n  C++ function : math::integer_eval::expf\n  Source       : src/math/generic/expf.cpp (e1a5f92db023)\n  Clang        : 23.1.3\n  Config       : variant=integer_eval target=x86_64-unknown-linux-gnu LIBC_MATH=[NO_ERRNO|NO_EXCEPT|ASSUME_ROUND_NEAREST_ONLY] cpu=[INT128]\n  Tables       : [LOG2_E, EXP2F_COEFFS]"
 -/
 #guard_msgs in
 #eval Diag.inspectKernel IntegerEval.kernel
 
 /--
-info: "Kernel: expf\n  C++ function : math::float_eval_cr_rn::expf\n  Source       : src/math/generic/expf.cpp (e1a5f92db023)\n  Clang        : 23.1.5\n  Config       : variant=float_eval_cr_rn target=x86_64-pc-linux-gnu LIBC_MATH=[SMALL_TABLES|NO_ERRNO|NO_EXCEPT|INTERMEDIATE_COMP_IN_FLOAT|ASSUME_ROUND_NEAREST_ONLY] cpu=[FMA_FLOAT,FMA_DOUBLE,NEAREST_INT,INT128]\n  Tables       : [COEFFS]"
+info: "Kernel: expf\n  C++ function : math::float_eval_cr_rn::expf\n  Source       : src/math/generic/expf.cpp (e1a5f92db023)\n  Clang        : 23.1.3\n  Config       : variant=float_eval_cr_rn target=x86_64-unknown-linux-gnu LIBC_MATH=[SMALL_TABLES|NO_ERRNO|NO_EXCEPT|INTERMEDIATE_COMP_IN_FLOAT|ASSUME_ROUND_NEAREST_ONLY] cpu=[FMA_FLOAT,FMA_DOUBLE,NEAREST_INT,INT128]\n  Tables       : [COEFFS]"
 -/
 #guard_msgs in
 #eval Diag.inspectKernel FloatEvalCrRn.kernel
 
 /--
-info: "[compare expf vs expf] mode=nearest range=[0x3F800000, +32): all 32 inputs agree"
+info: "[compare expf/double_eval vs expf/integer_eval] mode=nearest range=[0x3F800000, +32): all 32 inputs agree"
 -/
 #guard_msgs in
 #eval Diag.compareKernels DoubleEval.kernel IntegerEval.kernel .nearest 0x3F800000 32
 
 /--
-info: "[compare expf vs expf] mode=nearest FIRST DIFF at 0x3F800000 (+normal, s=+, exp=127, frac=0 val=1):\n  expf: 0x402DF854 (+normal, s=+, exp=128, frac=3012692 val=2850325/1048576)\n  expf: 0x402DF855 (+normal, s=+, exp=128, frac=3012693 val=11401301/4194304) ulp_diff=-1"
+info: "[compare expf/double_eval vs expf/float_eval] mode=nearest FIRST DIFF at 0x3F800000 (+normal, s=+, exp=127, frac=0 val=1):\n  expf/double_eval: 0x402DF854 (+normal, s=+, exp=128, frac=3012692 val=2850325/1048576)\n  expf/float_eval: 0x402DF855 (+normal, s=+, exp=128, frac=3012693 val=11401301/4194304) ulp_diff=-1"
 -/
 #guard_msgs in
 #eval Diag.compareKernels DoubleEval.kernel FloatEval.kernel .nearest 0x3F800000 32
+
+/--
+info: "[plan-matrix] mode=nearest input=0x3F800000 (+normal, s=+, exp=127, frac=0 val=1)\n  expf/double_eval: 0x402DF854 (+normal, s=+, exp=128, frac=3012692 val=2850325/1048576) [exact]\n  expf/double_eval_fma: 0x402DF854 (+normal, s=+, exp=128, frac=3012692 val=2850325/1048576) [exact]\n  expf/integer_eval: 0x402DF854 (+normal, s=+, exp=128, frac=3012692 val=2850325/1048576) [exact]\n  expf/static_rounding: 0x402DF854 (+normal, s=+, exp=128, frac=3012692 val=2850325/1048576) [exact]\n  expf/float_eval: 0x402DF855 (+normal, s=+, exp=128, frac=3012693 val=11401301/4194304) [ulp=1]\n  expf/float_eval_cr_rn: 0x402DF854 (+normal, s=+, exp=128, frac=3012692 val=2850325/1048576) [exact]"
+-/
+#guard_msgs in
+#eval Diag.diagnosePlanMatrix allPlans .nearest f32(0x3F800000#32)
 
 /-! ### Axiom check -/
 

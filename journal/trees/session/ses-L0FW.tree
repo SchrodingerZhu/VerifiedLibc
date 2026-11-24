@@ -1,0 +1,20 @@
+\title{Review of the migration to extraction from the Clang AST}
+\taxon{Session}
+\date{2026-11-24}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{extraction}
+\tag{review}
+\meta{harness}{Claude Code}
+\meta{model-id}{claude-fable-5-2}
+\meta{pr}{18}
+\import{base-macros}
+
+\p{The maintainer asked for \pr{14} to \pr{18}, a stack written in [ses-ZHIG](ses-ZHIG), to be reviewed, fixed up and merged, for leftovers of the earlier approach to be cleaned up, and for the sources to be formatted. The review was made on the top of the stack, and the changes are one commit on it: [log-WJ3Q](log-WJ3Q).}
+\ul{
+\li{\strong{Verified.} The top of the stack builds, 10 134 jobs, with no \code{\verb~|sorry~}; \code{\verb~|native_decide~} occurs only under \code{\verb~|LibcMath/Exhaustive/Run/Native/~}. With a compiler of the host, as the authors had used, the tests of the extractor pass and the six plans are generated again byte for byte from the commit of LLVM they record. The differential test against the compiled C++ finds no mismatch on 10 199 702 inputs for each direction of each of the five plans. A compiled exhaustive pass on the main ranges of \code{\verb~|Expf.DoubleEval.expf~} accepted all inputs to nearest and toward zero and was then stopped: [dec-K2Q4](dec-K2Q4).}
+\li{\strong{Found.} The extractor did not build in the flake shell: [ins-79M6](ins-79M6). The statements no longer exclude undefined behaviour, and nothing said so: [prob-VR5Z](prob-VR5Z). About 290 lines were over 100 columns, most of them generated.}
+\li{\strong{Read.} \code{\verb~|LibcMath/Core/Ops.lean~}, one extracted plan, \code{\verb~|LibcMath/Extracted/Statements.lean~} and \code{\verb~|LibcMath/Extracted/ExpfMain.lean~} were read in full. \code{\verb~|LibcMath/Core/Extended.lean~}, the proofs under \code{\verb~|LibcMath/Extracted/ExpfPaths/~} and the sources of the extractor were not read line by line; the proofs are checked by Lean, and the extractor by the tests above.}
+\li{\strong{Cleaned up.} The recorded pass of the removed interpreter over the main ranges; the branches of the merged pull requests; the experiment branches, whose useful part is now here ([log-7DAL](log-7DAL)) or recorded ([ins-Z5FK](ins-Z5FK)).}
+\li{\strong{Left open.} [prob-VR5Z](prob-VR5Z); [prob-48KJ](prob-48KJ), whose later steps are now about a kernel that is an expression, which is what they need.}
+}

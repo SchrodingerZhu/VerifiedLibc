@@ -77,4 +77,19 @@ endif()
 
 add_executable(ast2lean src/main.cpp)
 target_link_libraries(ast2lean PRIVATE libc_extract_core)
+
+# Find the Clang and LLVM libraries that were linked before any other copy at run time. A
+# toolchain wrapper may add library directories of its own, and one of them can hold another
+# version of `libclang-cpp` (the Lean release bundles one).
+set(AST2LEAN_RPATH "${LLVM_LIBRARY_DIR}")
+if(TARGET clang-cpp)
+  get_target_property(AST2LEAN_CLANG_CPP clang-cpp LOCATION)
+  if(AST2LEAN_CLANG_CPP)
+    get_filename_component(AST2LEAN_CLANG_LIBDIR "${AST2LEAN_CLANG_CPP}" DIRECTORY)
+    list(PREPEND AST2LEAN_RPATH "${AST2LEAN_CLANG_LIBDIR}")
+  endif()
+endif()
+foreach(dir IN LISTS AST2LEAN_RPATH)
+  target_link_options(ast2lean BEFORE PRIVATE "LINKER:-rpath,${dir}")
+endforeach()
 target_compile_options(ast2lean PRIVATE -Wall -Wextra)

@@ -99,7 +99,8 @@ def diagnoseBlock {fmt : FloatFormat}
       let x : Model fmt := .ofNatBits (first + i)
       !check mode x (impl mode x) with
   | none =>
-      s!"[{label}] mode={modeName mode} range=[{hexBits (BitVec.ofNat fmt.bitWidth first)}, +{count}): ok"
+      let start := hexBits (BitVec.ofNat fmt.bitWidth first)
+      s!"[{label}] mode={modeName mode} range=[{start}, +{count}): ok"
   | some i =>
       let n := first + i
       let x : Model fmt := .ofNatBits n
@@ -114,13 +115,20 @@ def firstDiffBits {fmt : FloatFormat}
     let x : Model fmt := .ofNatBits (first + i)
     !sameValueBool (impl₁ mode x) (impl₂ mode x)).map (first + ·)
 
+/-- Short human-readable tag identifying a kernel and its evaluation variant (e.g.
+`expf/double_eval`). -/
+def kernelTag {fmt : FloatFormat} (k : UnaryKernel fmt) : String :=
+  s!"{k.info.name}/{k.info.config.implVariant}"
+
 /-- Compare two extracted `UnaryKernel` evaluation plans over `[first, first + count)` and report
 either agreement or a detailed breakdown of the first disagreeing input (including ULP distance). -/
 def compareKernels {fmt : FloatFormat} (k₁ k₂ : UnaryKernel fmt)
     (mode : IEEERoundingMode) (first count : Nat) : String :=
+  let t₁ := kernelTag k₁
+  let t₂ := kernelTag k₂
   match firstDiffBits k₁.eval k₂.eval mode first count with
   | none =>
-      s!"[compare {k₁.info.name} vs {k₂.info.name}] mode={modeName mode} " ++
+      s!"[compare {t₁} vs {t₂}] mode={modeName mode} " ++
       s!"range=[{hexBits (BitVec.ofNat fmt.bitWidth first)}, +{count}): all {count} inputs agree"
   | some n =>
       let x : Model fmt := .ofNatBits n
@@ -129,9 +137,34 @@ def compareKernels {fmt : FloatFormat} (k₁ k₂ : UnaryKernel fmt)
       let ulpStr := match ulpDiff? y₁ y₂ with
         | some d => s!" ulp_diff={d}"
         | none => ""
-      s!"[compare {k₁.info.name} vs {k₂.info.name}] mode={modeName mode} FIRST DIFF at {describeFloat x}:\n" ++
-      s!"  {k₁.info.name}: {describeFloat y₁}\n" ++
-      s!"  {k₂.info.name}: {describeFloat y₂}{ulpStr}"
+      s!"[compare {t₁} vs {t₂}] mode={modeName mode} FIRST DIFF at {describeFloat x}:\n" ++
+      s!"  {t₁}: {describeFloat y₁}\n" ++
+      s!"  {t₂}: {describeFloat y₂}{ulpStr}"
+
+/-- Evaluate a list of extracted evaluation plans on one input `x` and print their outputs and ULP
+offsets relative to the first (reference) plan. -/
+def diagnosePlanMatrix {fmt : FloatFormat} (plans : List (UnaryKernel fmt))
+    (mode : IEEERoundingMode) (x : Model fmt) : String :=
+  let header := s!"[plan-matrix] mode={modeName mode} input={describeFloat x}"
+  match plans with
+  | [] => header ++ "\n  (no plans)"
+  | ref :: _ =>
+      let yRef := ref.eval mode x
+      let rows := plans.map fun k =>
+        let y := k.eval mode x
+        let delta :=
+          if sameValueBool y yRef then "exact"
+          else match ulpDiff? y yRef with
+            | some d => s!"ulp={d}"
+            | none => "diff"
+        s!"  {kernelTag k}: {describeFloat y} [{delta}]"
+      String.intercalate "\n" (header :: rows)
+
+/-- Run `diagnoseBlock` on a `UnaryKernel`, automatically tagging output with `kernelTag k`. -/
+def diagnoseKernelRange {fmt : FloatFormat}
+    (check : IEEERoundingMode → Model fmt → Model fmt → Bool)
+    (k : UnaryKernel fmt) (mode : IEEERoundingMode) (first count : Nat) : String :=
+  diagnoseBlock check k.eval mode first count (kernelTag k)
 
 /-- Print full provenance and active `LIBC_MATH` / CPU configuration of a kernel. -/
 def inspectKernel {fmt : FloatFormat} (k : UnaryKernel fmt) : String :=

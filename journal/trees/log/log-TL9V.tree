@@ -1,0 +1,16 @@
+\title{Update docs, journal problem statuses, insights, and \code{\verb~|Core.Diag~} plan diagnostics}
+\taxon{Change}
+\date{2026-11-24}
+\author{antigravity}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{diagnostics}
+\tag{journal}
+\import{base-macros}
+
+\p{Completes the five-PR direct Clang-AST extraction stack ([dec-03IY](dec-03IY), \pr{14}–\pr{17}) with polished cross-plan diagnostics, updated documentation, and reconciled Forester journal records:}
+\ul{
+\li{Enhances \code{\verb~|LibcMath/Core/Diag.lean~} with variant-tagged \code{\verb~|kernelTag~}, \code{\verb~|diagnosePlanMatrix~} (side-by-side comparison of all evaluation plans on one input with ULP deltas), and \code{\verb~|diagnoseKernelRange~}, verified with \code{\verb~|#guard_msgs~} in \code{\verb~|LibcMath/Extracted/Expf/Examples.lean~}.}
+\li{Rewrites \code{\verb~|README.md~} and \code{\verb~|CLAUDE.md~} to document \code{\verb~|LibcMath.Core~}, \code{\verb~|ast2lean~} (\code{\verb~|extract/extract-expf-plans.sh~}, \code{\verb~|--dump-config~}), multi-plan \code{\verb~|expf~}, \code{\verb~|checkrange --plan=...~}, \code{\verb~|difftest-expf.sh --plan=...~}, and \code{\verb~|Core.Diag~}, removing obsolete IR interpreter and \code{\verb~|MarkCoreOps~} instructions.}
+\li{Updates [note-expf-status](note-expf-status), marks obsolete IR/structured-bridge problems as \code{\verb~|superseded~} ([prob-W1QC](prob-W1QC), [prob-HIMH](prob-HIMH), [prob-HVD8](prob-HVD8), [prob-JYU7](prob-JYU7), [prob-ZWH4](prob-ZWH4), [prob-VFZQ](prob-VFZQ), [prob-IW37](prob-IW37)) and closes [prob-F4A8](prob-F4A8), and records insights [ins-WILP](ins-WILP), [ins-9ZCR](ins-9ZCR), [ins-FH1S](ins-FH1S) plus session [ses-ZHIG](ses-ZHIG).}
+}

@@ -3,8 +3,7 @@
 namespace __llvm_libc {
 
 namespace cpp {
-template <typename T>
-struct optional {
+template <typename T> struct optional {
   T val;
   bool present;
   constexpr bool has_value() const { return present; }
@@ -13,8 +12,7 @@ struct optional {
   constexpr explicit operator bool() const { return present; }
 };
 
-template <int Bits>
-struct UInt {
+template <int Bits> struct UInt {
   uint64_t val[Bits / 64];
 };
 } // namespace cpp
@@ -25,20 +23,16 @@ struct Sign {
   bool is_neg;
 };
 
-template <int Bits>
-struct DyadicFloat {
+template <int Bits> struct DyadicFloat {
   Sign sign;
   int exponent;
   cpp::UInt<Bits> mantissa;
 
-  constexpr DyadicFloat(Sign s, int e, cpp::UInt<Bits> m)
-      : sign(s), exponent(e), mantissa(m) {}
+  constexpr DyadicFloat(Sign s, int e, cpp::UInt<Bits> m) : sign(s), exponent(e), mantissa(m) {}
   explicit DyadicFloat(double x);
 
-  template <typename T>
-  T fast_as() const;
-  template <typename T>
-  T generic_as() const;
+  template <typename T> T fast_as() const;
+  template <typename T> T generic_as() const;
 };
 
 template <int Bits>
@@ -56,8 +50,7 @@ DoubleDouble exact_add(double a, double b);
 DoubleDouble exact_mult(double a, double b);
 DoubleDouble quick_mult(const DoubleDouble &a, const DoubleDouble &b);
 
-template <typename T, int N>
-struct ExceptValues {
+template <typename T, int N> struct ExceptValues {
   struct Entry {
     uint32_t input;
     uint32_t rnd_nearest;
@@ -69,10 +62,8 @@ struct ExceptValues {
   cpp::optional<T> lookup(uint32_t x_bits) const;
 };
 
-template <typename T, typename C>
-T polyeval(T, C c0);
-template <typename T, typename C, typename... Cs>
-T polyeval(T x, C c0, Cs... cs);
+template <typename T, typename C> T polyeval(T, C c0);
+template <typename T, typename C, typename... Cs> T polyeval(T x, C c0, Cs... cs);
 
 int quick_get_round();
 
@@ -83,19 +74,19 @@ namespace math {
 using Float128 = fputil::DyadicFloat<128>;
 
 constexpr Float128 COEFFS_128[3] = {
-  Float128({false}, -127, {{0x0000000000000000ULL, 0x8000000000000000ULL}}),
-  Float128({false}, -128, {{0x5555555555555555ULL, 0xAAAAAAAAAAAAAAAAULL}}),
-  Float128({true},  -130, {{0x1111111111111111ULL, 0xCCCCCCCCCCCCCCCCULL}}),
+    Float128({false}, -127, {{0x0000000000000000ULL, 0x8000000000000000ULL}}),
+    Float128({false}, -128, {{0x5555555555555555ULL, 0xAAAAAAAAAAAAAAAAULL}}),
+    Float128({true}, -130, {{0x1111111111111111ULL, 0xCCCCCCCCCCCCCCCCULL}}),
 };
 
 constexpr fputil::DoubleDouble DD_TABLE[2] = {
-  {0x1.0p-54, 0x1.0p+0},
-  {-0x1.2p-55, 0x1.5p+0},
+    {0x1.0p-54, 0x1.0p+0},
+    {-0x1.2p-55, 0x1.5p+0},
 };
 
 constexpr fputil::ExceptValues<float, 2> MY_EXCEPTS = {{
-  {0x3F800000u, 0x402DF854u, 0x402DF855u, 0x402DF854u, 0x402DF854u},
-  {0xBF800000u, 0x3EBC5AB2u, 0x3EBC5AB2u, 0x3EBC5AB1u, 0x3EBC5AB1u},
+    {0x3F800000u, 0x402DF854u, 0x402DF855u, 0x402DF854u, 0x402DF854u},
+    {0xBF800000u, 0x3EBC5AB2u, 0x3EBC5AB2u, 0x3EBC5AB1u, 0x3EBC5AB1u},
 }};
 
 // Demonstrates DyadicFloat<128>, DoubleDouble, ExceptValues, and switch lifting.

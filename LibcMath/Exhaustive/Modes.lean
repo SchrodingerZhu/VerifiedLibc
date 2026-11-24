@@ -74,6 +74,7 @@ theorem roundReal_towardZero_of_pos (fmt : FloatFormat) {r : ℝ} (hr : 0 < r) :
 results. -/
 theorem Spec.exp_eval_towardZero (fmt : FloatFormat) (x : Model fmt) :
     (Spec.exp fmt).eval .towardZero x = (Spec.exp fmt).eval .down x := by
-  simp only [Spec.eval, Spec.exp, Option.getD_none, roundReal_towardZero_of_pos fmt (Real.exp_pos _)]
+  simp only [Spec.eval, Spec.exp, Option.getD_none,
+    roundReal_towardZero_of_pos fmt (Real.exp_pos _)]
 
 end LibcMath

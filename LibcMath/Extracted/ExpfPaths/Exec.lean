@@ -120,7 +120,10 @@ theorem doubleEval_of_neg_nan (hb : 0xFF800001 ≤ b.toNat) :
   have huf : BitVec.ule 0xC2CFF1B5#32 b = true := by
     rw [ule_iff_toNat]; simp; omega
   have hinf : f32(b).isInfinite = false :=
-    Bool.eq_false_iff.mpr fun h => by have := Binary32.isInfinite_iff.mp h; rw [toNatBits_f32] at this; omega
+    Bool.eq_false_iff.mpr fun h => by
+      have := Binary32.isInfinite_iff.mp h
+      rw [toNatBits_f32] at this
+      omega
   have hnan : f32(b).isNaN = true :=
     Binary32.isNaN_iff.mpr (.inr (by rw [toNatBits_f32]; omega))
   unfold Expf.DoubleEval.expf
@@ -142,9 +145,15 @@ theorem doubleEval_of_underflow (hmode : mode ∈ cModes) (hlo : 0xC2CFF1B5 ≤ 
   have huf : BitVec.ule 0xC2CFF1B5#32 b = true := by
     rw [ule_iff_toNat]; simp; omega
   have hinf : f32(b).isInfinite = false :=
-    Bool.eq_false_iff.mpr fun h => by have := Binary32.isInfinite_iff.mp h; rw [toNatBits_f32] at this; omega
+    Bool.eq_false_iff.mpr fun h => by
+      have := Binary32.isInfinite_iff.mp h
+      rw [toNatBits_f32] at this
+      omega
   have hnan : f32(b).isNaN = false :=
-    Bool.eq_false_iff.mpr fun h => by have := Binary32.isNaN_iff.mp h; rw [toNatBits_f32] at this; omega
+    Bool.eq_false_iff.mpr fun h => by
+      have := Binary32.isNaN_iff.mp h
+      rw [toNatBits_f32] at this
+      omega
   unfold Expf.DoubleEval.expf
   dsimp only [Core.FPBits.ofVal]
   simp only [uintval_f32, hne, houter, Bool.true_or, ↓reduceIte, hsmall, huf,
@@ -156,7 +165,8 @@ rounding toward zero or down, and `+∞` otherwise. -/
 theorem doubleEval_of_overflow (hmode : mode ∈ cModes) (hlo : 0x42B17218 ≤ b.toNat)
     (hhi : b.toNat ≤ 0x7F7FFFFF) :
     Expf.DoubleEval.expf mode f32(b) =
-      if mode = .towardZero ∨ mode = .down then Model.posMaxFinite .binary32 else Model.posInf .binary32 := by
+      if mode = .towardZero ∨ mode = .down then Model.posMaxFinite .binary32
+      else Model.posInf .binary32 := by
   have hne : (b == 0xC236BD8C#32) = false := ne_except_of_toNat_ne b (by omega)
   have houter : BitVec.ule 0x42B17218#32 (b &&& 0x7FFFFFFF#32) = true := by
     rw [ule_iff_toNat, abs_toNat]; simp; omega
@@ -232,7 +242,10 @@ theorem doubleEvalFma_of_neg_nan (hb : 0xFF800001 ≤ b.toNat) :
   have huf : BitVec.ule 0xC2CFF1B5#32 b = true := by
     rw [ule_iff_toNat]; simp; omega
   have hinf : f32(b).isInfinite = false :=
-    Bool.eq_false_iff.mpr fun h => by have := Binary32.isInfinite_iff.mp h; rw [toNatBits_f32] at this; omega
+    Bool.eq_false_iff.mpr fun h => by
+      have := Binary32.isInfinite_iff.mp h
+      rw [toNatBits_f32] at this
+      omega
   have hnan : f32(b).isNaN = true :=
     Binary32.isNaN_iff.mpr (.inr (by rw [toNatBits_f32]; omega))
   unfold Expf.DoubleEvalFma.expf
@@ -252,9 +265,15 @@ theorem doubleEvalFma_of_underflow (hmode : mode ∈ cModes) (hlo : 0xC2CFF1B5 �
   have huf : BitVec.ule 0xC2CFF1B5#32 b = true := by
     rw [ule_iff_toNat]; simp; omega
   have hinf : f32(b).isInfinite = false :=
-    Bool.eq_false_iff.mpr fun h => by have := Binary32.isInfinite_iff.mp h; rw [toNatBits_f32] at this; omega
+    Bool.eq_false_iff.mpr fun h => by
+      have := Binary32.isInfinite_iff.mp h
+      rw [toNatBits_f32] at this
+      omega
   have hnan : f32(b).isNaN = false :=
-    Bool.eq_false_iff.mpr fun h => by have := Binary32.isNaN_iff.mp h; rw [toNatBits_f32] at this; omega
+    Bool.eq_false_iff.mpr fun h => by
+      have := Binary32.isNaN_iff.mp h
+      rw [toNatBits_f32] at this
+      omega
   unfold Expf.DoubleEvalFma.expf
   dsimp only [Core.FPBits.ofVal]
   simp only [uintval_f32, hne, houter, Bool.true_or, ↓reduceIte, hsmall, huf,
@@ -264,7 +283,8 @@ theorem doubleEvalFma_of_underflow (hmode : mode ∈ cModes) (hlo : 0xC2CFF1B5 �
 theorem doubleEvalFma_of_overflow (hmode : mode ∈ cModes) (hlo : 0x42B17218 ≤ b.toNat)
     (hhi : b.toNat ≤ 0x7F7FFFFF) :
     Expf.DoubleEvalFma.expf mode f32(b) =
-      if mode = .towardZero ∨ mode = .down then Model.posMaxFinite .binary32 else Model.posInf .binary32 := by
+      if mode = .towardZero ∨ mode = .down then Model.posMaxFinite .binary32
+      else Model.posInf .binary32 := by
   have hne : (b == 0xC236BD8C#32) = false := ne_except_of_toNat_ne b (by omega)
   have houter : BitVec.ule 0x42B17218#32 (b &&& 0x7FFFFFFF#32) = true := by
     rw [ule_iff_toNat, abs_toNat]; simp; omega
@@ -284,7 +304,8 @@ theorem doubleEvalFma_of_overflow (hmode : mode ∈ cModes) (hlo : 0x42B17218 �
     Core.FPBits.isPos, hpos, Bool.not_false, hov, Bool.and_self, hfin, Bool.false_eq_true]
   rcases hmode with rfl | rfl | rfl | rfl <;> decide +kernel
 
-theorem doubleEvalFma_of_posInf_or_pos_nan (hlo : 0x7F800000 ≤ b.toNat) (hhi : b.toNat ≤ 0x7FFFFFFF) :
+theorem doubleEvalFma_of_posInf_or_pos_nan (hlo : 0x7F800000 ≤ b.toNat)
+    (hhi : b.toNat ≤ 0x7FFFFFFF) :
     Expf.DoubleEvalFma.expf mode f32(b) = Model.add f32(b) (Model.posInf .binary32) mode := by
   have hne : (b == 0xC236BD8C#32) = false := ne_except_of_toNat_ne b (by omega)
   have houter : BitVec.ule 0x42B17218#32 (b &&& 0x7FFFFFFF#32) = true := by
@@ -363,7 +384,8 @@ private theorem staticRounding_kernel_f32 (mode : IEEERoundingMode) (b : BitVec 
 theorem staticRounding_of_zero (hb : b.toNat = 0 ∨ b.toNat = 0x80000000) :
     Expf.StaticRounding.kernel mode f32(b) = Model.posOne .binary32 := by
   rw [staticRounding_kernel_f32]
-  have habs : b &&& 0x7FFFFFFF#32 = 0x0#32 := BitVec.eq_of_toNat_eq (by rw [abs_toNat]; rcases hb with h | h <;> simp [h])
+  have habs : b &&& 0x7FFFFFFF#32 = 0x0#32 :=
+    BitVec.eq_of_toNat_eq (by rw [abs_toNat]; rcases hb with h | h <;> simp [h])
   unfold Expf.StaticRounding.expf_bits
   dsimp only
   simp only [habs, bne_self_eq_false, ↓reduceIte, Bool.false_eq_true]
@@ -377,7 +399,12 @@ theorem staticRounding_of_tiny_pos (hmode : mode ∈ cModes)
   obtain ⟨h1, h2⟩ := xe_sub_ule_of_small b (by omega)
   have hneg : ((b >>> 31) != 0x0#32) = false := by rw [isNeg_iff]; simp; omega
   have hnz : ((b &&& 0x7FFFFFFF#32) != 0x0#32) = true := by
-    rw [bne_iff_ne]; intro heq; have := congrArg BitVec.toNat heq; rw [abs_toNat] at this; simp at this; omega
+    rw [bne_iff_ne]
+    intro heq
+    have := congrArg BitVec.toNat heq
+    rw [abs_toNat] at this
+    simp at this
+    omega
   unfold Expf.StaticRounding.expf_bits
   dsimp only
   simp only [h1, h2, hneg, hnz, Bool.not_false, Bool.and_true, Bool.and_false, ↓reduceIte,
@@ -387,12 +414,18 @@ theorem staticRounding_of_tiny_pos (hmode : mode ∈ cModes)
 theorem staticRounding_of_tiny_neg (hmode : mode ∈ cModes)
     (hlo : 0x80000001 ≤ b.toNat) (hhi : b.toNat ≤ 0xB2FFFFFF) :
     Expf.StaticRounding.kernel mode f32(b) =
-      if mode = .towardZero ∨ mode = .down then Model.ofNatBits 0x3F7FFFFF else Model.posOne .binary32 := by
+      if mode = .towardZero ∨ mode = .down then Model.ofNatBits 0x3F7FFFFF
+      else Model.posOne .binary32 := by
   rw [staticRounding_kernel_f32]
   obtain ⟨h1, h2⟩ := xe_sub_ule_of_small b (by omega)
   have hneg : ((b >>> 31) != 0x0#32) = true := by rw [isNeg_iff]; simp; omega
   have hnz : ((b &&& 0x7FFFFFFF#32) != 0x0#32) = true := by
-    rw [bne_iff_ne]; intro heq; have := congrArg BitVec.toNat heq; rw [abs_toNat] at this; simp at this; omega
+    rw [bne_iff_ne]
+    intro heq
+    have := congrArg BitVec.toNat heq
+    rw [abs_toNat] at this
+    simp at this
+    omega
   unfold Expf.StaticRounding.expf_bits
   dsimp only
   simp only [h1, h2, hneg, hnz, Bool.not_true, Bool.and_true, Bool.and_false, ↓reduceIte,
@@ -414,7 +447,8 @@ theorem staticRounding_of_nan
 theorem staticRounding_of_overflow (hmode : mode ∈ cModes)
     (hlo : 0x42B17218 ≤ b.toNat) (hhi : b.toNat ≤ 0x7F7FFFFF) :
     Expf.StaticRounding.kernel mode f32(b) =
-      if mode = .towardZero ∨ mode = .down then Model.posMaxFinite .binary32 else Model.posInf .binary32 := by
+      if mode = .towardZero ∨ mode = .down then Model.posMaxFinite .binary32
+      else Model.posInf .binary32 := by
   rw [staticRounding_kernel_f32]
   obtain ⟨h1, h2⟩ := xe_sub_ule_of_large b (by omega)
   have hneg : ((b >>> 31) != 0x0#32) = false := by rw [isNeg_iff]; simp; omega
@@ -445,7 +479,8 @@ theorem staticRounding_of_underflow (hmode : mode ∈ cModes)
   have hfin : BitVec.ult b 0xFF800000#32 = true := by rw [ult_iff_toNat]; simp; omega
   unfold Expf.StaticRounding.expf_bits
   dsimp only
-  simp only [h1, h2, hneg, hnan, huf, hfin, Bool.not_true, Bool.false_and, Bool.and_true, ↓reduceIte,
+  simp only [h1, h2, hneg, hnan, huf, hfin, Bool.not_true, Bool.false_and, Bool.and_true,
+    ↓reduceIte,
     Bool.false_eq_true]
   rcases hmode with rfl | rfl | rfl | rfl <;> decide +kernel
 

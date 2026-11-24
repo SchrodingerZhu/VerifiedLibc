@@ -1,0 +1,17 @@
+\title{LLVM libc \code{\verb~|LIBC_MATH_*~} and target CPU macros change arithmetic semantics}
+\taxon{Insight}
+\date{2026-11-24}
+\author{antigravity}
+\contributor{schrodingerzy}
+\tag{extraction}
+\tag{semantics}
+\tag{core}
+\import{base-macros}
+
+\p{Source: session [ses-ZHIG](ses-ZHIG), verified across \pr{14}, \pr{15}, \pr{16}, and \pr{17} against upstream LLVM libc commit \code{\verb~|e1a5f92db023~} using \code{\verb~|scripts/difftest-expf.sh~}.}
+\p{An LLVM libc math function's exact floating-point result is determined not only by its C++ source text, but also by the preprocessor bitflags \code{\verb~|LIBC_MATH_HAS_*~} (\code{\verb~|optimization.h~}) and target CPU macros \code{\verb~|LIBC_TARGET_CPU_HAS_*~} (\code{\verb~|cpu_features.h~}) active during compilation:}
+\ul{
+\li{On x86-64, \code{\verb~|LIBC_TARGET_CPU_HAS_FMA_FLOAT~} and \code{\verb~|LIBC_TARGET_CPU_HAS_FMA_DOUBLE~} require both \code{\verb~|-mavx2~} and \code{\verb~|-mfma~} (not \code{\verb~|-mfma~} alone). Without hardware FMA, \code{\verb~|fputil::multiply_add(x, y, z)~} performs separate rounded multiplication and addition, which differs from fused \code{\verb~|fma~} under directed rounding modes. With \code{\verb~|-mavx2 -mfma~}, \code{\verb~|fputil::nearest_integer~} also switches from software magic-number rounding to hardware \code{\verb~|roundss~}/\code{\verb~|roundsd~}.}
+\li{\code{\verb~|LIBC_MATH_EXPF_IMPL~} selects among four distinct evaluation plans (\code{\verb~|double_eval~}, \code{\verb~|integer_eval~}, \code{\verb~|float_eval~}, \code{\verb~|float_eval_cr_rn~}) and is \code{\verb~|#undef~}'d at the end of \code{\verb~|expf.h~}, so config snapshotting must capture the remaining \code{\verb~|LIBC_MATH_HAS_*~} flags and infer the variant from the extracted C++ symbol name or an explicit \code{\verb~|--variant~} override.}
+\li{Because \code{\verb~|ast2lean~} snapshots all of these flags into \code{\verb~|Core.MathConfig~} and threads \code{\verb~|config~} into \code{\verb~|Core.multiplyAdd~}/\code{\verb~|multiplySub~}/\code{\verb~|subMultiply~}/\code{\verb~|nearestInt~}/\code{\verb~|setOverflow~}/\code{\verb~|setUnderflow~}/\code{\verb~|Frac64.mul~}, dense differential testing matched compiled Clang machine code with 0 mismatches across 2.85M evaluations covering both non-FMA and \code{\verb~|-mavx2 -mfma~} builds.}
+}
