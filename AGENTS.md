@@ -44,6 +44,9 @@ lake build             # must end with "Build completed successfully"
   shell, at the commit of LLVM that the files record.
 - Lean, C++ and Nix sources stay within 100 columns. The exceptions are expected messages under
   `#guard_msgs`, string literals, and long expressions in generated files.
+- **Keep a strictly linear history on `main`.** Do not create merge commits on `main`: rebase
+  feature branches (`git rebase`) or squash-merge pull requests so `git log --merges main` remains
+  empty and every commit on `main` builds cleanly.
 - When a status is reported, say first whether the main theorem is complete, and name what is
   open. "No errors" and "standard axioms" are not a status.
 
