@@ -8,12 +8,11 @@ import LibcMath.Oracle.Exp
 results are correct and half are off by one bit. It prints the time per call of `check` and how
 many finite nonzero inputs each step of `ExpOracle.round` settles.
 
-It is not a target of the package. To build it, add to `lakefile.toml`
+It is not a target of the package. To build it, add to `lakefile.lean`
 
-```toml
-[[lean_exe]]
-name = "bench-exp-oracle"
-root = "Bench.ExpOracle"
+```lean
+lean_exe «bench-exp-oracle» where
+  root := `Bench.ExpOracle
 ```
 -/
 

@@ -6,6 +6,7 @@
 \tag{architecture}
 \tag{error-bound}
 \meta{status}{accepted}
+\meta{updated}{2026-11-24}
 \import{base-macros}
 
 \p{\strong{Status:} accepted.}
@@ -14,3 +15,4 @@
 \p{\strong{Why it is the better route here.} It is the argument the authors of the code make, it is the only one that reaches formats with \code{\verb~|2⁶⁴~} inputs, and it does not need \code{\verb~|native_decide~}, which the exhaustive route needed for all but small ranges.}
 \p{\strong{Set aside.} The exhaustive check as the proof of the main ranges: the plan, run, record and generate steps of \code{\verb~|scripts/exhaustive.py~} and the certificate sets under \code{\verb~|LibcMath/Exhaustive/Run/~}. A compiled pass that was under way when the decision was made was stopped; what it had covered is in [log-WJ3Q](log-WJ3Q).}
 \p{\strong{Not decided.} Whether \code{\verb~|checkrange~}, the oracle and the block certificates stay in the repository as a test of a kernel and for the inputs that an error bound leaves over, or are removed. The inputs near a rounding boundary still have to be treated one by one or by a search for worst cases; [prob-48KJ](prob-48KJ) says what is known.}
+\p{\strong{Corrected on 2026-11-24 by the maintainer.} Numerical analysis is preferred for the main ranges, not required. A check of each input by compiled code against MPFR is an accepted way to close a range, with the trust it brings stated: [log-5KG8](log-5KG8). What is set aside is the check in the kernel and the reliance on an exhaustive pass as the only route.}

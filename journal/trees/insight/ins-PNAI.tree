@@ -1,0 +1,19 @@
+\title{Calling C from Lean at elaboration time, with the toolchain of the flake}
+\taxon{Insight}
+\date{2026-11-24}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{tooling}
+\tag{nix}
+\tag{ffi}
+\import{base-macros}
+
+\p{Source: session [ses-7MUY](ses-7MUY). Lean 4.36.0 from the flake. Each item was hit while making \code{\verb~|native_decide~} run MPFR.}
+\ul{
+\li{Declare the function in a module of a library with \code{\verb~|precompileModules := true~}, and keep that library small: a module there is compiled to a shared library that Lake loads when a module that imports it is elaborated. \code{\verb~|#eval~} and \code{\verb~|native_decide~} in the importing module then call the C code. The importing module itself need not be compiled ahead of time.}
+\li{\code{\verb~|lakefile.toml~} cannot compile a C file; \code{\verb~|lakefile.lean~} can, with a \code{\verb~|target~} that calls \code{\verb~|buildO~} and an \code{\verb~|extern_lib~} that wraps the object.}
+\li{The C compiler bundled with Lean has no headers of the C library, with or without the flags of \code{\verb~|buildLeanO~}. Plain C that does not include \code{\verb~|lean/lean.h~} is best compiled with \code{\verb~|cc~} of the environment. A function whose arguments and result are \code{\verb~|UInt8~} and \code{\verb~|UInt32~} needs nothing from the Lean runtime.}
+\li{The linker bundled with Lean does not read \code{\verb~|NIX_LDFLAGS~}. Pass the \code{\verb~|-L~} directories on in \code{\verb~|moreLinkArgs~}, with a run path for each, but only those that hold the wanted libraries: the shell also offers CaDiCaL, and its directory makes the link of an executable fail against the CaDiCaL that Lean bundles.}
+\li{A library of nixpkgs may refer to symbols of a newer C library than the one the linker of Lean knows, and the link of an executable then stops at \code{\verb~|--no-allow-shlib-undefined~}. \code{\verb~|-Wl,--allow-shlib-undefined~} leaves them to the loader, which has the newer library.}
+\li{\code{\verb~|#print axioms~} of a theorem proved by \code{\verb~|native_decide~} lists one axiom named after the theorem, ending in \code{\verb~|_native.native_decide.ax_1_1~}, not \code{\verb~|Lean.ofReduceBool~}.}
+}

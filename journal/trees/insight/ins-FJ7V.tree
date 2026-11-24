@@ -1,0 +1,15 @@
+\title{A build in the working tree does not show that the commit builds}
+\taxon{Insight}
+\date{2026-11-24}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{tooling}
+\tag{process}
+\import{base-macros}
+
+\p{Source: \pr{19} and the pull request that repaired it. Verified.}
+\ul{
+\li{\code{\verb~|.gitignore~} ignores everything under \code{\verb~|LibcMath/Exhaustive/Run/Native/~} except the set \code{\verb~|Demo~}, because generated certificate sets are not kept. A new file there, \code{\verb~|Mpfr.lean~}, was therefore never added by \code{\verb~|git add -A~}, while \code{\verb~|LibcMath.lean~} imported it. The build passed in the working tree, where the file existed, and the main branch did not build after the merge.}
+\li{Before a merge, look at \code{\verb~|git status --short --ignored~} for sources among the ignored files, or build a fresh checkout of the commit. A file that a tracked file imports must itself be tracked.}
+\li{The file is now an exception in \code{\verb~|.gitignore~}. A new hand-written file in an ignored directory needs one too.}
+}

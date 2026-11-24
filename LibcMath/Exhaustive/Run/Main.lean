@@ -1,17 +1,20 @@
 import LibcMath.Exhaustive.Run.Block
 import LibcMath.Exhaustive.Run.Target
+import LibcMath.Oracle.Mpfr
 
 /-!
 # `checkrange`: compiled evaluation of `checkRange`
 
-    checkrange [--plan=<name>] <mode> <first> <count> [<block>]
+    checkrange [--oracle=<name>] [--plan=<name>] <mode> <first> <count> [<block>]
 
-evaluates `checkRange Run.oracle impl mode b block` (through `checkBlock`) for the consecutive
+evaluates `checkRange O impl mode b block` (through `checkBlock`) for the consecutive
 blocks `b = first, first + block, …` covering `count` bit patterns, printing one tab-separated
 line per block on stdout:
 
     <mode> <first> <count> <ok|fail> <milliseconds>
 
+* `--oracle=<name>` selects the oracle `O`: `lean` [default] is `Run.oracle`, which is proved
+  sound in Lean; `mpfr` is `mpfrExpOracle`, which trusts MPFR and is much faster.
 * `--plan=<name>` selects the extracted `expf` evaluation plan (`double_eval` [default],
   `double_eval_fma`, `integer_eval`, `static_rounding`, `float_eval`, `float_eval_cr_rn`).
 * `mode` is `nearest`, `towardZero`, `up`, or `down`.
@@ -31,7 +34,26 @@ def parseMode : String → Option IEEERoundingMode
   | _ => none
 
 def usage : String :=
-  "usage: checkrange [--plan=double_eval|double_eval_fma|integer_eval|static_rounding|float_eval|float_eval_cr_rn] <nearest|towardZero|up|down> <first> <count> [<block>]"
+  "usage: checkrange [--oracle=lean|mpfr] [--plan=double_eval|double_eval_fma|integer_eval|" ++
+    "static_rounding|float_eval|float_eval_cr_rn] <nearest|towardZero|up|down> <first> <count> " ++
+    "[<block>]"
+
+/-- The test of an oracle, by its name on the command line. -/
+abbrev Check := IEEERoundingMode →
+  (input result : FloatLib.Floats.Formats.BinaryInterchange.Model .binary32) → Bool
+
+/-- Take a leading `--oracle=<name>` off the arguments. -/
+def parseOracleFlag (args : List String) : Option (Check × List String) :=
+  match args with
+  | flag :: rest =>
+      if flag.startsWith "--oracle=" then
+        match (flag.drop 9).toString with
+        | "lean" => some (Run.oracle.check, rest)
+        | "mpfr" => some (mpfrExpOracle.check, rest)
+        | _ => none
+      else
+        some (Run.oracle.check, args)
+  | [] => none
 
 def parsePlanFlag (args : List String) :
     Option (String × Core.UnaryKernel .binary32 × List String) :=
@@ -47,6 +69,9 @@ def parsePlanFlag (args : List String) :
   | [] => none
 
 def main (args : List String) : IO UInt32 := do
+  let some (check, args) := parseOracleFlag args
+    | IO.eprintln usage
+      return 2
   let some (planName, kernel, restArgs) := parsePlanFlag args
     | IO.eprintln usage
       return 2
@@ -69,11 +94,11 @@ def main (args : List String) : IO UInt32 := do
   while start < first + count do
     let size := min block (first + count - start)
     let t0 ← IO.monoMsNow
-    let ok := checkBlock Run.oracle.check kernel.eval mode start size
+    let ok := checkBlock check kernel.eval mode start size
     let t1 ← IO.monoMsNow
     if !ok then
       IO.eprintln
-        (Core.Diag.diagnoseBlock Run.oracle.check kernel.eval mode start size s!"expf/{planName}")
+        (Core.Diag.diagnoseBlock check kernel.eval mode start size s!"expf/{planName}")
     allOk := allOk && ok
     stdout.putStrLn s!"{name}\t{start}\t{size}\t{if ok then "ok" else "fail"}\t{t1 - t0}"
     stdout.flush
