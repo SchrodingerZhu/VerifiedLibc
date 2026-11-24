@@ -12,7 +12,9 @@ lake exe cache get     # prebuilt Mathlib; without it Mathlib is compiled from s
 lake build             # must end with "Build completed successfully"
 ```
 
-- Check one file without building the rest: `lake lean LibcMath/Path/To/File.lean`.
+- Check one file without building the rest: `lake env lean LibcMath/Path/To/File.lean`.
+- Build executables: `lake build checkrange difftest-expf-model`.
+- Build and smoke-test the C++23 Clang-AST extractor: `bash extract/test/run_tests.sh`.
 - Warnings about files "designed for use with the module system" come from Mathlib imports and
   are expected.
 - To work on a pull request beside the main checkout, use `git worktree add` and link
@@ -21,63 +23,69 @@ lake build             # must end with "Build completed successfully"
 ## What must stay true
 
 - No `sorry`, no new `axiom`, and no `native_decide` outside files whose name or directory says
-  so. Top-level theorems carry a `#guard_msgs in #print axioms …` check (see the end of
-  `LibcMath/Exhaustive/Expf.lean`); add one for each new top-level result, so that a regression
-  fails the build instead of relying on a claim in a pull request.
+  so. Top-level theorems carry a `#guard_msgs in #print axioms …` check (see
+  `LibcMath/Exhaustive/Expf.lean` and `LibcMath/Extracted/ExpfMain.lean`); add one for each new
+  top-level result, so that a regression fails the build instead of relying on a claim in a pull
+  request.
 - Files named `…Examples.lean` are part of the build. They are the tests: put a small worked case
   there for every new definition that is meant to be evaluated.
 
 ## Proof style
 
-- Reuse Mathlib and FloatLib before writing a lemma. Search with `exact?`, `rw?`, or `grep` in
-  `.lake/packages/FloatLib` and `.lake/packages/mathlib`. A general fact about rounding belongs in
-  FloatLib; keep it here only until it is upstream, and say so in its docstring.
-- Make definitions usable by `grind`. Predicates that are thin wrappers (`SameValue`,
-  `IR.Val.Encodes`, `HoldsOnBits`) are tagged `@[grind]`, so `grind` unfolds them; characterising
-  lemmas of Boolean checks (`checkBits_eq_true_iff`, `checkRange_eq_true_iff`, …) are tagged
-  `@[grind =]`. Follow the same pattern for new ones, and try `grind` first on goals about
-  ranges, `SameValue` and `Encodes`.
-- When `grind` fails, read the goal it prints; that it stalls on an equation between `fun`
-  expressions means the definitions involved have to be unfolded by `simp only` first
-  (`roundReal_towardZero_of_pos` in `LibcMath/Exhaustive/Modes.lean` is such a case).
+- Reuse Mathlib, FloatLib, and `LibcMath.Core` before writing a lemma. Search with `exact?`,
+  `rw?`, or `grep` in `.lake/packages/FloatLib` and `.lake/packages/mathlib`. A general fact about
+  rounding belongs in FloatLib; keep it here only until it is upstream, and say so in its
+  docstring.
+- Make definitions usable by `grind`. Thin predicates (`SameValue`, `CorrectAt`, `HoldsOnBits`,
+  `Core.FPBits.*`, `Core.Sign.*`) are tagged `@[grind]`, and Boolean characterisations
+  (`checkBits_eq_true_iff`, `checkRange_eq_true_iff`, `checkModesAgree_eq_true_iff`, …) are tagged
+  `@[grind =]`. Follow the same pattern for new definitions, and try `grind` first on goals about
+  ranges, `SameValue`, `CorrectAt`, and `MathConfig`.
+- When `grind` fails, read the goal it prints; if it stalls on an equation between `fun`
+  expressions, unfold the definitions with `simp only` first (`roundReal_towardZero_of_pos` in
+  `LibcMath/Exhaustive/Modes.lean` is such a case).
+- Do **not** put `@[inline]` on multi-call wrappers over FloatLib's `@[macro_inline]` operations
+  (`Model.add`, `Model.mul`, `Model.sub`); inlining cascades blow up the LCNF compiler.
 - Keep a proof term where it is one line of composition. Search tactics are for finding it.
 
-## When a block check is `false`
+## Agent-friendly diagnostics
 
-Every check of a block of bit patterns is `checkBits test first count`
-(`LibcMath/Exhaustive/Range.lean`). Its diagnostic is `firstFailingBits test first count`, and for
-`checkRange` there is the shorthand
+### Inspecting extracted kernels, configs, and cross-plan diffs (`LibcMath.Core.Diag`)
+
+Every extracted kernel module defines `config : Core.MathConfig`, `kernelMeta : Core.KernelMeta`,
+and `kernel : Core.UnaryKernel fmt`. Inspect provenance, active `LIBC_MATH_*` / CPU flags, or
+compare evaluation plans directly in Lean:
 
 ```lean
-#eval checkRange.firstFailure O.check run mode first count   -- `some n`: first failing pattern
+#eval Core.Diag.inspectKernel Extracted.Expf.DoubleEval.kernel
+#eval Core.Diag.describeFloat (Extracted.Expf.DoubleEval.expf .nearest f32(0x3F800000#32))
+#eval Core.Diag.compareKernels Extracted.Expf.DoubleEval.kernel Extracted.Expf.FloatEval.kernel .nearest 0x3F800000 32
+#eval Core.Diag.diagnosePlanMatrix Extracted.Expf.allPlans .nearest f32(0x3F800000#32)
 ```
 
-Then evaluate `run mode (.ofNatBits n)` and `O.check mode (.ofNatBits n) _` to see which side is
-at fault. `LibcMath/Exhaustive/ReductionExamples.lean` has a passing block, a failing block and
-its diagnosis.
+From the shell, `ast2lean --dump-config` snapshots the exact preprocessor macros seen by Clang for
+any flag combination without generating Lean.
+
+### When a block check is `false`
+
+Every check of a block of bit patterns is `checkBits test first count`
+(`LibcMath/Exhaustive/Range.lean`). Its diagnostics are:
+
+```lean
+#eval checkRange.firstFailure O.check impl mode first count          -- `some n`: first failing pattern
+#eval Core.Diag.diagnoseKernelRange O.check kernel mode first count -- full report with hex, class, rational value
+```
+
+The `checkrange` CLI (`LibcMath/Exhaustive/Run/Main.lean`) automatically prints
+`Core.Diag.diagnoseBlock` to stderr whenever a block fails while preserving the stdout manifest
+TSV format.
 
 Pass the oracle's test `O.check`, not the oracle: a specification is noncomputable, so a
 definition that takes an `Oracle S` as an argument cannot be compiled at a concrete `S`, and
 `#eval` on it fails with "depends on 'Spec.exp', which is 'noncomputable'". Evaluation in the
 kernel (`decide +kernel`) is not affected.
 
-## When the interpreter answers `none`
-
-`Func.exec`, `Func.run` and `Func.runUnary` (`LibcMath/IR/Interp.lean`) answer `none` when the
-interpreter gives up, which does not mean that the function has no result. Ask why:
-
-```lean
-#eval IO.println (f.explain mode [.ofModel x])          -- first step without an answer
-#eval IO.println (f.explainFloat fmt mode [.ofModel x]) -- also: answer of the wrong width
-```
-
-The report names the block, the register and the kind of instruction, and lists the registers
-that are not known exactly (a NaN from arithmetic, or the result of `raiseExcept`).
-`LibcMath/IR/InterpExamples.lean` has a case. `LibcMath/IR/InterpDiag.lean` follows
-`Func.execFrom` step by step; when the interpreter changes, change it too, and the examples will
-show whether the reports still hold.
-
-## Which closed form covers a bit pattern of `exp`
+### Which closed form covers a bit pattern of `exp`
 
 `LibcMath/Functions/ExpRanges.lean` proves the correctly rounded binary32 `exp` on whole blocks of
 bit patterns. The blocks are also data:
