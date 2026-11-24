@@ -58,7 +58,8 @@ def checkRange.test (check : IEEERoundingMode → Model fmt → Model fmt → Bo
 theorem checkRange_eq_checkBits (O : Oracle S)
     (impl : IEEERoundingMode → Model fmt → Model fmt) (mode : IEEERoundingMode)
     (first count : ℕ) :
-    checkRange O impl mode first count = checkBits (checkRange.test O.check impl mode) first count :=
+    checkRange O impl mode first count =
+      checkBits (checkRange.test O.check impl mode) first count :=
   rfl
 
 /-- First bit pattern of `[first, first + count)` rejected by `check`. Compilable for `#eval`. -/
@@ -75,7 +76,8 @@ theorem checkRange.firstFailure_eq_none_iff {O : Oracle S} :
 @[grind =]
 theorem checkRange_eq_true_iff {O : Oracle S} :
     checkRange O impl mode first count = true ↔
-      ∀ i < count, O.check mode (.ofNatBits (first + i)) (impl mode (.ofNatBits (first + i))) = true :=
+      ∀ i < count,
+        O.check mode (.ofNatBits (first + i)) (impl mode (.ofNatBits (first + i))) = true :=
   checkBits_eq_true_iff
 
 /-- A block is checked by checking an initial part and the rest. -/

@@ -110,9 +110,13 @@
           git
           curl
 
-          # Extraction of libc functions from LLVM IR (see ./extract).
+          # Extraction of libc functions from the Clang AST (see ./extract). `ast2lean` links
+          # against the Clang and LLVM libraries, and `clang-scan-deps` orders its C++ modules.
           llvmPackages_23.clang
+          llvmPackages_23.clang-tools
+          llvmPackages_23.libclang.dev
           llvmPackages_23.llvm
+          llvmPackages_23.llvm.dev
           cmake
           ninja
 
@@ -137,6 +141,13 @@
           (journalTools pkgs).serve
           (journalTools pkgs).new
         ];
+
+        # The Lean release bundles a clang of its own, which comes first in PATH and cannot
+        # build C++ against the system headers. The extraction scripts use these instead.
+        AST2LEAN_CC = "${pkgs.llvmPackages_23.clang}/bin/clang";
+        AST2LEAN_CXX = "${pkgs.llvmPackages_23.clang}/bin/clang++";
+        LLVM_DIR = "${pkgs.llvmPackages_23.llvm.dev}/lib/cmake/llvm";
+        Clang_DIR = "${pkgs.llvmPackages_23.libclang.dev}/lib/cmake/clang";
       };
     });
 

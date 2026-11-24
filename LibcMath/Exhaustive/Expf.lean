@@ -33,8 +33,10 @@ theorem expfImplCorrectlyRounded_of_holdsOnBits
 /-- `Expf.DoubleEval.expf` is correctly rounded if it is correct on all bit patterns under each of
 the four rounding directions. -/
 theorem expfCorrectlyRounded_of_holdsOnBits
-    (nearest : HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEval.expf .nearest) 0 (2 ^ 32))
-    (towardZero : HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEval.expf .towardZero) 0 (2 ^ 32))
+    (nearest : HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEval.expf .nearest)
+        0 (2 ^ 32))
+    (towardZero : HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEval.expf .towardZero)
+        0 (2 ^ 32))
     (up : HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEval.expf .up) 0 (2 ^ 32))
     (down : HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEval.expf .down) 0 (2 ^ 32)) :
     ExpfCorrectlyRounded :=

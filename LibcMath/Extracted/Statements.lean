@@ -39,7 +39,8 @@ round-to-nearest-even mode. -/
 def ExpfFloatEvalCrRnCorrectlyRounded : Prop :=
   CorrectlyRounded (Spec.exp .binary32) {.nearest} Expf.FloatEvalCrRn.expf
 
-/-- Default top-level correctness statement for `expf` (`double_eval`, all four C rounding modes). -/
+/-- Default top-level correctness statement for `expf` (`double_eval`, all four C rounding modes).
+-/
 abbrev ExpfCorrectlyRounded : Prop :=
   ExpfDoubleEvalCorrectlyRounded
 

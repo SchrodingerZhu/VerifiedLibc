@@ -29,6 +29,24 @@ lake build             # must end with "Build completed successfully"
   request.
 - Files named `…Examples.lean` are part of the build. They are the tests: put a small worked case
   there for every new definition that is meant to be evaluated.
+- Files under `LibcMath/Extracted/Expf/` other than `Plans.lean` and `Examples.lean` are generated.
+  Do not edit them; change `extract/` and run `extract/extract-expf-plans.sh <llvm-project>/libc`
+  in the flake shell, at the commit of LLVM that the files record.
+- Lean, C++ and Nix sources stay within 100 columns. The exceptions are expected messages under
+  `#guard_msgs` and string literals, which cannot be broken.
+
+## What the theorems do not say
+
+The extracted kernels are total Lean functions, and the statements are about their results only.
+
+- **Undefined behaviour is not tracked.** A conversion to an integer that is out of range gives
+  `0` in `Core.fptosi` and `Core.fptoui`, where C++ gives no meaning. A proof about a kernel does
+  not show that the C++ code stays clear of such a case.
+- **Effects are dropped.** `ast2lean --drop-effects` removes `errno` and the floating-point
+  exception flags, so nothing is proved about them.
+- **The translation is trusted.** `ast2lean` and the definitions in `LibcMath/Core/` are not
+  verified against Clang. `scripts/difftest-expf.sh` compares a kernel with the compiled C++ on
+  many inputs; run it after any change to `extract/` or to `LibcMath/Core/`.
 
 ## Proof style
 

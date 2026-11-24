@@ -19,14 +19,14 @@ auto runCli(int argc, char **argv) -> int;
 
 } // namespace libc_extract
 
-module :private;
+module : private;
 
 namespace libc_extract {
 namespace {
 
 void printUsage(std::string_view prog) {
   std::println(std::cerr,
-R"(usage: {0} <source.cpp> --function=<name> [options] [-- <clang-args...>]
+               R"(usage: {0} <source.cpp> --function=<name> [options] [-- <clang-args...>]
        {0} <source.cpp> --list-functions [clang-args...]
        {0} <source.cpp> --dump-config [clang-args...]
 
@@ -57,7 +57,8 @@ Options:
   -h, --help             Show this message
 
 Clang flags (e.g. -I..., -D..., -std=..., -mavx2, -mfma) may be passed either
-directly or after `--`.)", prog);
+directly or after `--`.)",
+               prog);
 }
 
 auto consumePrefixed(std::string_view arg, std::string_view prefix, std::string &dst) -> bool {
@@ -135,7 +136,8 @@ auto runCli(int argc, char **argv) -> int {
       parse_opts.strict = true;
     } else if (a == "-I" || a == "-D" || a == "-U" || a == "-isystem" || a == "-include") {
       parse_opts.clang_args.emplace_back(a);
-      if (i + 1 < args.size()) parse_opts.clang_args.emplace_back(args[++i]);
+      if (i + 1 < args.size())
+        parse_opts.clang_args.emplace_back(args[++i]);
     } else if (a.starts_with("-I") || a.starts_with("-D") || a.starts_with("-U") ||
                a.starts_with("-std=") || a.starts_with("-f") || a.starts_with("-m") ||
                a.starts_with("-W") || a.starts_with("-O") || a.starts_with("--target=")) {
@@ -143,7 +145,8 @@ auto runCli(int argc, char **argv) -> int {
     } else if (!a.starts_with("-") && parse_opts.source_file.empty()) {
       parse_opts.source_file = std::string(a);
     } else {
-      std::println(std::cerr, "ast2lean: unrecognized option '{}' (put raw Clang flags after `--`)", a);
+      std::println(std::cerr, "ast2lean: unrecognized option '{}' (put raw Clang flags after `--`)",
+                   a);
       return 2;
     }
   }
@@ -170,8 +173,7 @@ auto runCli(int argc, char **argv) -> int {
       return 1;
     }
     for (const auto &f : *listed) {
-      std::println("{:<48} {}  [{}]{}",
-                   f.qualified_name, f.signature, f.mangled_name,
+      std::println("{:<48} {}  [{}]{}", f.qualified_name, f.signature, f.mangled_name,
                    f.is_template_instantiation ? " (instantiation)" : "");
     }
     return 0;

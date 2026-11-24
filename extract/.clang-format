@@ -1,0 +1,4 @@
+# Formatting of the extractor sources. Run `clang-format -i extract/src/* extract/test/*.cpp`
+# from the flake shell after a change.
+BasedOnStyle: LLVM
+ColumnLimit: 100

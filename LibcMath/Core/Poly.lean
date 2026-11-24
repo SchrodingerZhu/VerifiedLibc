@@ -75,7 +75,8 @@ def altpolyevalList {α : Type} [PolyElem α] (cfg : MathConfig) (mode : IEEERou
   | [a0] => a0
   | a0 :: rest => PolyElem.subMul cfg mode a0 x (altpolyevalList cfg mode x rest)
 
-/-- Array-backed Horner evaluation starting at `offset` (matches `fputil::polyeval<OFFSET>(x, a)`). -/
+/-- Array-backed Horner evaluation starting at `offset` (matches `fputil::polyeval<OFFSET>(x, a)`).
+-/
 @[inline] def polyeval {α : Type} [PolyElem α] (cfg : MathConfig) (mode : IEEERoundingMode)
     (x : α) (coeffs : Array α) (offset : Nat := 0) : α :=
   polyevalList cfg mode x (coeffs.toList.drop offset)
