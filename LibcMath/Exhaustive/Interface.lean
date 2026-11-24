@@ -1,3 +1,4 @@
+import LibcMath.Exhaustive.Range
 import LibcMath.Spec
 
 /-!
@@ -9,8 +10,9 @@ from, so that they can be developed and run independently:
 
 * an `Oracle` decides, for one input and one candidate result, whether the result is the correctly
   rounded one, and is proved sound once;
-* an executable implementation `run` returns the result of the code under study on one input;
-* `checkRange` runs both over a block of consecutive bit patterns.
+* a total executable implementation `impl : IEEERoundingMode → Model fmt → Model fmt` (such as an
+  extracted `Core.UnaryKernel`) computes the result on one input;
+* `checkRange` runs both over a block of consecutive bit patterns using `checkBits`.
 
 Establishing `checkRange … = true` for blocks that cover a format is then a finite computation,
 which can be split among any number of workers.
@@ -30,15 +32,11 @@ structure Oracle (S : Spec fmt) where
   sound : ∀ mode input result, check mode input result = true →
     SameValue result (S.eval mode input)
 
-/-- The implementation `run` produces a result accepted by `O` on each of the `count` bit patterns
-starting at `first`. -/
+/-- The implementation `impl` produces a result accepted by `O` on each of the `count` bit
+patterns starting at `first`. -/
 def checkRange {S : Spec fmt} (O : Oracle S)
-    (run : IEEERoundingMode → Model fmt → Option (Model fmt))
+    (impl : IEEERoundingMode → Model fmt → Model fmt)
     (mode : IEEERoundingMode) (first count : Nat) : Bool :=
-  (List.range count).all fun i =>
-    let input : Model fmt := .ofNatBits (first + i)
-    match run mode input with
-    | some result => O.check mode input result
-    | none => false
+  checkBits (fun input => O.check mode input (impl mode input)) first count
 
 end LibcMath

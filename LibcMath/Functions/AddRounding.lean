@@ -113,4 +113,75 @@ theorem add_one_of_zero_bits (hmode : mode ∈ cModes)
   rcases hbits with h | h <;> rw [h] <;> rcases hmode with rfl | rfl | rfl | rfl <;>
     decide +kernel
 
+/-- `1 + ±0 = 1`. -/
+theorem one_add_of_zero_bits (hmode : mode ∈ cModes)
+    (hbits : x.toNatBits = 0 ∨ x.toNatBits = 0x80000000) :
+    Model.add (posOne .binary32) x mode = posOne .binary32 := by
+  rw [← ofNatBits_toNatBits x]
+  rcases hbits with h | h <;> rw [h] <;> rcases hmode with rfl | rfl | rfl | rfl <;>
+    decide +kernel
+
+/-- `1 + x = x + 1` for finite `x` with `1 + x > 0` and `|1 + x| ≤ maxFinite` whose rounded sum is
+nonzero. -/
+private theorem one_add_eq (hfinite : x.isFinite = true) {lo hi : ℚ}
+    {result : Model FloatFormat.binary32} (hpos : 0 < lo) (hlo : (lo : ℝ) ≤ x.toReal + 1)
+    (hhi : x.toReal + 1 ≤ (hi : ℝ)) (hhi' : hi ≤ 2)
+    (hroundLo : roundRat .binary32 mode lo = result)
+    (hroundHi : roundRat .binary32 mode hi = result) (hresult : result.toReal ≠ 0) :
+    Model.add (posOne .binary32) x mode = result := by
+  have hone : (posOne FloatFormat.binary32).toReal = ((1 : ℚ) : ℝ) :=
+    toReal_eq (by decide +kernel)
+  have hmax : (posMaxFinite FloatFormat.binary32).toReal =
+      ((340282346638528859811704183484516925440 : ℚ) : ℝ) := toReal_eq (by decide +kernel)
+  push_cast at hone hmax
+  have hlo' : (0 : ℝ) < lo := by exact_mod_cast hpos
+  have hhi'' : (hi : ℝ) ≤ 2 := by exact_mod_cast hhi'
+  have hround := roundReal_eq_of_mem_Icc_rat (fmt := .binary32) rfl mode hpos hlo hhi hroundLo
+    hroundHi
+  rw [add_comm x.toReal 1, ← hone] at hround
+  rw [add_eq_roundReal rfl mode (by decide +kernel) hfinite
+    (by rw [hone, hmax, abs_of_pos (by linarith)]; linarith) (by rw [hone]; linarith)
+    (by rw [hround]; exact hresult), hround]
+
+/-- For `0 < x ≤ 2⁻²⁶` the sum `1 + x` is `1 + 2⁻²³` when rounding up, and `1` otherwise. -/
+theorem one_add_of_tiny_pos_bits (hmode : mode ∈ cModes)
+    (hbits : 0x00000001 ≤ x.toNatBits ∧ x.toNatBits ≤ 0x32800000) :
+    Model.add (posOne .binary32) x mode =
+      if mode = .up then ofNatBits 0x3F800001 else posOne .binary32 := by
+  have hlo := (Binary32.toReal_ofNatBits_le_iff_of_nonneg (by norm_num) (by omega)).mpr hbits.1
+  have hhi := (Binary32.toReal_le_ofNatBits_iff_of_nonneg (by norm_num) (by omega)).mpr hbits.2
+  rw [toReal_eq (y := ofNatBits 0x00000001) (q := 1 / 2 ^ 149) (by decide +kernel)] at hlo
+  rw [toReal_eq (y := ofNatBits 0x32800000) (q := 1 / 2 ^ 26) (by decide +kernel)] at hhi
+  have hfinite : x.isFinite = true := Binary32.isFinite_iff.mpr (.inl (by omega))
+  have hsucc : (ofNatBits 0x3F800001 : Model FloatFormat.binary32).toReal =
+      ((1 + 1 / 2 ^ 23 : ℚ) : ℝ) := toReal_eq (by decide +kernel)
+  have hone : (posOne FloatFormat.binary32).toReal = ((1 : ℚ) : ℝ) :=
+    toReal_eq (by decide +kernel)
+  rcases hmode with rfl | rfl | rfl | rfl <;>
+    refine one_add_eq (lo := 1 + 1 / 2 ^ 149) (hi := 1 + 1 / 2 ^ 26) hfinite
+      (by norm_num) (by push_cast at hlo ⊢; linarith) (by push_cast at hhi ⊢; linarith)
+      (by norm_num) (by decide +kernel) (by decide +kernel) ?_ <;>
+    simp only [reduceCtorEq, ↓reduceIte, hsucc, hone] <;> norm_num
+
+/-- For `-2⁻²⁶ ≤ x < 0` the sum `1 + x` is `1 - 2⁻²⁴` when rounding toward zero or down, and `1`
+otherwise. -/
+theorem one_add_of_tiny_neg_bits (hmode : mode ∈ cModes)
+    (hbits : 0x80000001 ≤ x.toNatBits ∧ x.toNatBits ≤ 0xB2800000) :
+    Model.add (posOne .binary32) x mode =
+      if mode = .towardZero ∨ mode = .down then ofNatBits 0x3F7FFFFF else posOne .binary32 := by
+  have hhi := (Binary32.toReal_le_ofNatBits_iff_of_nonpos (by norm_num) (by omega)).mpr hbits.1
+  have hlo := (Binary32.toReal_ofNatBits_le_iff_of_nonpos (by norm_num) (by omega)).mpr hbits.2
+  rw [toReal_eq (y := ofNatBits 0x80000001) (q := -(1 / 2 ^ 149)) (by decide +kernel)] at hhi
+  rw [toReal_eq (y := ofNatBits 0xB2800000) (q := -(1 / 2 ^ 26)) (by decide +kernel)] at hlo
+  have hfinite : x.isFinite = true := Binary32.isFinite_iff.mpr (.inr (by omega))
+  have hpred : (ofNatBits 0x3F7FFFFF : Model FloatFormat.binary32).toReal =
+      ((1 - 1 / 2 ^ 24 : ℚ) : ℝ) := toReal_eq (by decide +kernel)
+  have hone : (posOne FloatFormat.binary32).toReal = ((1 : ℚ) : ℝ) :=
+    toReal_eq (by decide +kernel)
+  rcases hmode with rfl | rfl | rfl | rfl <;>
+    refine one_add_eq (lo := 1 - 1 / 2 ^ 26) (hi := 1 - 1 / 2 ^ 149) hfinite
+      (by norm_num) (by push_cast at hlo ⊢; linarith) (by push_cast at hhi ⊢; linarith)
+      (by norm_num) (by decide +kernel) (by decide +kernel) ?_ <;>
+    simp only [reduceCtorEq, or_self, or_true, true_or, ↓reduceIte, hpred, hone] <;> norm_num
+
 end LibcMath
