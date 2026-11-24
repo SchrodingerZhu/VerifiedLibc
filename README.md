@@ -118,6 +118,14 @@ Certificate methods:
 Compiled `checkrange` checks 512 inputs in 4–8 ms per thread (~64,000–128,000 inputs/s). Only the
 `Demo` certificate sets are kept in git.
 
+## Checking against MPFR
+
+`checkrange --oracle=mpfr` compares a kernel with the correctly rounded result that MPFR computes
+(`c/mpfr_oracle.c`), and `LibcMath/Exhaustive/Run/Native/Mpfr.lean` certifies blocks against it
+inside Lean with `native_decide`. A theorem obtained this way depends on one named axiom about
+MPFR, `MpfrOracle.mpfrExpf_sameValue`, and on the Lean compiler; `LibcMath/Oracle/Mpfr.lean` says
+what the axiom covers. The default oracle, `expOracle`, is proved in Lean and needs neither.
+
 ## Testing extracted models against compiled machine code
 
 Differential testing checks that each AST-extracted Lean kernel agrees bit-for-bit (up to NaN)
