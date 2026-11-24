@@ -5,12 +5,12 @@
 \contributor{schrodingerzy}
 \tag{exhaustive}
 \tag{integration}
-\meta{status}{open}
+\meta{status}{closed}
 \meta{created}{2026-11-23}
-\meta{updated}{2026-11-23}
+\meta{updated}{2026-11-24}
 \import{base-macros}
 
-\p{\strong{Status:} open.}
+\p{\strong{Status:} closed by \pr{17} ([log-GHTT](log-GHTT)). \code{\verb~|checkBlock~} in \code{\verb~|LibcMath/Exhaustive/Run/Block.lean~} now delegates directly to \code{\verb~|checkBits~}, and \code{\verb~|checkrange~} automatically prints \code{\verb~|Core.Diag.diagnoseBlock~} (wrapping the first failing pattern) to stderr whenever a block fails.}
 \p{The changes in [log-Y5JW](log-Y5JW) were pushed to the branch of \pr{1} after other branches had been built on its first version. Nothing was rebased.}
 \ul{
 \li{The branch of \pr{13} adds a clause that no execution goes wrong to \code{\verb~|IR.Func.IsComputedBy~} and \code{\verb~|IR.Func.CorrectAt~} in \code{\verb~|LibcMath/Exhaustive/Reduction.lean~}. The review changed other parts of that file; a merge has to be made and built.}

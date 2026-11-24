@@ -5,11 +5,12 @@
 \contributor{schrodingerzy}
 \tag{ir}
 \tag{floatlib}
-\meta{status}{open}
+\meta{status}{superseded}
 \meta{created}{2026-11-23}
+\meta{updated}{2026-11-24}
 \import{base-macros}
 
-\p{\strong{Status:} open.}
+\p{\strong{Status:} superseded by [dec-03IY](dec-03IY) and \pr{17}. The legacy LLVM-IR interpreter (\code{\verb~|LibcMath/IR/Interp.lean~}) was removed in \pr{17}; AST-extracted kernels operate directly on total FloatLib \code{\verb~|Model~} operations, which propagate NaNs natively.}
 \p{A register that holds a NaN produced by arithmetic or a conversion is recorded as "some NaN", and any instruction other than \code{\verb~|phi~}, \code{\verb~|select~}, \code{\verb~|bitcast~} and \code{\verb~|ret~} that reads it makes the interpreter answer \code{\verb~|none~}. \code{\verb~|nanConsumed~} in \code{\verb~|LibcMath/IR/InterpExamples.lean~} shows it. The description of \pr{2} says that this does not happen on any input of \code{\verb~|expf~}; another function may need it.}
 \ul{
 \li{To continue, the interpreter has to know that \code{\verb~|Model.add~}, \code{\verb~|Model.sub~} and \code{\verb~|Model.mul~} return a NaN when an operand is a NaN, whichever NaN it is. The author of \pr{2} did not find such lemmas in FloatLib 4.1.0, where \code{\verb~|isNaN_neg~}, \code{\verb~|isNaN_abs~} and \code{\verb~|cast_of_isNaN~} exist. The review did not search again.}

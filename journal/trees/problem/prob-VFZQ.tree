@@ -5,12 +5,12 @@
 \contributor{schrodingerzy}
 \tag{ir}
 \tag{integration}
-\meta{status}{open}
+\meta{status}{superseded}
 \meta{created}{2026-11-23}
-\meta{updated}{2026-11-23}
+\meta{updated}{2026-11-24}
 \import{base-macros}
 
-\p{\strong{Status:} open.}
+\p{\strong{Status:} superseded by [dec-03IY](dec-03IY) and \pr{17}. \code{\verb~|LibcMath/IR/Interp*.lean~} was removed in \pr{17} ([log-GHTT](log-GHTT)) along with the rest of the legacy LLVM-IR interpreter stack.}
 \p{The branch of \pr{13} changes \code{\verb~|LibcMath/IR/Interp.lean~} from the definition of \code{\verb~|Instr.exec~} to the end, for flags of instructions and for executions that go wrong, and leaves the part before it as in \pr{2}. The review of \pr{2} therefore changed only that first part and added files. What remains for the merge:}
 \ul{
 \li{\code{\verb~|LibcMath/IR/InterpLemmas.lean~} on that branch declares \code{\verb~|Val.toModel?_ofModel~}, which \code{\verb~|LibcMath/SpecLemmas.lean~} already has. Delete the copy.}
