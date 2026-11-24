@@ -68,7 +68,9 @@ it after any change to `extract/` or to `LibcMath/Core/`.
   plans, `Plans.lean`, `Examples.lean`, `Statements.lean`, the short paths under `Paths/`, the
   error analysis of its main path, and `Main.lean` with the theorem and what is open.
   `LibcMath/Extracted/<Function>.lean` imports them all; `LibcMath/Extracted/Expf.lean` is the model.
-- Proofs are kept for one evaluation plan of a function. Other plans may be extracted and tested.
+- The primary full proof targets the default plan (`double_eval`); other extracted plans keep
+  correctness statements, short-path proofs, conditional reductions, and inter-plan equivalence
+  theorems where applicable.
 - What does not depend on the function stays outside: `LibcMath/Core/` (the operations of libc),
   `LibcMath/Functions/` (facts about real functions and rounding), `LibcMath/BitRange.lean` and
   `LibcMath/Correctness.lean` (statements about ranges of inputs), `LibcMath/Check/` and

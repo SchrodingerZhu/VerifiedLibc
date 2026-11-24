@@ -91,8 +91,10 @@ its polynomial. They are to be proved by numerical analysis of that computation;
 `Main.lean` lists the steps, of which one is done: the polynomial is within `10⁻¹⁵` of the
 exponential (`Expf.Poly.abs_poly_sub_exp_le`, in `Polynomial.lean`).
 
-Proofs exist for the plan `double_eval` only. The other five plans are extracted and tested, and
-nothing is stated or proved about them.
+The primary theorem targets `double_eval`. Statements and proved short-path reductions also exist
+for `double_eval_fma` (87.30 % proved), `static_rounding` (87.69 % proved), and `integer_eval`
+(87.69 % proved, plus `integerEval_eq_staticRounding_nearest`), along with the statement for
+`float_eval_cr_rn`.
 
 ## Testing a kernel
 

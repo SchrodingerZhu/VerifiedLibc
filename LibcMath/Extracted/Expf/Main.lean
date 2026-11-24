@@ -15,6 +15,11 @@ These are the inputs for which the function reads its tables and evaluates its p
 271 675 927 and 273 674 676 bit patterns, 12.70 % of all. Everything else, 87.30 %, is proved in
 `Paths/Ranges.lean`.
 
+The file also retains the conditional reductions of the other extracted evaluation plans
+(`DoubleEvalFma`, `StaticRounding`, `IntegerEval`) from their proved short paths (87.30 % and
+87.69 % of bit patterns) to their main polynomial ranges, together with
+`expfIntegerEvalCorrectlyRounded_of_staticRounding`.
+
 `#print axioms expf_correctlyRounded` lists `sorryAx` for as long as either lemma is open; the
 check at the end of this file records it. Do not replace a `sorry` here by a hypothesis of the
 theorem: an open obligation is to stay visible.
@@ -84,6 +89,65 @@ theorem expf_correctlyRounded : ExpfCorrectlyRounded := by
   exact (((low.append (Expf.correctAt_main_pos hmode)).append middle).append
     (Expf.correctAt_main_neg hmode)).append high
 
+/-! ### Other evaluation plans (short paths proved, main ranges conditional) -/
+
+/-- Under `mode`, `Expf.DoubleEvalFma.expf` is correct on both main polynomial ranges. -/
+def ExpfFmaMainRangesChecked (mode : IEEERoundingMode) : Prop :=
+  HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode)
+    0x32800001 0x42B17218 ∧
+  HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEvalFma.expf mode)
+    0xB2800001 0xC2CFF1B5
+
+/-- `Expf.DoubleEvalFma.expf` is correctly rounded in all four C rounding directions, provided it is
+on its two polynomial ranges. -/
+theorem expfDoubleEvalFmaCorrectlyRounded_of_mainRanges
+    (h : ∀ mode ∈ cModes, ExpfFmaMainRangesChecked mode) :
+    ExpfDoubleEvalFmaCorrectlyRounded := by
+  refine correctlyRounded_of_holdsOnBits fun mode hmode => ?_
+  obtain ⟨low, middle, high⟩ := Expf.Paths.holdsOnBits_short_paths_fma hmode
+  obtain ⟨positive, negative⟩ := h mode hmode
+  exact (((low.append positive).append middle).append negative).append high
+
+/-- Under `mode`, the pure-integer kernel `Expf.StaticRounding.kernel` is correct on both main
+polynomial ranges (`528 573 389` inputs). -/
+def ExpfStaticRoundingMainRangesChecked (mode : IEEERoundingMode) : Prop :=
+  HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode)
+    0x33000000 0x42B17218 ∧
+  HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.StaticRounding.kernel mode)
+    0xB3000000 0xC2CFF1B5
+
+/-- `Expf.StaticRounding.kernel` is correctly rounded in all four C rounding directions, provided it
+is on its two polynomial ranges. -/
+theorem expfStaticRoundingCorrectlyRounded_of_mainRanges
+    (h : ∀ mode ∈ cModes, ExpfStaticRoundingMainRangesChecked mode) :
+    ExpfStaticRoundingCorrectlyRounded := by
+  refine correctlyRounded_of_holdsOnBits fun mode hmode => ?_
+  obtain ⟨low, middle, high⟩ := Expf.Paths.holdsOnBits_short_paths_staticRounding hmode
+  obtain ⟨positive, negative⟩ := h mode hmode
+  exact (((low.append positive).append middle).append negative).append high
+
+/-- `Expf.IntegerEval.kernel` is correctly rounded in `.nearest` mode, provided it is on its two
+polynomial ranges (`528 573 389` inputs). -/
+theorem expfIntegerEvalCorrectlyRounded_of_mainRanges
+    (hpos : HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.IntegerEval.kernel .nearest)
+      0x33000000 0x42B17218)
+    (hneg : HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.IntegerEval.kernel .nearest)
+      0xB3000000 0xC2CFF1B5) :
+    ExpfIntegerEvalCorrectlyRounded := by
+  refine correctlyRounded_of_holdsOnBits fun mode hmode => ?_
+  rcases hmode with rfl
+  obtain ⟨low, middle, high⟩ := Expf.Paths.holdsOnBits_short_paths_integerEval
+  exact (((low.append hpos).append middle).append hneg).append high
+
+/-- `ExpfStaticRoundingCorrectlyRounded` immediately implies `ExpfIntegerEvalCorrectlyRounded`. -/
+theorem expfIntegerEvalCorrectlyRounded_of_staticRounding
+    (h : ExpfStaticRoundingCorrectlyRounded) :
+    ExpfIntegerEvalCorrectlyRounded := by
+  intro mode hmode x
+  rcases hmode with rfl
+  obtain ⟨y, hy, hsame⟩ := h .nearest (by simp [cModes]) x
+  exact ⟨y, by rw [Expf.Paths.integerEval_eq_staticRounding_nearest]; exact hy, hsame⟩
+
 /-! ### Axioms
 
 `sorryAx` is listed for as long as the two lemmas above are open. When they are proved, this
@@ -95,7 +159,7 @@ info: 'LibcMath.Extracted.expf_correctlyRounded' depends on axioms: [propext, so
 #guard_msgs in
 #print axioms expf_correctlyRounded
 
-/-- What is proved without `sorry`: the short paths. -/
+/-- What is proved without `sorry`: the short paths of `double_eval`. -/
 theorem expf_correct_on_short_paths {mode : IEEERoundingMode} (hmode : mode ∈ cModes) :
     HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEval.expf mode) 0x00000000 0x32800001 ∧
     HoldsOnBits (CorrectAt (Spec.exp .binary32) Expf.DoubleEval.expf mode) 0x42B17218 0xB2800001 ∧
@@ -108,5 +172,37 @@ info: 'LibcMath.Extracted.expf_correct_on_short_paths' depends on axioms: [prope
 -/
 #guard_msgs in
 #print axioms expf_correct_on_short_paths
+
+/--
+info: 'LibcMath.Extracted.expfDoubleEvalFmaCorrectlyRounded_of_mainRanges' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms expfDoubleEvalFmaCorrectlyRounded_of_mainRanges
+
+/--
+info: 'LibcMath.Extracted.expfStaticRoundingCorrectlyRounded_of_mainRanges' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms expfStaticRoundingCorrectlyRounded_of_mainRanges
+
+/--
+info: 'LibcMath.Extracted.expfIntegerEvalCorrectlyRounded_of_mainRanges' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms expfIntegerEvalCorrectlyRounded_of_mainRanges
+
+/--
+info: 'LibcMath.Extracted.expfIntegerEvalCorrectlyRounded_of_staticRounding' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms expfIntegerEvalCorrectlyRounded_of_staticRounding
 
 end LibcMath.Extracted
