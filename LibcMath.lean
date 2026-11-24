@@ -1,4 +1,6 @@
 import LibcMath.Spec
+import LibcMath.Core
+import LibcMath.CoreExamples
 import LibcMath.Functions
 import LibcMath.Functions.Binary32Bits
 import LibcMath.Functions.RoundingRanges
