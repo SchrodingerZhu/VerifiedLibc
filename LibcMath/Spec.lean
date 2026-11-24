@@ -14,7 +14,7 @@ IEEE 754. This file adds what is specific to math functions:
   results the C standard fixes at zeros, infinities and other exceptional arguments.
 * `SameValue` compares two results while identifying all NaNs.
 * `CorrectlyRounded` says that an implementation, which may depend on the rounding direction,
-  returns the result `Spec.eval` prescribes on every input.
+  has a result on every input, and that it is the one `Spec.eval` prescribes.
 
 The definitions are meant for IEEE formats (`fmt.isIEEE`). Floating-point exception flags and
 `errno` are not part of the statement.
@@ -55,11 +55,14 @@ noncomputable def Spec.eval (S : Spec fmt) (mode : IEEERoundingMode) (x : Model 
   else if x.isZero then S.atZero x.signBit
   else (S.exact x.toReal).getD (Model.roundReal fmt mode (S.real x.toReal))
 
-/-- `impl` is a correctly rounded implementation of `S` under every rounding direction in `modes`.
+/-- `impl` is a correctly rounded implementation of `S` under every rounding direction in `modes`:
+on every input it has a result, and the result is the one `S` prescribes.
+
 The implementation receives the rounding direction in effect, which for code running on a
-floating-point unit is the dynamic rounding mode. -/
+floating-point unit is the dynamic rounding mode. It returns `none` when it reaches an operation
+that its language leaves undefined, so a correctly rounded implementation never does. -/
 def CorrectlyRounded (S : Spec fmt) (modes : Set IEEERoundingMode)
-    (impl : IEEERoundingMode → Model fmt → Model fmt) : Prop :=
-  ∀ mode ∈ modes, ∀ x, SameValue (impl mode x) (S.eval mode x)
+    (impl : IEEERoundingMode → Model fmt → Option (Model fmt)) : Prop :=
+  ∀ mode ∈ modes, ∀ x, ∃ y, impl mode x = some y ∧ SameValue y (S.eval mode x)
 
 end LibcMath

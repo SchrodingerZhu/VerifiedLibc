@@ -167,17 +167,21 @@ end KernelMeta
 
 /-- Common representation for a unary math kernel extracted from LLVM libc.
 
-Because `UnaryKernel` coerces to `IEEERoundingMode → Model fmt → Model fmt`, a kernel can be
+The model returns `none` on an execution that reaches an operation C++ leaves undefined (see
+`LibcMath/Core/Ops.lean`).
+
+Because `UnaryKernel` coerces to `IEEERoundingMode → Model fmt → Option (Model fmt)`, a kernel can
+be
 passed directly to `CorrectlyRounded`, `checkRange`, `HoldsOnBits`, and diagnostics while keeping
 its build configuration and provenance inspectable at compile time and runtime. -/
 structure UnaryKernel (fmt : FloatFormat) where
   /-- Extraction metadata and active `LIBC_MATH` / CPU configuration. -/
   info : KernelMeta
   /-- Executable high-level Lean model of the C++ function. -/
-  eval : IEEERoundingMode → Model fmt → Model fmt
+  eval : IEEERoundingMode → Model fmt → Option (Model fmt)
 
 instance {fmt : FloatFormat} :
-    CoeFun (UnaryKernel fmt) (fun _ => IEEERoundingMode → Model fmt → Model fmt) where
+    CoeFun (UnaryKernel fmt) (fun _ => IEEERoundingMode → Model fmt → Option (Model fmt)) where
   coe k := k.eval
 
 /-- The rounding directions this kernel's configuration claims to support. -/

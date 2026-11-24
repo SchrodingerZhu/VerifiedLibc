@@ -7,6 +7,7 @@
 \tag{trust}
 \meta{status}{open}
 \meta{created}{2026-11-24}
+\meta{updated}{2026-11-24}
 \import{base-macros}
 
 \p{\strong{Status:} open.}
@@ -18,3 +19,4 @@
 \li{\strong{NaNs.} A kernel returns the NaN that FloatLib computes. The statements compare results up to the identity of NaNs, so this matters only where code reads the bits of a NaN that an operation produced.}
 }
 \p{\strong{Plan, 2026-11-24.} The maintainer asked for the statement to be restored. The extractor's intermediate form is an expression tree, so a second pass over it can emit, next to each function \code{\verb~|f~}, a Boolean \code{\verb~|f.defined~} with the same parameters: the conjunction, along the path that is taken, of the conditions under which each operation has a meaning in C++ (a conversion to an integer in range, a table index in bounds, a shift by less than the width, no signed overflow, a divisor that is not zero). \code{\verb~|CorrectAt~} then asks for \code{\verb~|defined~} as well as for the value; the short-path proofs show it where no such operation is reached, and a check of a block tests it with the value. The values of the kernels, and the proofs about them, stay as they are.}
+\p{\strong{2026-11-24, [log-OY8M](log-OY8M).} Undefined behaviour is tracked again, by \code{\verb~|Option~}, for the operations listed in \code{\verb~|LibcMath/Core/Ops.lean~}. Not tracked: an overflowing left shift of a signed value, and the library types of \code{\verb~|LibcMath/Core/Extended.lean~}. Effects and the trust in the translation are as described above.}

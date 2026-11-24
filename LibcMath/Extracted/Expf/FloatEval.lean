@@ -38,54 +38,56 @@ def EXP2F_COEFFS : Array (Model .binary32) :=
 
 /-- Extracted from `math::float_eval::scale_exp2f`
 (`_ZN11__llvm_libc4math10float_eval11scale_exp2fEfi`). -/
-def scale_exp2f (mode : IEEERoundingMode) (y : Model .binary32) (m : BitVec 32) : Model .binary32 :=
-  if BitVec.ule (m + 0x7E#32) 0xFD#32 then
-    let scale_bits := (m + 0x7F#32) <<< 23
+def scale_exp2f (mode : IEEERoundingMode) (y : Model .binary32) (m : BitVec 32) : Option
+    (Model .binary32) := do
+  if BitVec.ule ((← Core.sadd? m 0x7E#32)) 0xFD#32 then
+    let scale_bits := ((← Core.sadd? m 0x7F#32)) <<< 23
     let scale := (Core.bitCast scale_bits : Model .binary32)
-    Core.fmul mode y scale
+    pure (Core.fmul mode y scale)
   else if BitVec.slt 0x7F#32 m then
-    let scale_bits := ((m - 0x1#32) + 0x7F#32) <<< 23
+    let scale_bits := ((← Core.sadd? ((← Core.ssub? m 0x1#32)) 0x7F#32)) <<< 23
     let scale := (Core.bitCast scale_bits : Model .binary32)
-    Core.fmul mode (Core.fmul mode y f32(0x40000000#32)) scale
+    pure (Core.fmul mode (Core.fmul mode y f32(0x40000000#32)) scale)
   else
-    let scale_bits := ((m + 0x19#32) + 0x7F#32) <<< 23
+    let scale_bits := ((← Core.sadd? ((← Core.sadd? m 0x19#32)) 0x7F#32)) <<< 23
     let scale := (Core.bitCast scale_bits : Model .binary32)
-    Core.fmul mode (Core.fmul mode y scale) f32(0x33000000#32)
+    pure (Core.fmul mode (Core.fmul mode y scale) f32(0x33000000#32))
 
 /-- Extracted from `math::float_eval::exp2f_eval`
 (`_ZN11__llvm_libc4math10float_eval10exp2f_evalEfi`). -/
-def exp2f_eval (mode : IEEERoundingMode) (u : Model .binary32) (m : BitVec 32) : Model .binary32 :=
+def exp2f_eval (mode : IEEERoundingMode) (u : Model .binary32) (m : BitVec 32) : Option
+    (Model .binary32) := do
   let p := estrin[config, mode, 1] u EXP2F_COEFFS
-  let y := horner[config, mode] u [f32(0x3F800000#32), EXP2F_COEFFS[0]!, p]
-  scale_exp2f mode y m
+  let y := horner[config, mode] u [f32(0x3F800000#32), (← EXP2F_COEFFS[0]?), p]
+  pure ((← scale_exp2f mode y m))
 
 /-- Extracted from `math::float_eval::expf` (`_ZN11__llvm_libc4math10float_eval4expfEf`). -/
-def expf (mode : IEEERoundingMode) (x : Model .binary32) : Model .binary32 :=
+def expf (mode : IEEERoundingMode) (x : Model .binary32) : Option (Model .binary32) := do
   let xbits := Core.FPBits.ofVal x
   let x_u := Core.FPBits.uintval xbits
   let x_abs := x_u &&& 0x7FFFFFFF#32
-  let cont (_ : Unit) : Model .binary32 :=
+  let cont (_ : Unit) : Option (Model .binary32) := do
     let LOG2_E := ({ lo := f32(0x32A57060#32), hi := f32(0x3FB8AA3B#32) } : Core.FloatFloat)
     let kf := Core.nearestInt config mode (Core.fmul mode x LOG2_E.hi)
-    let k := Core.fptosi 32 kf
+    let k ← Core.fptosi? 32 kf
     let u_hi := msub[config, mode](x, LOG2_E.hi, kf)
     let u := madd[config, mode](x, LOG2_E.lo, u_hi)
-    exp2f_eval mode u k
+    pure ((← exp2f_eval mode u k))
   if (BitVec.ule 0x42B17218#32 x_abs) || (BitVec.ule x_abs 0x32800000#32) then
     if BitVec.sle (BitVec.setWidth 32 (Core.FPBits.biasedExp xbits)) 0x65#32 then
-      Core.fadd mode f32(0x3F800000#32) x
+      pure (Core.fadd mode f32(0x3F800000#32) x)
     else if BitVec.ule 0xC2CFF1B5#32 (Core.FPBits.uintval xbits) then
       if Core.FPBits.isInf xbits then
-        f32(0x00000000#32)
+        pure (f32(0x00000000#32))
       else if Core.FPBits.isNaN xbits then
-        x
+        pure (x)
       else
-        Core.setUnderflow config mode
+        pure (Core.setUnderflow config mode)
     else if (Core.FPBits.isPos xbits) && (BitVec.ule 0x42B17218#32 (Core.FPBits.uintval xbits)) then
       if BitVec.ult (Core.FPBits.uintval xbits) 0x7F800000#32 then
-        Core.setOverflow config mode
+        pure (Core.setOverflow config mode)
       else
-        Core.fadd mode x (Core.FPBits.getVal (Core.FPBits.inf .binary32))
+        pure (Core.fadd mode x (Core.FPBits.getVal (Core.FPBits.inf .binary32)))
     else
       cont ()
   else

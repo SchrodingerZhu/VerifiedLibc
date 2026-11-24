@@ -1,4 +1,4 @@
-import LibcMath.Exhaustive.Interface
+import LibcMath.Check.Oracle
 
 /-!
 # A compilable form of `checkRange`
@@ -10,7 +10,7 @@ computation with the oracle's test passed as a plain Boolean function; `checkRan
 is definitional (`rfl`).
 -/
 
-namespace LibcMath.Exhaustive
+namespace LibcMath.Check
 
 open FloatLib.Floats.Formats.BinaryInterchange
 open Model (IEEERoundingMode)
@@ -20,21 +20,21 @@ variable {fmt : FloatFormat}
 /-- `impl` produces a result accepted by `check` on each of the `count` bit patterns starting at
 `first`. Delegates directly to `checkBits`. -/
 def checkBlock (check : IEEERoundingMode → (input result : Model fmt) → Bool)
-    (impl : IEEERoundingMode → Model fmt → Model fmt)
+    (impl : IEEERoundingMode → Model fmt → Option (Model fmt))
     (mode : IEEERoundingMode) (first count : Nat) : Bool :=
-  checkBits (fun input => check mode input (impl mode input)) first count
+  checkBits (fun input => (impl mode input).any (check mode input)) first count
 
 theorem checkRange_eq_checkBlock {S : Spec fmt} (O : Oracle S)
-    (impl : IEEERoundingMode → Model fmt → Model fmt)
+    (impl : IEEERoundingMode → Model fmt → Option (Model fmt))
     (mode : IEEERoundingMode) (first count : Nat) :
     checkRange O impl mode first count = checkBlock O.check impl mode first count :=
   rfl
 
 theorem checkRange_of_checkBlock {S : Spec fmt} {O : Oracle S}
-    {impl : IEEERoundingMode → Model fmt → Model fmt}
+    {impl : IEEERoundingMode → Model fmt → Option (Model fmt)}
     {mode : IEEERoundingMode} {first count : Nat}
     (h : checkBlock O.check impl mode first count = true) :
     checkRange O impl mode first count = true :=
   h
 
-end LibcMath.Exhaustive
+end LibcMath.Check

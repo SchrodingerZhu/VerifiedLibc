@@ -58,6 +58,13 @@ open Model.AlgebraicRounding (roundRat roundLocated)
 
 variable {mode : IEEERoundingMode} {x : Model FloatFormat.binary32}
 
+/-- `exp` is positive, so rounding it toward zero and rounding it down prescribe the same
+results, in every format. -/
+theorem _root_.LibcMath.Spec.exp_eval_towardZero (fmt : FloatFormat) (x : Model fmt) :
+    (Spec.exp fmt).eval .towardZero x = (Spec.exp fmt).eval .down x := by
+  simp only [Spec.eval, Spec.exp, Option.getD_none,
+    roundReal_towardZero_of_pos fmt (Real.exp_pos _)]
+
 /-! ## Exceptional arguments -/
 
 /-- `exp` of a NaN is the canonical NaN. -/

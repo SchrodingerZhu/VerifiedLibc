@@ -37,7 +37,7 @@ def rnSpotInputs : List (Model .binary32) :=
 theorem crNearestPlans_agree_on_spotInputs :
     crNearestPlans.all (fun k =>
       rnSpotInputs.all (fun x =>
-        Diag.sameValueBool (k .nearest x) (DoubleEval.kernel .nearest x))) = true := by
+        Diag.sameResultBool (k .nearest x) (DoubleEval.kernel .nearest x))) = true := by
   decide +kernel
 
 /-- All three four-mode correctly-rounded plans (`DoubleEval`, `DoubleEvalFma`, `StaticRounding`)
@@ -48,24 +48,24 @@ theorem crAllModePlans_agree_all_modes :
     allModes.all (fun m =>
       crAllModePlans.all (fun k =>
         rnSpotInputs.all (fun x =>
-          Diag.sameValueBool (k m x) (DoubleEval.kernel m x)))) = true := by
+          Diag.sameResultBool (k m x) (DoubleEval.kernel m x)))) = true := by
   decide +kernel
 
 /-- Verify exact IEEE outputs at `1.0` (`0x402DF854` for CR plans, `0x402DF855` = +1 ULP for fast
 `FloatEval`) and at the hard-to-round exceptional point `0xC236BD8C` (`0x1E88452D`). -/
 theorem expf_one_exact :
-    DoubleEval.expf .nearest f32(0x3F800000#32) = f32(0x402DF854#32) ∧
-    DoubleEvalFma.expf .nearest f32(0x3F800000#32) = f32(0x402DF854#32) ∧
-    IntegerEval.expf f32(0x3F800000#32) = f32(0x402DF854#32) ∧
-    StaticRounding.kernel .nearest f32(0x3F800000#32) = f32(0x402DF854#32) ∧
-    FloatEvalCrRn.expf .nearest f32(0x3F800000#32) = f32(0x402DF854#32) ∧
-    FloatEval.expf .nearest f32(0x3F800000#32) = f32(0x402DF855#32) := by
+    DoubleEval.expf .nearest f32(0x3F800000#32) = some f32(0x402DF854#32) ∧
+    DoubleEvalFma.expf .nearest f32(0x3F800000#32) = some f32(0x402DF854#32) ∧
+    IntegerEval.expf f32(0x3F800000#32) = some f32(0x402DF854#32) ∧
+    StaticRounding.kernel .nearest f32(0x3F800000#32) = some f32(0x402DF854#32) ∧
+    FloatEvalCrRn.expf .nearest f32(0x3F800000#32) = some f32(0x402DF854#32) ∧
+    FloatEval.expf .nearest f32(0x3F800000#32) = some f32(0x402DF855#32) := by
   decide +kernel
 
 theorem expf_exceptional_point_exact :
-    DoubleEval.expf .nearest f32(0xC236BD8C#32) = f32(0x1E88452D#32) ∧
-    IntegerEval.expf f32(0xC236BD8C#32) = f32(0x1E88452D#32) ∧
-    FloatEvalCrRn.expf .nearest f32(0xC236BD8C#32) = f32(0x1E88452D#32) := by
+    DoubleEval.expf .nearest f32(0xC236BD8C#32) = some f32(0x1E88452D#32) ∧
+    IntegerEval.expf f32(0xC236BD8C#32) = some f32(0x1E88452D#32) ∧
+    FloatEvalCrRn.expf .nearest f32(0xC236BD8C#32) = some f32(0x1E88452D#32) := by
   decide +kernel
 
 /-- All five correctly-rounded plans agree on a 64-input slice around `1.0` in `.nearest`. -/

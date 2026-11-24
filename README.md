@@ -33,9 +33,11 @@ Mathlib and FloatLib each target one Lean release, so move all three together.
 
 ## Extracting functions from LLVM libc
 
-Proofs are about the actual LLVM libc implementations, extracted directly from the C++ Clang AST
-into high-level functional Lean models targeting `LibcMath.Core` (no low-level LLVM-IR CFG
-interpreter or relational bridge):
+Proofs are about the actual LLVM libc implementations, extracted from the Clang AST of the C++
+sources into Lean functions over `LibcMath.Core`. An extracted function returns `Option`: `none`
+stands for an execution that reaches an operation C++ leaves undefined (a conversion to an integer
+out of range, a table index out of bounds, a shift by the width or more, signed overflow, a
+division by zero).
 
 - `extract/` contains **`ast2lean`**, a C++23 module-first (`.cppm`) Clang LibTooling extractor.
 - `ast2lean` snapshots active preprocessor flags (`LIBC_MATH_HAS_*`, `LIBC_TARGET_CPU_HAS_*`,
@@ -71,60 +73,43 @@ The six extracted `expf` evaluation plans under `LibcMath/Extracted/Expf/` are:
 - `FloatEval`: fast single-precision Estrin+Horner (`LIBC_MATH=0x3F`, RN, ~1 ULP)
 - `FloatEvalCrRn`: GPU `FloatFloat` FMA (`LIBC_MATH=0x3E`, RN, CR)
 
-## Exhaustive checking
+## What is proved, and what is open
 
-binary32 has `2^32` bit patterns, few enough to examine each one under each rounding direction.
-`LibcMath/Extracted/Expf/Main.lean` analytically discharges 87.30% of all inputs for `DoubleEval` /
-`DoubleEvalFma` (leaving `545,350,603` inputs per mode) and 87.69% for `StaticRounding` /
-`IntegerEval` (leaving `528,573,389` inputs per mode), with zero open bridge hypotheses.
+`expf_correctlyRounded` (`LibcMath/Extracted/Expf/Main.lean`) states that
+`math::double_eval::expf` is correctly rounded in the four rounding directions of C and reaches no
+operation that C++ leaves undefined. **Its proof is not complete**: it uses two lemmas that end in
+`sorry`, and `#print axioms` lists `sorryAx`.
 
-`checkRange O impl mode first count` (`LibcMath/Exhaustive/Interface.lean`) runs any total
-implementation `impl` and a sound oracle `O` on `count` consecutive bit patterns via `checkBits`,
-and `LibcMath/Exhaustive/Reduction.lean` turns `checkRange … = true` directly into
-`CorrectlyRounded`. The files under `LibcMath/Exhaustive/Run/` and `scripts/exhaustive.py` scale
-this across blocks.
+| Inputs | Share | State |
+|---|---|---|
+| Zeros, infinities, NaNs, `\|x\| ≤ 2⁻²⁶`, overflow, underflow | 87.30 % | proved, by ranges (`Paths/`) |
+| `2⁻²⁶ < x < 88.72…` | 6.33 % | open: `Expf.correctAt_main_pos` |
+| `-103.97… < x < -2⁻²⁶` | 6.37 % | open: `Expf.correctAt_main_neg` |
+
+The two open lemmas are about the inputs for which the function reads its tables and evaluates
+its polynomial. They are to be proved by numerical analysis of that computation; the docstring of
+`Main.lean` lists the steps, of which one is done: the polynomial is within `10⁻¹⁵` of the
+exponential (`Expf.Poly.abs_poly_sub_exp_le`, in `Polynomial.lean`).
+
+Proofs exist for the plan `double_eval` only. The other five plans are extracted and tested, and
+nothing is stated or proved about them.
+
+## Testing a kernel
+
+Tests show whether a statement is true before effort goes into proving it. They are not how a
+function is proved correct.
 
 ```bash
 lake build checkrange
-
-# Optional: inspect any extracted expf plan directly (stderr prints detailed failure diagnostics)
 .lake/build/bin/checkrange --plan=double_eval nearest 1065353216 1024 512
-.lake/build/bin/checkrange --plan=integer_eval nearest 1065353216 1024 512
-
-# 1. Split a range into blocks.
-scripts/exhaustive.py plan nearest 0x3f800000 0x10000 0x1000 > manifest.tsv
-
-# 2. Evaluate pending blocks with compiled code across shards.
-scripts/exhaustive.py run manifest.tsv results-0.tsv --shard 0/8 &
-scripts/exhaustive.py run manifest.tsv results-1.tsv --shard 1/8 &
-…
-
-# 3. Collect the results into the manifest.
-scripts/exhaustive.py record manifest.tsv results-*.tsv
-
-# 4. Write Lean certificates for `ok` blocks and verify them in Lean.
-scripts/exhaustive.py generate manifest.tsv Native Main --batch 16
-lake build LibcMath.Exhaustive.Run.Native.Main
+.lake/build/bin/checkrange --oracle=mpfr --plan=float_eval nearest 1065353216 64
 ```
 
-Certificate methods:
-
-- `Kernel`: each block is checked inside Lean's kernel (`decide +kernel`). Nothing is trusted
-  beyond the kernel. With direct AST-extracted kernels (no CFG interpreter), `Kernel/Demo`
-  checks 32 inputs in ~4.6 s wall time (~3.6 s user, including Lean startup), >70× faster than
-  the legacy IR interpreter.
-- `Native`: each block is proved by `native_decide`, trusting the Lean compiler and compiled code.
-
-Compiled `checkrange` checks 512 inputs in 4–8 ms per thread (~64,000–128,000 inputs/s). Only the
-`Demo` certificate sets are kept in git.
-
-## Checking against MPFR
-
-`checkrange --oracle=mpfr` compares a kernel with the correctly rounded result that MPFR computes
-(`c/mpfr_oracle.c`), and `LibcMath/Exhaustive/Run/Native/Mpfr.lean` certifies blocks against it
-inside Lean with `native_decide`. A theorem obtained this way depends on one named axiom about
-MPFR, `MpfrOracle.mpfrExpf_sameValue`, and on the Lean compiler; `LibcMath/Oracle/Mpfr.lean` says
-what the axiom covers. The default oracle, `expOracle`, is proved in Lean and needs neither.
+`checkrange` runs a kernel on consecutive bit patterns and asks an oracle whether each result is
+the correctly rounded one. A failure is reported on stderr with the input, the result and how the
+kernel was configured. `--oracle=lean`, the default, is `expOracle`, which is proved sound in
+Lean; `--oracle=mpfr` asks MPFR (`c/mpfr_oracle.c`) and is trusted, with that trust stated as the
+axiom `MpfrOracle.mpfrExpf_sameValue` in `LibcMath/Oracle/Mpfr.lean`.
 
 ## Testing extracted models against compiled machine code
 

@@ -76,28 +76,40 @@ def ulpDiff? {fmt : FloatFormat} (a b : Model fmt) : Option Int := do
 @[inline] def sameValueBool {fmt : FloatFormat} (a b : Model fmt) : Bool :=
   a == b || (a.isNaN && b.isNaN)
 
+/-- A result of a kernel for a report: `none` is an execution that reaches an operation C++ leaves
+undefined. -/
+def describeResult {fmt : FloatFormat} : Option (Model fmt) → String
+  | some y => describeFloat y
+  | none => "undefined behaviour (the kernel returned `none`)"
+
+/-- Whether two results of kernels agree: both defined with the same value, or both undefined. -/
+@[inline] def sameResultBool {fmt : FloatFormat} : Option (Model fmt) → Option (Model fmt) → Bool
+  | some a, some b => sameValueBool a b
+  | none, none => true
+  | _, _ => false
+
 /-- Diagnose a single input against an oracle's executable `check` predicate. -/
 def diagnoseInput {fmt : FloatFormat}
     (check : IEEERoundingMode → Model fmt → Model fmt → Bool)
-    (impl : IEEERoundingMode → Model fmt → Model fmt)
+    (impl : IEEERoundingMode → Model fmt → Option (Model fmt))
     (mode : IEEERoundingMode) (x : Model fmt)
     (label : String := "kernel") : String :=
   let y := impl mode x
-  let ok := check mode x y
+  let ok := y.any (check mode x)
   s!"[{label}] mode={modeName mode} status={if ok then "ok" else "FAIL"}\n" ++
   s!"  input : {describeFloat x}\n" ++
-  s!"  output: {describeFloat y}"
+  s!"  output: {describeResult y}"
 
 /-- Find the first bit pattern in `[first, first + count)` rejected by `check`, returning a
 detailed multi-line diagnostic report (or an `ok` summary if every input passes). -/
 def diagnoseBlock {fmt : FloatFormat}
     (check : IEEERoundingMode → Model fmt → Model fmt → Bool)
-    (impl : IEEERoundingMode → Model fmt → Model fmt)
+    (impl : IEEERoundingMode → Model fmt → Option (Model fmt))
     (mode : IEEERoundingMode) (first count : Nat)
     (label : String := "kernel") : String :=
   match (List.range count).find? fun i =>
       let x : Model fmt := .ofNatBits (first + i)
-      !check mode x (impl mode x) with
+      !(impl mode x).any (check mode x) with
   | none =>
       let start := hexBits (BitVec.ofNat fmt.bitWidth first)
       s!"[{label}] mode={modeName mode} range=[{start}, +{count}): ok"
@@ -109,11 +121,11 @@ def diagnoseBlock {fmt : FloatFormat}
 
 /-- First bit pattern in `[first, first + count)` where two implementations disagree (up to NaN). -/
 def firstDiffBits {fmt : FloatFormat}
-    (impl₁ impl₂ : IEEERoundingMode → Model fmt → Model fmt)
+    (impl₁ impl₂ : IEEERoundingMode → Model fmt → Option (Model fmt))
     (mode : IEEERoundingMode) (first count : Nat) : Option Nat :=
   ((List.range count).find? fun i =>
     let x : Model fmt := .ofNatBits (first + i)
-    !sameValueBool (impl₁ mode x) (impl₂ mode x)).map (first + ·)
+    !sameResultBool (impl₁ mode x) (impl₂ mode x)).map (first + ·)
 
 /-- Short human-readable tag identifying a kernel and its evaluation variant (e.g.
 `expf/double_eval`). -/
@@ -134,12 +146,15 @@ def compareKernels {fmt : FloatFormat} (k₁ k₂ : UnaryKernel fmt)
       let x : Model fmt := .ofNatBits n
       let y₁ := k₁.eval mode x
       let y₂ := k₂.eval mode x
-      let ulpStr := match ulpDiff? y₁ y₂ with
-        | some d => s!" ulp_diff={d}"
-        | none => ""
+      let ulpStr := match y₁, y₂ with
+        | some a, some b =>
+          match ulpDiff? a b with
+          | some d => s!" ulp_diff={d}"
+          | none => ""
+        | _, _ => ""
       s!"[compare {t₁} vs {t₂}] mode={modeName mode} FIRST DIFF at {describeFloat x}:\n" ++
-      s!"  {t₁}: {describeFloat y₁}\n" ++
-      s!"  {t₂}: {describeFloat y₂}{ulpStr}"
+      s!"  {t₁}: {describeResult y₁}\n" ++
+      s!"  {t₂}: {describeResult y₂}{ulpStr}"
 
 /-- Evaluate a list of extracted evaluation plans on one input `x` and print their outputs and ULP
 offsets relative to the first (reference) plan. -/
@@ -153,11 +168,14 @@ def diagnosePlanMatrix {fmt : FloatFormat} (plans : List (UnaryKernel fmt))
       let rows := plans.map fun k =>
         let y := k.eval mode x
         let delta :=
-          if sameValueBool y yRef then "exact"
-          else match ulpDiff? y yRef with
-            | some d => s!"ulp={d}"
-            | none => "diff"
-        s!"  {kernelTag k}: {describeFloat y} [{delta}]"
+          if sameResultBool y yRef then "exact"
+          else match y, yRef with
+            | some a, some b =>
+              match ulpDiff? a b with
+              | some d => s!"ulp={d}"
+              | none => "diff"
+            | _, _ => "diff"
+        s!"  {kernelTag k}: {describeResult y} [{delta}]"
       String.intercalate "\n" (header :: rows)
 
 /-- Run `diagnoseBlock` on a `UnaryKernel`, automatically tagging output with `kernelTag k`. -/

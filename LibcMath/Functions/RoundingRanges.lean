@@ -72,4 +72,10 @@ theorem roundReal_of_le_two_zpow_mul (mode : IEEERoundingMode) {y r : ℝ} (hpos
     roundReal fmt mode y = roundLocated fmt mode false 0 fmt.minSubnormalExponent false true :=
   roundReal_of_lt_two_zpow mode hpos (hy.trans_lt (mul_lt_of_lt_one_right (by positivity) hr))
 
+/-- Rounding a positive real toward zero is rounding it down. -/
+theorem roundReal_towardZero_of_pos (fmt : FloatFormat) {r : ℝ} (hr : 0 < r) :
+    Model.roundReal fmt .towardZero r = Model.roundReal fmt .down r := by
+  rw [roundReal_of_pos _ hr, roundReal_of_pos _ hr]
+  rfl
+
 end LibcMath

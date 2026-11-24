@@ -27,7 +27,11 @@ check_contains "expf-kernel"   "def kernel : Core.UnaryKernel .binary32 :=" "$ou
 check_contains "expf-table"    "def EXP_M1 : Array (Model .binary64)" "$out_expf"
 check_contains "expf-nearest"  "Core.nearestInt config mode"          "$out_expf"
 check_contains "expf-poly"     "horner[config, mode] r ["             "$out_expf"
-check_contains "expf-join"     "let cont (_ : Unit) : Model .binary32" "$out_expf"
+check_contains "expf-option"   "(x : Model .binary32) : Option (Model .binary32) := do" "$out_expf"
+check_contains "expf-join"     "let cont (_ : Unit) : Option (Model .binary32) := do" "$out_expf"
+# Operations that C++ leaves undefined are emitted as checked ones.
+check_contains "expf-fptosi"   "← Core.fptosi? 32" "$out_expf"
+check_contains "expf-index"    "← EXP_M1["          "$out_expf"
 check_contains "expf-fpbits"   "Core.FPBits.isInf xbits"              "$out_expf"
 
 out_dyadic=$("$bin" "$root/test/dyadic_sample.cpp" --function=accurate_kernel)

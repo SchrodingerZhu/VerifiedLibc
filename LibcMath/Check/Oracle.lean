@@ -1,4 +1,4 @@
-import LibcMath.Exhaustive.Range
+import LibcMath.BitRange
 import LibcMath.Spec
 
 /-!
@@ -32,11 +32,11 @@ structure Oracle (S : Spec fmt) where
   sound : ∀ mode input result, check mode input result = true →
     SameValue result (S.eval mode input)
 
-/-- The implementation `impl` produces a result accepted by `O` on each of the `count` bit
+/-- The implementation `impl` has a result, and `O` accepts it, on each of the `count` bit
 patterns starting at `first`. -/
 def checkRange {S : Spec fmt} (O : Oracle S)
-    (impl : IEEERoundingMode → Model fmt → Model fmt)
+    (impl : IEEERoundingMode → Model fmt → Option (Model fmt))
     (mode : IEEERoundingMode) (first count : Nat) : Bool :=
-  checkBits (fun input => O.check mode input (impl mode input)) first count
+  checkBits (fun input => (impl mode input).any (O.check mode input)) first count
 
 end LibcMath

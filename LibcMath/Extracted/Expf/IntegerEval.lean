@@ -45,55 +45,57 @@ def EXP2F_COEFFS : Array Core.Frac64 :=
 /-- Extracted from `math::static_rounding::exp_b_scale`
 (`_ZN11__llvm_libc4math15static_rounding11exp_b_scaleEjjNS_6Frac64Ej`). -/
 def exp_b_scale (x_u : BitVec 32) (x_e : BitVec 32) (log2_b : Core.Frac64) (max_e : BitVec 32) :
-    BitVec 64 :=
-  let m := (BitVec.setWidth 64 ((x_u &&& 0x7FFFFF#32) ||| 0x800000#32)) <<< (x_e - (max_e - 0x26#32)).toNat
-  (Core.Frac64.mul config (Core.Frac64.ofBits m) log2_b).val
+    Option (BitVec 64) := do
+  let m := (BitVec.setWidth 64 ((x_u &&& 0x7FFFFF#32) ||| 0x800000#32)) <<< (← Core.shiftAmount? 64 (x_e - (max_e - 0x26#32)).toNat)
+  pure ((Core.Frac64.mul config (Core.Frac64.ofBits m) log2_b).val)
 
 /-- Extracted from `math::static_rounding::exp2f_eval_bits`
 (`_ZN11__llvm_libc4math15static_rounding15exp2f_eval_bitsEmbi`). -/
-def exp2f_eval_bits (u_bits : BitVec 64) (is_neg : Bool) (rounding : BitVec 32) : BitVec 32 :=
-  let u_signed := if is_neg then -u_bits else u_bits
-  let k := (BitVec.sshiftRight (BitVec.setWidth 32 (u_signed >>> 32)) 22) + 0x7E#32
+def exp2f_eval_bits (u_bits : BitVec 64) (is_neg : Bool) (rounding : BitVec 32) : Option
+    (BitVec 32) := do
+  let u_signed ← if is_neg then (do pure ((← Core.sneg? u_bits))) else pure (u_bits)
+  let k ← Core.sadd? (BitVec.sshiftRight (BitVec.setWidth 32 (u_signed >>> 32)) 22) 0x7E#32
   let u := Core.Frac64.ofBits ((u_signed <<< 10) ||| (BitVec.setWidth 64 0x1#32))
   let u2 := Core.Frac64.mul config u u
-  let p_even := horner[config, .nearest] u2 [EXP2F_COEFFS[0]!, EXP2F_COEFFS[2]!, EXP2F_COEFFS[4]!,
-      EXP2F_COEFFS[6]!, EXP2F_COEFFS[8]!, EXP2F_COEFFS[10]!]
-  let p_odd := horner[config, .nearest] u2 [EXP2F_COEFFS[1]!, EXP2F_COEFFS[3]!, EXP2F_COEFFS[5]!,
-      EXP2F_COEFFS[7]!, EXP2F_COEFFS[9]!]
+  let p_even := horner[config, .nearest] u2 [(← EXP2F_COEFFS[0]?), (← EXP2F_COEFFS[2]?),
+      (← EXP2F_COEFFS[4]?), (← EXP2F_COEFFS[6]?), (← EXP2F_COEFFS[8]?),
+      (← EXP2F_COEFFS[10]?)]
+  let p_odd := horner[config, .nearest] u2 [(← EXP2F_COEFFS[1]?), (← EXP2F_COEFFS[3]?),
+      (← EXP2F_COEFFS[5]?), (← EXP2F_COEFFS[7]?), (← EXP2F_COEFFS[9]?)]
   let p := Core.Frac64.mul config (madd[config, .nearest](p_odd, u, p_even)) u
   if (BitVec.sle 0x0#32 k) && (rounding == 0x0#32) then
-    (((BitVec.setWidth 32 (p.val >>> 40)) + 0x1#32) >>> 1) + ((k + 0x1#32) <<< 23)
+    pure ((((BitVec.setWidth 32 (p.val >>> 40)) + 0x1#32) >>> 1) + (((← Core.sadd? k 0x1#32)) <<< 23))
   else
     let mant := (BitVec.setWidth 32 (p.val >>> 33)) ||| 0x80000000#32
     let shift := 0x7#32
     let exp_bits := k <<< 23
-    let (shift, exp_bits) :=
+    let (shift, exp_bits) ← do
       if BitVec.slt k 0x0#32 then
-        let shift := 0x7#32 - k
+        let shift ← Core.ssub? 0x7#32 k
         let exp_bits := 0x0#32
-        (shift, exp_bits)
+        pure ((shift, exp_bits))
       else
-        (shift, exp_bits)
-    (((mant >>> shift.toNat) + 0x1#32) >>> 1) + exp_bits
+        pure ((shift, exp_bits))
+    pure ((((mant >>> (← Core.shiftAmount? 32 shift.toNat)) + 0x1#32) >>> 1) + exp_bits)
 
 /-- Extracted from `math::static_rounding::expf_bits`
 (`_ZN11__llvm_libc4math15static_rounding9expf_bitsEji`). -/
-def expf_bits (x_u : BitVec 32) (rounding : BitVec 32) : BitVec 32 :=
+def expf_bits (x_u : BitVec 32) (rounding : BitVec 32) : Option (BitVec 32) := do
   let is_neg := (x_u >>> 31) != 0x0#32
   let x_abs := x_u &&& 0x7FFFFFFF#32
   let x_e := x_abs >>> 23
-  let cont (_ : Unit) : BitVec 32 :=
-    let u_bits := exp_b_scale x_u x_e LOG2_E 0x85#32
-    exp2f_eval_bits u_bits is_neg rounding
+  let cont (_ : Unit) : Option (BitVec 32) := do
+    let u_bits ← exp_b_scale x_u x_e LOG2_E 0x85#32
+    pure ((← exp2f_eval_bits u_bits is_neg rounding))
   if BitVec.ule 0x1F#32 (x_e - 0x66#32) then
     if BitVec.ule x_e 0x65#32 then
-      0x3F800000#32
+      pure (0x3F800000#32)
     else if BitVec.ult 0x7F800000#32 x_abs then
-      x_u ||| 0x400000#32
+      pure (x_u ||| 0x400000#32)
     else if (!is_neg) && (BitVec.ule 0x42B17218#32 x_u) then
-      0x7F800000#32
+      pure (0x7F800000#32)
     else if BitVec.ule 0xC2CFF1B5#32 x_u then
-      0x0#32
+      pure (0x0#32)
     else
       cont ()
   else
@@ -101,12 +103,13 @@ def expf_bits (x_u : BitVec 32) (rounding : BitVec 32) : BitVec 32 :=
 
 /-- Extracted from `math::static_rounding::expf`
 (`_ZN11__llvm_libc4math15static_rounding4expfEfi`). -/
-def math_static_rounding_expf (x : Model .binary32) (rounding : BitVec 32) : Model .binary32 :=
-  (Core.bitCast (expf_bits ((Core.bitCast x : BitVec 32)) rounding) : Model .binary32)
+def math_static_rounding_expf (x : Model .binary32) (rounding : BitVec 32) : Option
+    (Model .binary32) := do
+  pure ((Core.bitCast ((← expf_bits ((Core.bitCast x : BitVec 32)) rounding)) : Model .binary32))
 
 /-- Extracted from `math::integer_eval::expf` (`_ZN11__llvm_libc4math12integer_eval4expfEf`). -/
-def expf (x : Model .binary32) : Model .binary32 :=
-  math_static_rounding_expf x 0x0#32
+def expf (x : Model .binary32) : Option (Model .binary32) := do
+  pure ((← math_static_rounding_expf x 0x0#32))
 
 /-- Machine-readable provenance and configuration metadata for `expf`. -/
 def kernelMeta : Core.KernelMeta :=

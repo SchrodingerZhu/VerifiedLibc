@@ -56,7 +56,8 @@ theorem sameValue_equivalence : Equivalence (SameValue (fmt := fmt)) :=
 
 /-- Correct rounding is a statement about each rounding direction separately. -/
 theorem CorrectlyRounded.mono {S : Spec fmt} {modes modes' : Set IEEERoundingMode}
-    {impl : IEEERoundingMode → Model fmt → Model fmt} (h : CorrectlyRounded S modes impl)
+    {impl : IEEERoundingMode → Model fmt → Option (Model fmt)}
+    (h : CorrectlyRounded S modes impl)
     (hmodes : modes' ⊆ modes) : CorrectlyRounded S modes' impl :=
   fun mode hmode => h mode (hmodes hmode)
 

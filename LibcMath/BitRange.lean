@@ -21,7 +21,7 @@ such as `HoldsOnBits P a c` from statements on `[a, b)` and `[b, c)` are closed 
 ## Boolean checks and their diagnostics
 
 `checkBits test first count` evaluates a Boolean test on a block of consecutive bit patterns; it
-is the common form of the block checks of `LibcMath.Exhaustive.Reduction`. When such a check is
+is the common form of the block checks of `LibcMath.Check.Range`. When such a check is
 `false`, `firstFailingBits test first count` evaluates to the first bit pattern that fails
 (`firstFailingBits_eq_none_iff`, `firstFailingBits_eq_some`), so a failed block is located with
 `#eval` instead of by bisection.

@@ -1,0 +1,18 @@
+\title{The open part of \code{\verb~|expf~} is made explicit, and enumeration is taken out}
+\taxon{Session}
+\date{2026-11-24}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{expf}
+\tag{process}
+\meta{harness}{Claude Code}
+\meta{model-id}{claude-fable-5-2}
+\import{base-macros}
+
+\p{The maintainer found the state of the proof hidden and the work leaning on enumeration, and asked for: no leaning toward enumeration of any kind; a main branch that works, with a proof for one plan; what is open as \code{\verb~|sorry~}; and pull requests merged without being sent for review, the state being too unsettled to review. The same day the maintainer had chosen \code{\verb~|Option~} for undefined behaviour.}
+\ul{
+\li{\strong{Done.} [log-OY8M](log-OY8M), under [dec-US4Q](dec-US4Q).}
+\li{\strong{A repair on the way.} The main branch did not build after \pr{19}: a file was ignored by git. Found when a fresh branch failed; repaired in \pr{20}; lesson in [ins-FJ7V](ins-FJ7V).}
+\li{\strong{Open.} The two lemmas of \code{\verb~|Main.lean~}; the steps a proof needs are in the docstring of that file and in [prob-48KJ](prob-48KJ). Of the gaps in [prob-VR5Z](prob-VR5Z), effects and the trust in the translation remain.}
+}
+\p{\strong{What went wrong before this session.} Reports of the form "no \code{\verb~|sorry~}, standard axioms" were made for a theorem whose unproved part was a hypothesis. The rule against it is now in \code{\verb~|CLAUDE.md~}: a status says first whether the main theorem is complete.}
