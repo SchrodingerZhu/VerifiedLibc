@@ -16,7 +16,7 @@ Covers four extracted plans:
 * `Expf.IntegerEval.kernel` (pure integer `Frac64`, round-to-nearest-even)
 -/
 
-namespace LibcMath.Extracted.ExpfPaths
+namespace LibcMath.Extracted.Expf.Paths
 
 open FloatLib.Floats.Formats.BinaryInterchange
 open Model (IEEERoundingMode)
@@ -529,4 +529,4 @@ theorem integerEval_eq_staticRounding_nearest (x : Model .binary32) :
         Expf.StaticRounding.exp_b_scale x_u x_e Expf.StaticRounding.LOG2_E 0x85#32 := fun _ _ => rfl
   simp [heval, hsc]
 
-end LibcMath.Extracted.ExpfPaths
+end LibcMath.Extracted.Expf.Paths

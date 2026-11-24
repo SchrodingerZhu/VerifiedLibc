@@ -24,7 +24,7 @@ lake build             # must end with "Build completed successfully"
 
 - No `sorry`, no new `axiom`, and no `native_decide` outside files whose name or directory says
   so. Top-level theorems carry a `#guard_msgs in #print axioms …` check (see
-  `LibcMath/Exhaustive/Expf.lean` and `LibcMath/Extracted/ExpfMain.lean`); add one for each new
+  `LibcMath/Extracted/Expf/Exhaustive.lean` and `LibcMath/Extracted/Expf/Main.lean`); add one for each new
   top-level result, so that a regression fails the build instead of relying on a claim in a pull
   request.
 - Files named `…Examples.lean` are part of the build. They are the tests: put a small worked case
@@ -34,6 +34,16 @@ lake build             # must end with "Build completed successfully"
   in the flake shell, at the commit of LLVM that the files record.
 - Lean, C++ and Nix sources stay within 100 columns. The exceptions are expected messages under
   `#guard_msgs` and string literals, which cannot be broken.
+
+## Where things go
+
+- `LibcMath/Extracted/<Function>/` holds everything about one function: its generated evaluation
+  plans, `Plans.lean`, `Examples.lean`, `Statements.lean`, the short paths under `Paths/`, the
+  error analysis of its main path, its instance of the exhaustive reduction, and `Main.lean`.
+  `LibcMath/Extracted/<Function>.lean` imports them all; `LibcMath/Extracted/Expf.lean` is the model.
+- What does not depend on the function stays outside: `LibcMath/Core/` (the operations of libc),
+  `LibcMath/Functions/` (facts about real functions and rounding), `LibcMath/Exhaustive/` and
+  `LibcMath/Oracle/`.
 
 ## What the theorems do not say
 
