@@ -5,12 +5,13 @@
 \contributor{schrodingerzy}
 \tag{exp}
 \tag{kernel}
-\meta{status}{open}
+\meta{status}{superseded}
 \meta{created}{2026-11-23}
+\meta{updated}{2026-11-24}
 \meta{pr}{12}
 \import{base-macros}
 
-\p{\strong{Status:} open.}
+\p{\strong{Status:} superseded by [dec-03IY](dec-03IY) and \pr{17}. Direct Clang-AST extraction (\code{\verb~|ast2lean~}, \pr{15}) produces high-level functional Lean kernels over \code{\verb~|LibcMath.Core~} directly; the legacy IR interpreter and \code{\verb~|LibcMath/Extracted/ExpfStructured*.lean~} (along with \code{\verb~|Block15ComputesExpfMain~}) were removed in \pr{17} ([log-GHTT](log-GHTT)).}
 \p{\code{\verb~|Block15ComputesExpfMain~} in \code{\verb~|LibcMath/Extracted/ExpfStructuredOpen.lean~} says that from block 15 on the interpreter computes \code{\verb~|expfMain~}, for every argument and rounding direction. It is a hypothesis of \code{\verb~|runUnary_eq_expfStructured~} and of \code{\verb~|holdsOnBits_of_checkBlockMain'~}, so the faster check on the structured form ([log-Q3D3](log-Q3D3)) does not yet give a theorem about the extracted code.}
 \ul{
 \li{\code{\verb~|LibcMath/Extracted/ExpfStructuredExec.lean~} has a proof in which every tactic step elaborates. According to the description of \pr{12}, the kernel checks the first 8 of the 22 instructions of block 20 in seconds and did not finish the whole within 25 minutes on a loaded machine; whether it terminates is not known. The file is not imported, and was not built by the session that merged it.}

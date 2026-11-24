@@ -101,16 +101,22 @@ info: "Kernel: expf\n  C++ function : math::float_eval_cr_rn::expf\n  Source    
 #eval Diag.inspectKernel FloatEvalCrRn.kernel
 
 /--
-info: "[compare expf vs expf] mode=nearest range=[0x3F800000, +32): all 32 inputs agree"
+info: "[compare expf/double_eval vs expf/integer_eval] mode=nearest range=[0x3F800000, +32): all 32 inputs agree"
 -/
 #guard_msgs in
 #eval Diag.compareKernels DoubleEval.kernel IntegerEval.kernel .nearest 0x3F800000 32
 
 /--
-info: "[compare expf vs expf] mode=nearest FIRST DIFF at 0x3F800000 (+normal, s=+, exp=127, frac=0 val=1):\n  expf: 0x402DF854 (+normal, s=+, exp=128, frac=3012692 val=2850325/1048576)\n  expf: 0x402DF855 (+normal, s=+, exp=128, frac=3012693 val=11401301/4194304) ulp_diff=-1"
+info: "[compare expf/double_eval vs expf/float_eval] mode=nearest FIRST DIFF at 0x3F800000 (+normal, s=+, exp=127, frac=0 val=1):\n  expf/double_eval: 0x402DF854 (+normal, s=+, exp=128, frac=3012692 val=2850325/1048576)\n  expf/float_eval: 0x402DF855 (+normal, s=+, exp=128, frac=3012693 val=11401301/4194304) ulp_diff=-1"
 -/
 #guard_msgs in
 #eval Diag.compareKernels DoubleEval.kernel FloatEval.kernel .nearest 0x3F800000 32
+
+/--
+info: "[plan-matrix] mode=nearest input=0x3F800000 (+normal, s=+, exp=127, frac=0 val=1)\n  expf/double_eval: 0x402DF854 (+normal, s=+, exp=128, frac=3012692 val=2850325/1048576) [exact]\n  expf/double_eval_fma: 0x402DF854 (+normal, s=+, exp=128, frac=3012692 val=2850325/1048576) [exact]\n  expf/integer_eval: 0x402DF854 (+normal, s=+, exp=128, frac=3012692 val=2850325/1048576) [exact]\n  expf/static_rounding: 0x402DF854 (+normal, s=+, exp=128, frac=3012692 val=2850325/1048576) [exact]\n  expf/float_eval: 0x402DF855 (+normal, s=+, exp=128, frac=3012693 val=11401301/4194304) [ulp=1]\n  expf/float_eval_cr_rn: 0x402DF854 (+normal, s=+, exp=128, frac=3012692 val=2850325/1048576) [exact]"
+-/
+#guard_msgs in
+#eval Diag.diagnosePlanMatrix allPlans .nearest f32(0x3F800000#32)
 
 /-! ### Axiom check -/
 

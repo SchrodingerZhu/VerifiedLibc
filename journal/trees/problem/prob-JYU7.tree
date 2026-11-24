@@ -4,11 +4,12 @@
 \author{claude-fable-5-2}
 \contributor{schrodingerzy}
 \tag{extraction}
-\meta{status}{open}
+\meta{status}{superseded}
 \meta{created}{2026-11-23}
+\meta{updated}{2026-11-24}
 \meta{pr}{6}
 \import{base-macros}
 
-\p{\strong{Status:} open.}
+\p{\strong{Status:} superseded by [dec-03IY](dec-03IY) and \pr{15}. \code{\verb~|extract/CoreOps.cpp~} was removed in \pr{15}; \code{\verb~|ast2lean~} inspects Clang \code{\verb~|FunctionDecl~} AST nodes and template argument lists directly rather than string-scanning demangled names.}
 \p{\code{\verb~|relativeName~} in \code{\verb~|extract/CoreOps.cpp~} strips template arguments by counting \code{\verb~|<~} and \code{\verb~|>~}. A name whose template arguments contain a comparison, such as the return type \code{\verb~|enable_if<... && sizeof(T) <= sizeof(U), T>::type~} of \code{\verb~|fputil::generic::add_or_sub~}, comes out as \code{\verb~|cpp::enable_if~}. \code{\verb~|--function~} therefore cannot name the body functions of \code{\verb~|f16addf~}, \code{\verb~|f16subf~}, \code{\verb~|f16mulf~}, \code{\verb~|f16divf~} and \code{\verb~|f16fmaf~} by their real names, and a lambda inside a function gets the same name as the function (\code{\verb~|math::double_eval::exp2f~} in the module of \code{\verb~|powf~}); the tool takes the first match in module order.}
 \p{Found by [the survey of extraction](note-extraction-coverage) of \pr{6}; see [the observations about the tools](note-extraction-tools).}

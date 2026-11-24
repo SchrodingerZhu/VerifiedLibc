@@ -5,12 +5,13 @@
 \contributor{schrodingerzy}
 \tag{extraction}
 \tag{semantics}
-\meta{status}{open}
+\meta{status}{superseded}
 \meta{created}{2026-11-23}
+\meta{updated}{2026-11-24}
 \meta{pr}{6}
 \import{base-macros}
 
-\p{\strong{Status:} open.}
+\p{\strong{Status:} superseded by [dec-03IY](dec-03IY) and \pr{15}. \code{\verb~|ir2lean~} was replaced by \code{\verb~|ast2lean~}, which extracts directly from the C++ AST prior to LLVM IR fast-math flag synthesis and snapshots active \code{\verb~|LIBC_MATH_*~} and target CPU macros into \code{\verb~|Core.MathConfig~}.}
 \p{\code{\verb~|ir2lean~} drops fast-math flags without a diagnostic. 45 of the surveyed entrypoints contain \code{\verb~|nnan~} or \code{\verb~|ninf~} on some instruction, among them \code{\verb~|cospif~}, which exports today. The flags are not in the source; the optimizer adds them where it has proved that no NaN or infinity can occur, so they have the same standing as \code{\verb~|nsw~} and \code{\verb~|nuw~}, which \code{\verb~|Semantics.lean~} documents as not represented. No \code{\verb~|nsz~}, \code{\verb~|arcp~}, \code{\verb~|contract~}, \code{\verb~|reassoc~} or \code{\verb~|afn~} occurs anywhere.}
 \p{Found by [the survey of extraction](note-extraction-coverage) of \pr{6}; see [the observations about the tools](note-extraction-tools).}
 \p{Either reject an instruction that carries \code{\verb~|nnan~} or \code{\verb~|ninf~}, or represent the flags in \code{\verb~|LibcMath/IR/Syntax.lean~} and say in the semantics what an execution that violates one means, as the branch of \pr{13} does for \code{\verb~|nsw~} and \code{\verb~|nuw~}.}

@@ -1,0 +1,16 @@
+\title{Direct AST-extracted kernels speed up Lean kernel checking by over 70x}
+\taxon{Insight}
+\date{2026-11-24}
+\author{antigravity}
+\contributor{schrodingerzy}
+\tag{kernel}
+\tag{exhaustive}
+\tag{expf}
+\import{base-macros}
+
+\p{Source: session [ses-ZHIG](ses-ZHIG), measured on \pr{17} after replacing the legacy LLVM-IR CFG interpreter (\code{\verb~|LibcMath/IR/Interp.lean~}) with direct AST-extracted functional Lean models over \code{\verb~|LibcMath.Core~} ([dec-03IY](dec-03IY)).}
+\ul{
+\li{\strong{Kernel evaluation (\code{\verb~|decide +kernel~}).} Checking \code{\verb~|LibcMath/Exhaustive/Run/Kernel/Demo/Nearest3F800000.lean~} (32 binary32 inputs starting at \code{\verb~|1.0~} against \code{\verb~|expOracle~} inside Lean's kernel) took 4.56s wall time (3.60s user, including Lean process startup and importing Mathlib/FloatLib/Oracle): about 0.11s per input amortized, compared with 0.35–0.5s (and earlier 7.7s) per input under the CFG interpreter—a speedup of more than 70x over the unoptimized interpreter and 3–4x over the last recorded interpreter timings, without requiring any \code{\verb~|Block15ComputesExpfMain~} equivalence bridge ([prob-W1QC](prob-W1QC)).}
+\li{\strong{Compiled \code{\verb~|checkrange~}.} Checking 512-input blocks around \code{\verb~|1.0~} in round-to-nearest mode took 4–8 ms per block across all five correctly-rounded plans (\code{\verb~|double_eval~}: 8 ms, \code{\verb~|double_eval_fma~}: 4–5 ms, \code{\verb~|integer_eval~}: 7 ms, \code{\verb~|static_rounding~}: 7 ms, \code{\verb~|float_eval_cr_rn~}: 7 ms), i.e., 8–16 µs per input on a single core.}
+\li{\strong{Cross-plan kernel agreement.} In \code{\verb~|LibcMath/Extracted/Expf/Examples.lean~}, \code{\verb~|decide +kernel~} checks 64 consecutive inputs across all five correctly-rounded evaluation plans (320 kernel evaluations) in a few seconds.}
+}

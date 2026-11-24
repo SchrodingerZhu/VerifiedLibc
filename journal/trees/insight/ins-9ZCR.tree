@@ -1,0 +1,16 @@
+\title{Lean 4.36.0 pitfalls with FloatLib: \code{\verb~|FloatFormat.bitWidth~} synthesis and \code{\verb~|@[inline]~} over \code{\verb~|@[macro_inline]~}}
+\taxon{Insight}
+\date{2026-11-24}
+\author{antigravity}
+\contributor{schrodingerzy}
+\tag{lean}
+\tag{floatlib}
+\tag{core}
+\import{base-macros}
+
+\p{Source: session [ses-ZHIG](ses-ZHIG), encountered while building \code{\verb~|LibcMath/Core/~} (\pr{14}) and typechecking six AST-extracted \code{\verb~|expf~} plans (\pr{15}, \pr{16}) on Lean 4.36.0 with FloatLib v4.1.0.}
+\ul{
+\li{\strong{Semireducible \code{\verb~|FloatFormat.bitWidth~} breaks \code{\verb~|BitVec~} typeclass synthesis.} Because \code{\verb~|FloatFormat.binary32~} and \code{\verb~|FloatFormat.bitWidth~} are regular definitions (not \code{\verb~|abbrev~}), a function returning \code{\verb~|BitVec fmt.bitWidth~} produces \code{\verb~|BitVec FloatFormat.binary32.bitWidth~}, for which \code{\verb~|HAnd~}, \code{\verb~|HAdd~}, and \code{\verb~|Core.BitCast~} fail to synthesize against \code{\verb~|BitVec 32~} at reducible transparency. Fix: introduce an \code{\verb~|outParam~} typeclass \code{\verb~|Core.FmtBitWidth (fmt : FloatFormat) (w : outParam Nat)~} with concrete instances for \code{\verb~|.binary16~} (16), \code{\verb~|.binary32~} (32), \code{\verb~|.binary64~} (64), \code{\verb~|.binary128~} (128), and a \code{\verb~|priority := low~} fallback for generic \code{\verb~|fmt.bitWidth~}, casting via \code{\verb~|BitVec.cast~}.}
+\li{\strong{Never mark multi-call wrappers over FloatLib arithmetic \code{\verb~|@[inline]~}.} FloatLib's \code{\verb~|Model.add~}, \code{\verb~|Model.sub~}, and \code{\verb~|Model.mul~} are \code{\verb~|@[macro_inline]~}. Marking composite routines like \code{\verb~|Core.NumberPair.exactAdd~}, \code{\verb~|exactMult~}, or \code{\verb~|div~} as \code{\verb~|@[inline]~} causes exponential LCNF term growth and hits Lean's 200k-heartbeat compiler limit. Keeping composite wrappers non-\code{\verb~|@[inline]~} avoids the blowup completely.}
+\li{\strong{Reserved keywords in Lean 4.36.0.} Both \code{\verb~|meta~} and \code{\verb~|of~} are keywords in Lean 4.36.0 and must not be used as bare structure fields or function names (hence \code{\verb~|UnaryKernel.info~}, \code{\verb~|FPBits.ofVal~}, \code{\verb~|Frac64.ofBits~}, and escaping in \code{\verb~|ast2lean~}).}
+}

@@ -6,9 +6,10 @@
 \tag{exhaustive}
 \meta{status}{open}
 \meta{created}{2026-11-23}
+\meta{updated}{2026-11-24}
 \import{base-macros}
 
-\p{\strong{Status:} open.}
+\p{\strong{Status:} open (partially addressed by \pr{17}: \code{\verb~|IR.Func.IsComputedBy~} and \code{\verb~|RunsCorrectlyAt~} were removed when \code{\verb~|LibcMath/Exhaustive/Reduction.lean~} was simplified to total functions; \code{\verb~|checkBlocks~}, \code{\verb~|checkRangeResult~}, and \code{\verb~|checkModesAgree~} remain available for future reductions).}
 \p{On 2026-11-23 the branch of \pr{13}, which builds the whole route for \code{\verb~|expf~}, used from \pr{1} only \code{\verb~|HoldsOnBits~} with \code{\verb~|append~}, \code{\verb~|holdsOnBits_of_checkRange~}, \code{\verb~|IsComputedBy~} and the \code{\verb~|expfCorrectlyRounded_of_…~} theorems. Nothing outside the files of \pr{1} referred to \code{\verb~|checkBlocks~}, \code{\verb~|checkRangeResult~}, \code{\verb~|checkModesAgree~}, \code{\verb~|correctAt_of_map~}, \code{\verb~|HoldsOnBits.of_isChain~}, \code{\verb~|checkRange_add~}, \code{\verb~|HoldsOnBits.subrange~}, \code{\verb~|HoldsOnBits.singleton~}, \code{\verb~|Spec.exp_eval_towardZero~}, \code{\verb~|sameValue_equivalence~} or \code{\verb~|CorrectlyRounded.mono~}.}
 \ul{
 \li{The saving for rounding toward zero, \code{\verb~|expf_holdsOnBits_towardZero_of_down~}, is among the unused parts: the blocks for that direction are checked against the oracle like the others. Either use it or state why not.}
