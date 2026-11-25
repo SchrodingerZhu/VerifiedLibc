@@ -23,12 +23,16 @@ PLANS: list[tuple[str, str, str, str, str, str, str, str | None]] = [
     ("exp", "Exp2f", "exp2f", "exp2f", "DoubleEvalAvx2Fma", "double_eval_avx2_fma", "avx2_fma", None),
     ("exp", "Exp2f", "exp2f", "exp2f", "FloatEval", "float_eval", "float_eval", None),
     ("exp", "Exp2f", "exp2f", "exp2f", "IntegerEval", "integer_eval", "integer_eval", None),
+    ("exp", "Exp2f", "exp2f", "exp2f", "StaticRounding", "static_rounding", "static_rounding",
+     "math::static_rounding::exp2f"),
     ("exp", "Exp2f", "exp2f", "exp2f", "DoubleEvalAArch64", "double_eval_aarch64", "aarch64", None),
     ("exp", "Exp10f", "exp10f", "exp10f", "DoubleEvalSse2", "double_eval_sse2", "sse2", None),
     ("exp", "Exp10f", "exp10f", "exp10f", "DoubleEvalSse42", "double_eval_sse42", "sse42", None),
     ("exp", "Exp10f", "exp10f", "exp10f", "DoubleEvalAvx2Fma", "double_eval_avx2_fma", "avx2_fma", None),
     ("exp", "Exp10f", "exp10f", "exp10f", "FloatEval", "float_eval", "float_eval", None),
     ("exp", "Exp10f", "exp10f", "exp10f", "IntegerEval", "integer_eval", "integer_eval", None),
+    ("exp", "Exp10f", "exp10f", "exp10f", "StaticRounding", "static_rounding", "static_rounding",
+     "math::static_rounding::exp10f"),
     ("exp", "Exp10f", "exp10f", "exp10f", "DoubleEvalAArch64", "double_eval_aarch64", "aarch64", None),
     ("exp", "Expm1f", "expm1f", "expm1f", "Sse2", "sse2", "sse2", None),
     ("exp", "Expm1f", "expm1f", "expm1f", "Sse42", "sse42", "sse42", None),
@@ -202,6 +206,8 @@ def flags_for(kind: str, cpp_file: str, rdir: str) -> list[str]:
         return ["-mavx2", "-mfma", f"-DLIBC_MATH_{upper}_IMPL=float_eval", "-DLIBC_MATH=0x3F"]
     if kind == "integer_eval":
         return ["-mno-sse4.2", "-mno-fma", f"-DLIBC_MATH_{upper}_IMPL=integer_eval", "-DLIBC_MATH=0x2C"]
+    if kind == "static_rounding":
+        return ["-mno-sse4.2", "-mno-fma", f"-DLIBC_MATH_{upper}_IMPL=integer_eval", "-DLIBC_MATH=0x0C"]
     if kind == "aarch64":
         return ["--target=aarch64-none-elf", "-ffreestanding", "-nostdinc", "-isystem", f"{rdir}/include"]
     if kind == "riscv64":

@@ -5,12 +5,13 @@ import LibcMath.Kernels.Exp10f.Generated.DoubleEvalSse42
 import LibcMath.Kernels.Exp10f.Generated.DoubleEvalAvx2Fma
 import LibcMath.Kernels.Exp10f.Generated.FloatEval
 import LibcMath.Kernels.Exp10f.Generated.IntegerEval
+import LibcMath.Kernels.Exp10f.Generated.StaticRounding
 import LibcMath.Kernels.Exp10f.Generated.DoubleEvalAArch64
 
 /-!
 # Extracted `exp10f` evaluation and microarch plans
 
-Collects six extracted LLVM libc `exp10f` plans and states plan-qualified correctness obligations.
+Collects seven extracted LLVM libc `exp10f` plans and states plan-qualified correctness obligations.
 Every statement names its evaluation and microarch plan explicitly.
 -/
 
@@ -20,13 +21,14 @@ open FloatLib.Floats.Formats.BinaryInterchange
 open LibcMath.Libc
 open LibcMath.Kernels.Exp10f.Generated
 
-/-- Lists all six extracted `exp10f` evaluation and microarch plans. -/
+/-- Lists all seven extracted `exp10f` evaluation and microarch plans. -/
 def allPlans : List (UnaryKernel .binary32) :=
   [ DoubleEvalSse2.kernel
   , DoubleEvalSse42.kernel
   , DoubleEvalAvx2Fma.kernel
   , FloatEval.kernel
   , IntegerEval.kernel
+  , StaticRounding.kernel
   , DoubleEvalAArch64.kernel ]
 
 /-- Correct rounding of `exp10f` (`double_eval_sse2`) across all four C rounding modes. -/
@@ -48,6 +50,11 @@ def Exp10fDoubleEvalAArch64CorrectlyRounded : Prop :=
 /-- Correct rounding of `exp10f` (`integer_eval`) in round-to-nearest-even mode. -/
 def Exp10fIntegerEvalCorrectlyRounded : Prop :=
   UnaryFnCorrectlyRounded FloatLibSpec.exp10 {.nearest} IntegerEval.kernel.eval
+
+/-- Correct rounding of `exp10f` (`static_rounding`, integer only) across all four C rounding
+modes. -/
+def Exp10fStaticRoundingCorrectlyRounded : Prop :=
+  UnaryFnCorrectlyRounded FloatLibSpec.exp10 cModes StaticRounding.kernel.eval
 
 /-- Definedness (no C++ undefined behavior) of fast `exp10f` (`float_eval`, RN-only). -/
 def Exp10fFloatEvalDefined : Prop :=
@@ -71,6 +78,10 @@ theorem exp10fDoubleEvalAArch64_correctlyRounded : Exp10fDoubleEvalAArch64Correc
 
 /-- **Open.** Prove `exp10f` (`integer_eval`) is correctly rounded in round-to-nearest-even. -/
 theorem exp10fIntegerEval_correctlyRounded : Exp10fIntegerEvalCorrectlyRounded := by
+  sorry
+
+/-- **Open.** Prove `exp10f` (`static_rounding`) is correctly rounded across all four C modes. -/
+theorem exp10fStaticRounding_correctlyRounded : Exp10fStaticRoundingCorrectlyRounded := by
   sorry
 
 /-- **Open.** Prove fast `exp10f` (`float_eval`) executes without C++ undefined behavior. -/
@@ -121,6 +132,15 @@ info: 'LibcMath.Kernels.Exp10f.exp10fIntegerEval_correctlyRounded' depends on ax
 -/
 #guard_msgs in
 #print axioms exp10fIntegerEval_correctlyRounded
+
+/--
+info: 'LibcMath.Kernels.Exp10f.exp10fStaticRounding_correctlyRounded' depends on axioms: [propext,
+ sorryAx,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms exp10fStaticRounding_correctlyRounded
 
 /--
 info: 'LibcMath.Kernels.Exp10f.exp10fFloatEval_defined' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]

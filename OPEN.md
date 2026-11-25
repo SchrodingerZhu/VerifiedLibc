@@ -4,7 +4,7 @@ Generated from every `sorry` under `LibcMath/` by `scripts/check-open.py`.
 Do not edit by hand; run `python3 scripts/check-open.py --update` after changing
 the open lemmas.
 
-Total open obligations: **160**.
+Total open obligations: **162**.
 
 | File | Lemma | Summary |
 |---|---|---|
@@ -51,6 +51,7 @@ Total open obligations: **160**.
 | `LibcMath/Kernels/Exp10f.lean` | `exp10fDoubleEvalAvx2Fma_correctlyRounded` | **Open.** Prove `exp10f` (`double_eval_avx2_fma`) is correctly rounded across all modes. |
 | `LibcMath/Kernels/Exp10f.lean` | `exp10fDoubleEvalAArch64_correctlyRounded` | **Open.** Prove `exp10f` (`double_eval_aarch64`) is correctly rounded across all modes. |
 | `LibcMath/Kernels/Exp10f.lean` | `exp10fIntegerEval_correctlyRounded` | **Open.** Prove `exp10f` (`integer_eval`) is correctly rounded in round-to-nearest-even. |
+| `LibcMath/Kernels/Exp10f.lean` | `exp10fStaticRounding_correctlyRounded` | **Open.** Prove `exp10f` (`static_rounding`) is correctly rounded across all four C modes. |
 | `LibcMath/Kernels/Exp10f.lean` | `exp10fFloatEval_defined` | **Open.** Prove fast `exp10f` (`float_eval`) executes without C++ undefined behavior. |
 | `LibcMath/Kernels/Exp10m1f.lean` | `exp10m1fSse2_correctlyRounded` | **Open.** Prove `exp10m1f` (`sse2`) is correctly rounded across all four C rounding modes. |
 | `LibcMath/Kernels/Exp10m1f.lean` | `exp10m1fSse42_correctlyRounded` | **Open.** Prove `exp10m1f` (`sse42`) is correctly rounded across all four C rounding modes. |
@@ -60,6 +61,7 @@ Total open obligations: **160**.
 | `LibcMath/Kernels/Exp2f.lean` | `exp2fDoubleEvalAvx2Fma_correctlyRounded` | **Open.** Prove `exp2f` (`double_eval_avx2_fma`) is correctly rounded across all four modes. |
 | `LibcMath/Kernels/Exp2f.lean` | `exp2fDoubleEvalAArch64_correctlyRounded` | **Open.** Prove `exp2f` (`double_eval_aarch64`) is correctly rounded across all four modes. |
 | `LibcMath/Kernels/Exp2f.lean` | `exp2fIntegerEval_correctlyRounded` | **Open.** Prove `exp2f` (`integer_eval`) is correctly rounded in round-to-nearest-even. |
+| `LibcMath/Kernels/Exp2f.lean` | `exp2fStaticRounding_correctlyRounded` | **Open.** Prove `exp2f` (`static_rounding`) is correctly rounded across all four C modes. |
 | `LibcMath/Kernels/Exp2f.lean` | `exp2fFloatEval_defined` | **Open.** Prove fast `exp2f` (`float_eval`) executes without C++ undefined behavior. |
 | `LibcMath/Kernels/Exp2m1f.lean` | `exp2m1fSse2_correctlyRounded_nonNegNaN` | **Open.** Prove `exp2m1f` (`sse2`) is correctly rounded on all non-negative-NaN inputs. |
 | `LibcMath/Kernels/Exp2m1f.lean` | `exp2m1fSse42_correctlyRounded_nonNegNaN` | **Open.** Prove `exp2m1f` (`sse42`) is correctly rounded on all non-negative-NaN inputs. |

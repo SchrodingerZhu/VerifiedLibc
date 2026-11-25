@@ -5,12 +5,13 @@ import LibcMath.Kernels.Exp2f.Generated.DoubleEvalSse42
 import LibcMath.Kernels.Exp2f.Generated.DoubleEvalAvx2Fma
 import LibcMath.Kernels.Exp2f.Generated.FloatEval
 import LibcMath.Kernels.Exp2f.Generated.IntegerEval
+import LibcMath.Kernels.Exp2f.Generated.StaticRounding
 import LibcMath.Kernels.Exp2f.Generated.DoubleEvalAArch64
 
 /-!
 # Extracted `exp2f` evaluation and microarch plans
 
-Collects six extracted LLVM libc `exp2f` plans and states plan-qualified correctness obligations.
+Collects seven extracted LLVM libc `exp2f` plans and states plan-qualified correctness obligations.
 Every statement names its evaluation and microarch plan explicitly.
 -/
 
@@ -20,13 +21,14 @@ open FloatLib.Floats.Formats.BinaryInterchange
 open LibcMath.Libc
 open LibcMath.Kernels.Exp2f.Generated
 
-/-- Lists all six extracted `exp2f` evaluation and microarch plans. -/
+/-- Lists all seven extracted `exp2f` evaluation and microarch plans. -/
 def allPlans : List (UnaryKernel .binary32) :=
   [ DoubleEvalSse2.kernel
   , DoubleEvalSse42.kernel
   , DoubleEvalAvx2Fma.kernel
   , FloatEval.kernel
   , IntegerEval.kernel
+  , StaticRounding.kernel
   , DoubleEvalAArch64.kernel ]
 
 /-- Correct rounding of `exp2f` (`double_eval_sse2`) across all four C rounding modes. -/
@@ -48,6 +50,11 @@ def Exp2fDoubleEvalAArch64CorrectlyRounded : Prop :=
 /-- Correct rounding of `exp2f` (`integer_eval`) in round-to-nearest-even mode. -/
 def Exp2fIntegerEvalCorrectlyRounded : Prop :=
   UnaryFnCorrectlyRounded FloatLibSpec.exp2 {.nearest} IntegerEval.kernel.eval
+
+/-- Correct rounding of `exp2f` (`static_rounding`, integer only) across all four C rounding
+modes. -/
+def Exp2fStaticRoundingCorrectlyRounded : Prop :=
+  UnaryFnCorrectlyRounded FloatLibSpec.exp2 cModes StaticRounding.kernel.eval
 
 /-- Definedness (no C++ undefined behavior) of fast `exp2f` (`float_eval`, RN-only). -/
 def Exp2fFloatEvalDefined : Prop :=
@@ -71,6 +78,10 @@ theorem exp2fDoubleEvalAArch64_correctlyRounded : Exp2fDoubleEvalAArch64Correctl
 
 /-- **Open.** Prove `exp2f` (`integer_eval`) is correctly rounded in round-to-nearest-even. -/
 theorem exp2fIntegerEval_correctlyRounded : Exp2fIntegerEvalCorrectlyRounded := by
+  sorry
+
+/-- **Open.** Prove `exp2f` (`static_rounding`) is correctly rounded across all four C modes. -/
+theorem exp2fStaticRounding_correctlyRounded : Exp2fStaticRoundingCorrectlyRounded := by
   sorry
 
 /-- **Open.** Prove fast `exp2f` (`float_eval`) executes without C++ undefined behavior. -/
@@ -121,6 +132,15 @@ info: 'LibcMath.Kernels.Exp2f.exp2fIntegerEval_correctlyRounded' depends on axio
 -/
 #guard_msgs in
 #print axioms exp2fIntegerEval_correctlyRounded
+
+/--
+info: 'LibcMath.Kernels.Exp2f.exp2fStaticRounding_correctlyRounded' depends on axioms: [propext,
+ sorryAx,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms exp2fStaticRounding_correctlyRounded
 
 /--
 info: 'LibcMath.Kernels.Exp2f.exp2fFloatEval_defined' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]
