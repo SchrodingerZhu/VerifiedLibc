@@ -12,20 +12,36 @@ open LibcMath.Libc.DSL
 
 /-- Active LLVM libc `LIBC_MATH_*` and target CPU configuration captured by `ast2lean`. -/
 def config : Libc.MathConfig :=
-  { skipAccuratePass := false
+  { arch := .x86_64
+    armArchVersion := 0
+    isBigEndian := false
+    skipAccuratePass := false
     smallTables := false
     noErrno := false
     noExcept := false
     intermediateCompInFloat := false
     assumeRoundNearestOnly := false
+    hasSse2 := true
+    hasSsse3 := true
+    hasSse42 := true
+    hasAvx := true
+    hasAvx2 := true
+    hasAvx512f := false
+    hasFmaGlobal := true
     hasFmaHalf := false
     hasFmaFloat := true
     hasFmaDouble := true
     hasNearestInt := true
     hasFpuFloat := true
     hasFpuDouble := true
+    hasArmFpuFloat := false
+    hasArmFpuDouble := false
+    hasArmNeon := false
+    hasRiscVFpuFloat := false
+    hasRiscVFpuDouble := false
     hasFastFloat16 := false
     hasInt128 := true
+    fpLogbNanMin := true
     targetTriple := "x86_64-pc-linux-gnu"
     implVariant := "double_eval_fma" }
 

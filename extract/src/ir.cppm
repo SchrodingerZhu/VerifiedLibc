@@ -24,20 +24,36 @@ template <class... Ts> struct Overloaded : Ts... {
 // ============================================================================
 
 struct MathConfig {
+  std::string arch = "x86_64";
+  std::uint32_t arm_arch_version = 0;
+  bool is_big_endian = false;
   bool skip_accurate_pass = false;
   bool small_tables = false;
   bool no_errno = false;
   bool no_except = false;
   bool intermediate_comp_in_float = false;
   bool assume_round_nearest_only = false;
+  bool has_sse2 = true;
+  bool has_ssse3 = false;
+  bool has_sse42 = false;
+  bool has_avx = false;
+  bool has_avx2 = false;
+  bool has_avx512f = false;
+  bool has_fma_global = false;
   bool has_fma_half = false;
   bool has_fma_float = false;
   bool has_fma_double = false;
   bool has_nearest_int = false;
   bool has_fpu_float = true;
   bool has_fpu_double = true;
+  bool has_arm_fpu_float = false;
+  bool has_arm_fpu_double = false;
+  bool has_arm_neon = false;
+  bool has_riscv_fpu_float = false;
+  bool has_riscv_fpu_double = false;
   bool has_fast_float16 = false;
   bool has_int128 = true;
+  bool fp_logb_nan_min = true;
   std::string target_triple = "x86_64-unknown-linux-gnu";
   std::string impl_variant = "default";
 };
@@ -296,6 +312,9 @@ struct StructUpdateExpr {
   std::string field;
   ExprPtr value;
 };
+struct ArrayLitExpr {
+  std::vector<ExprPtr> elems;
+};
 struct CoreCallExpr {
   CoreOpKind op;
   std::string lean_name;
@@ -304,6 +323,7 @@ struct CoreCallExpr {
   bool needs_mode = false;
   bool needs_config = false;
   bool is_effect = false;
+  std::vector<std::string> trailing_args = {};
 };
 struct PolyevalExpr {
   PolyScheme scheme = PolyScheme::Horner;
@@ -361,9 +381,9 @@ struct UnsupportedExpr {
 
 struct Expr {
   std::variant<ConstExpr, VarExpr, TableRefExpr, UnaryExpr, BinaryExpr, CastExpr, SelectExpr,
-               IndexExpr, FieldExpr, StructLitExpr, StructUpdateExpr, CoreCallExpr, PolyevalExpr,
-               FuncCallExpr, LetExpr, LetJoinExpr, CallJoinExpr, LetTupleExpr, TupleExpr, IfExpr,
-               MatchExpr, UnsupportedExpr>
+               IndexExpr, FieldExpr, StructLitExpr, StructUpdateExpr, ArrayLitExpr, CoreCallExpr,
+               PolyevalExpr, FuncCallExpr, LetExpr, LetJoinExpr, CallJoinExpr, LetTupleExpr,
+               TupleExpr, IfExpr, MatchExpr, UnsupportedExpr>
       v;
   TypePtr type;
 

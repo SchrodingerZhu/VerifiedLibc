@@ -41,13 +41,21 @@ DyadicFloat<Bits> quick_add(const DyadicFloat<Bits> &a, const DyadicFloat<Bits> 
 template <int Bits>
 DyadicFloat<Bits> quick_mul(const DyadicFloat<Bits> &a, const DyadicFloat<Bits> &b);
 
+template <typename T> struct FPBits {
+  uint32_t bits;
+  constexpr explicit FPBits(T x) : bits(__builtin_bit_cast(uint32_t, x)) {}
+  constexpr explicit FPBits(uint32_t b) : bits(b) {}
+  constexpr T get_val() const { return __builtin_bit_cast(T, bits); }
+  constexpr void set_sign(Sign s) { bits = (bits & 0x7FFFFFFFu) | (s.is_neg ? 0x80000000u : 0u); }
+};
+
 struct DoubleDouble {
   double lo;
   double hi;
 };
 
-DoubleDouble exact_add(double a, double b);
-DoubleDouble exact_mult(double a, double b);
+template <bool FAST2SUM = true, typename T = double> DoubleDouble exact_add(T a, T b);
+template <typename T = double, unsigned long SPLIT_B = 27> DoubleDouble exact_mult(T a, T b);
 DoubleDouble quick_mult(const DoubleDouble &a, const DoubleDouble &b);
 
 template <typename T, int N> struct ExceptValues {
@@ -131,6 +139,22 @@ double loop_reduce(double x, int n) {
     acc = acc * 0.5 + DD_TABLE[i & 1].hi;
   }
   return acc;
+}
+
+// Demonstrates mutating FPBits::set_sign, FAST2SUM=false, SPLIT_B=28, and `to` keyword escaping.
+float mutating_and_templates(float from, float to) {
+  const double LOCAL_SCALE[2] = {1.0, 2.0};
+  fputil::FPBits<float> fb(from);
+  fb.set_sign({true});
+  double res;
+  if (to > 0.0f) {
+    auto s = fputil::exact_add<false>(static_cast<double>(fb.get_val()), LOCAL_SCALE[0]);
+    auto p = fputil::exact_mult<double, 28>(s.hi, LOCAL_SCALE[1]);
+    res = p.hi + p.lo;
+  } else {
+    res = static_cast<double>(to);
+  }
+  return static_cast<float>(res);
 }
 
 } // namespace math

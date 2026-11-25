@@ -39,7 +39,19 @@ check_contains "dyadic-table"  "0xAAAAAAAAAAAAAAAA5555555555555555#128" "$out_dy
 check_contains "dyadic-dd"     "Libc.NumberPair.exactMult config mode"  "$out_dyadic"
 check_contains "dyadic-poly"   "horner[config, mode] dx ["              "$out_dyadic"
 check_contains "dyadic-except" "Libc.ExceptValues.lookup config mode MY_EXCEPTS" "$out_dyadic"
+check_contains "dyadic-except-fields" "rndTowardZero := 0x402DF854#32" "$out_dyadic"
+check_contains "dyadic-fastas" "Libc.DyadicFloat.fastAs config .binary64 mode total" "$out_dyadic"
 check_contains "dyadic-match"  "match Libc.quickGetRound mode with"     "$out_dyadic"
+
+out_mut=$("$bin" "$root/test/dyadic_sample.cpp" --function=mutating_and_templates --strict)
+check_contains "mut-set-sign"  "let fb := Libc.FPBits.setSign fb"       "$out_mut"
+check_contains "mut-fast2sum"  "Libc.NumberPair.exactAdd mode"          "$out_mut"
+check_contains "mut-fast2sum-f" "false"                                 "$out_mut"
+check_contains "mut-splitb"    "Libc.NumberPair.exactMult config mode s.hi" "$out_mut"
+check_contains "mut-splitb-28" " 28"                                    "$out_mut"
+check_contains "mut-binary"    "def kernel : Libc.BinaryKernel .binary32 :=" "$out_mut"
+check_contains "mut-keyword"   "(to' : Model .binary32)"                "$out_mut"
+check_contains "mut-local-tbl" "def LOCAL_SCALE : Array (Model .binary64)" "$out_mut"
 
 out_horner=$("$bin" "$root/test/dyadic_sample.cpp" --function=manual_horner)
 # The coefficient list is longer than a line, so the emitter breaks it after a comma.
@@ -56,5 +68,7 @@ check_contains "loop-while"    "while BitVec.slt i n do" "$out_loop"
 
 out_cfg=$("$bin" "$root/test/expf_sample.cpp" --dump-config -Wno-undefined-inline -DLIBC_NAMESPACE=__llvm_libc)
 check_contains "dump-config"   "MathConfig:" "$out_cfg"
+check_contains "dump-arch"     "arch                    = x86_64" "$out_cfg"
+check_contains "dump-x86-isa"  "CPU_X86_ISA" "$out_cfg"
 
 echo "All ast2lean smoke tests passed."

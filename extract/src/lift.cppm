@@ -238,6 +238,10 @@ auto exprMentionsVar(const ExprPtr &e, std::string_view name) -> bool {
           [name](const StructUpdateExpr &su) {
             return exprMentionsVar(su.base, name) || exprMentionsVar(su.value, name);
           },
+          [name](const ArrayLitExpr &al) {
+            return std::ranges::any_of(
+                al.elems, [name](const auto &el) { return exprMentionsVar(el, name); });
+          },
           [name](const CoreCallExpr &cc) {
             return std::ranges::any_of(cc.args,
                                        [name](const auto &a) { return exprMentionsVar(a, name); });
@@ -324,6 +328,10 @@ auto substVarInExpr(const ExprPtr &e, std::string_view var, const ExprPtr &repla
                  [&](StructUpdateExpr &su) {
                    su.base = rec(su.base);
                    su.value = rec(su.value);
+                 },
+                 [&](ArrayLitExpr &al) {
+                   for (auto &el : al.elems)
+                     el = rec(el);
                  },
                  [&](CoreCallExpr &cc) {
                    for (auto &a : cc.args)
@@ -571,6 +579,10 @@ auto simplifyExpr(ExprPtr e, const LiftOptions &opts) -> ExprPtr {
                  [&](StructUpdateExpr &su) {
                    su.base = recurse(std::move(su.base));
                    su.value = recurse(std::move(su.value));
+                 },
+                 [&](ArrayLitExpr &al) {
+                   for (auto &el : al.elems)
+                     el = recurse(std::move(el));
                  },
                  [&](CoreCallExpr &cc) {
                    for (auto &a : cc.args)
@@ -948,6 +960,9 @@ public:
               auto body = lift(tail, scope, fallthrough);
               if (!body)
                 return std::nullopt;
+              if (!v.init && !exprMentionsVar(*body, v.name)) {
+                return *body;
+              }
               auto body_ty = (*body)->type;
               ExprPtr init =
                   v.init.value_or(Expr::make(UnsupportedExpr{"uninitialized " + v.name}, v.type));
@@ -1283,6 +1298,11 @@ auto exprUsesRoundingMode(const ExprPtr &e, const std::unordered_set<std::string
             return exprUsesRoundingMode(su.base, mode_funcs) ||
                    exprUsesRoundingMode(su.value, mode_funcs);
           },
+          [&](const ArrayLitExpr &al) {
+            return std::ranges::any_of(al.elems, [&](const auto &el) {
+              return exprUsesRoundingMode(el, mode_funcs);
+            });
+          },
           [&](const CoreCallExpr &cc) {
             // Frac64 multiply_add does not depend on IEEE rounding mode.
             bool op_needs_mode = cc.needs_mode && !(e->type && e->type->isFrac64());
@@ -1411,6 +1431,10 @@ void propagateCallModeExpr(ExprPtr &e, const std::unordered_set<std::string> &mo
                  [&](StructUpdateExpr &su) {
                    propagateCallModeExpr(su.base, mode_funcs);
                    propagateCallModeExpr(su.value, mode_funcs);
+                 },
+                 [&](ArrayLitExpr &al) {
+                   for (auto &el : al.elems)
+                     propagateCallModeExpr(el, mode_funcs);
                  },
                  [&](CoreCallExpr &cc) {
                    for (auto &a : cc.args)

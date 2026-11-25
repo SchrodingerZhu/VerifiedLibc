@@ -63,8 +63,14 @@ auto indentStr(int level) -> std::string {
 
 auto leanIdent(std::string_view name) -> std::string {
   constexpr std::string_view kKeywords[] = {
-      "in",  "do", "let",  "if",   "then",   "else", "match", "with", "where", "def",
-      "fun", "by", "have", "from", "import", "end",  "open",  "type", "meta",  "of",
+      "in",      "do",        "let",      "if",      "then",      "else",      "match",
+      "with",    "where",     "def",      "fun",     "by",        "have",      "from",
+      "import",  "end",       "open",     "type",    "meta",      "of",        "to",
+      "at",      "for",       "return",   "break",   "continue",  "mut",       "try",
+      "catch",   "finally",   "unless",   "class",   "structure", "inductive", "theorem",
+      "axiom",   "example",   "namespace", "section", "variable",  "universe",  "deriving",
+      "extends", "private",   "protected", "partial", "noncomputable", "show",  "suffices",
+      "nomatch", "calc",
   };
   if (std::ranges::contains(kKeywords, name)) {
     return std::format("{}'", name);
@@ -218,7 +224,8 @@ auto isAtomicExpr(const ExprPtr &e) -> bool {
          std::holds_alternative<TableRefExpr>(e->v) || std::holds_alternative<IndexExpr>(e->v) ||
          std::holds_alternative<FieldExpr>(e->v) || std::holds_alternative<TupleExpr>(e->v) ||
          std::holds_alternative<StructLitExpr>(e->v) ||
-         std::holds_alternative<StructUpdateExpr>(e->v);
+         std::holds_alternative<StructUpdateExpr>(e->v) ||
+         std::holds_alternative<ArrayLitExpr>(e->v);
 }
 
 class LeanEmitter {
@@ -266,30 +273,52 @@ private:
     return std::format(
         R"(/-- Active LLVM libc `LIBC_MATH_*` and target CPU configuration captured by `ast2lean`. -/
 def config : Libc.MathConfig :=
-  {{ skipAccuratePass := {}
+  {{ arch := .{}
+    armArchVersion := {}
+    isBigEndian := {}
+    skipAccuratePass := {}
     smallTables := {}
     noErrno := {}
     noExcept := {}
     intermediateCompInFloat := {}
     assumeRoundNearestOnly := {}
+    hasSse2 := {}
+    hasSsse3 := {}
+    hasSse42 := {}
+    hasAvx := {}
+    hasAvx2 := {}
+    hasAvx512f := {}
+    hasFmaGlobal := {}
     hasFmaHalf := {}
     hasFmaFloat := {}
     hasFmaDouble := {}
     hasNearestInt := {}
     hasFpuFloat := {}
     hasFpuDouble := {}
+    hasArmFpuFloat := {}
+    hasArmFpuDouble := {}
+    hasArmNeon := {}
+    hasRiscVFpuFloat := {}
+    hasRiscVFpuDouble := {}
     hasFastFloat16 := {}
     hasInt128 := {}
+    fpLogbNanMin := {}
     targetTriple := "{}"
     implVariant := "{}" }}
 
 )",
+        cfg.arch, cfg.arm_arch_version, leanBool(cfg.is_big_endian),
         leanBool(cfg.skip_accurate_pass), leanBool(cfg.small_tables), leanBool(cfg.no_errno),
         leanBool(cfg.no_except), leanBool(cfg.intermediate_comp_in_float),
-        leanBool(cfg.assume_round_nearest_only), leanBool(cfg.has_fma_half),
+        leanBool(cfg.assume_round_nearest_only), leanBool(cfg.has_sse2), leanBool(cfg.has_ssse3),
+        leanBool(cfg.has_sse42), leanBool(cfg.has_avx), leanBool(cfg.has_avx2),
+        leanBool(cfg.has_avx512f), leanBool(cfg.has_fma_global), leanBool(cfg.has_fma_half),
         leanBool(cfg.has_fma_float), leanBool(cfg.has_fma_double), leanBool(cfg.has_nearest_int),
-        leanBool(cfg.has_fpu_float), leanBool(cfg.has_fpu_double), leanBool(cfg.has_fast_float16),
-        leanBool(cfg.has_int128), cfg.target_triple, cfg.impl_variant);
+        leanBool(cfg.has_fpu_float), leanBool(cfg.has_fpu_double), leanBool(cfg.has_arm_fpu_float),
+        leanBool(cfg.has_arm_fpu_double), leanBool(cfg.has_arm_neon),
+        leanBool(cfg.has_riscv_fpu_float), leanBool(cfg.has_riscv_fpu_double),
+        leanBool(cfg.has_fast_float16), leanBool(cfg.has_int128), leanBool(cfg.fp_logb_nan_min),
+        cfg.target_triple, cfg.impl_variant);
   }
 
   auto emitKernelBundle(const ir::Module &mod, const Function &main_fn) -> std::string {
@@ -355,6 +384,48 @@ def kernel : Libc.UnaryKernel {} :=
 )",
             floatFmtLean(in_fmt), eval_expr);
       }
+    } else if (main_fn.params.size() == 2 && main_fn.params[0].type &&
+               main_fn.params[0].type->isFloat() && main_fn.params[1].type &&
+               main_fn.params[1].type->isFloat() && main_fn.return_type &&
+               main_fn.return_type->isFloat()) {
+      auto fmt0 = std::get<FloatType>(main_fn.params[0].type->v).fmt;
+      auto fmt1 = std::get<FloatType>(main_fn.params[1].type->v).fmt;
+      auto out_fmt = std::get<FloatType>(main_fn.return_type->v).fmt;
+      if (fmt0 == fmt1 && fmt0 == out_fmt) {
+        std::string eval_expr = main_fn.uses_rounding_mode
+                                    ? main_fn.lean_name
+                                    : std::format("fun _ x y => {} x y", main_fn.lean_name);
+        out += std::format(
+            R"(/-- Extracted binary kernel bundle carrying metadata and executable implementation. -/
+def kernel : Libc.BinaryKernel {} :=
+  {{ info := kernelMeta
+    eval := {} }}
+
+)",
+            floatFmtLean(fmt0), eval_expr);
+      }
+    } else if (main_fn.params.size() == 3 && main_fn.params[0].type &&
+               main_fn.params[0].type->isFloat() && main_fn.params[1].type &&
+               main_fn.params[1].type->isFloat() && main_fn.params[2].type &&
+               main_fn.params[2].type->isFloat() && main_fn.return_type &&
+               main_fn.return_type->isFloat()) {
+      auto fmt0 = std::get<FloatType>(main_fn.params[0].type->v).fmt;
+      auto fmt1 = std::get<FloatType>(main_fn.params[1].type->v).fmt;
+      auto fmt2 = std::get<FloatType>(main_fn.params[2].type->v).fmt;
+      auto out_fmt = std::get<FloatType>(main_fn.return_type->v).fmt;
+      if (fmt0 == fmt1 && fmt0 == fmt2 && fmt0 == out_fmt) {
+        std::string eval_expr = main_fn.uses_rounding_mode
+                                    ? main_fn.lean_name
+                                    : std::format("fun _ x y z => {} x y z", main_fn.lean_name);
+        out += std::format(
+            R"(/-- Extracted ternary kernel bundle carrying metadata and executable implementation. -/
+def kernel : Libc.TernaryKernel {} :=
+  {{ info := kernelMeta
+    eval := {} }}
+
+)",
+            floatFmtLean(fmt0), eval_expr);
+      }
     }
     return out;
   }
@@ -368,7 +439,7 @@ def kernel : Libc.UnaryKernel {} :=
     std::string out;
     out += std::format("/-- Extracted from `{}` (`{}`). -/\n", fn.cpp_name, fn.mangled_name);
     if (!fn.diagnostics.empty()) {
-      out += "/-! Extractor diagnostics:\n";
+      out += "/- Extractor diagnostics:\n";
       for (const auto &d : fn.diagnostics) {
         out += std::format("  * {}\n", d);
       }
@@ -481,6 +552,7 @@ def kernel : Libc.UnaryKernel {} :=
                                          [&](const auto &f) { return hasPartial(f.second); });
             },
             [&](const StructUpdateExpr &su) { return hasPartial(su.base) || hasPartial(su.value); },
+            [&](const ArrayLitExpr &al) { return any(al.elems); },
             [&](const CoreCallExpr &cc) { return any(cc.args); },
             [&](const PolyevalExpr &pe) { return hasPartial(pe.var) || any(pe.coeffs); },
             [](const FuncCallExpr &) { return true; },
@@ -591,6 +663,13 @@ def kernel : Libc.UnaryKernel {} :=
               return std::format("{{ {} with {} := {} }}", emitInlineExpr(su.base),
                                  leanIdent(su.field), emitInlineExpr(su.value));
             },
+            [&](const ArrayLitExpr &al) {
+              std::vector<std::string> parts;
+              parts.reserve(al.elems.size());
+              for (const auto &el : al.elems)
+                parts.push_back(emitInlineExpr(el));
+              return std::format("#[{}]", joinWith(parts, ", "));
+            },
             [&](const CoreCallExpr &cc) {
               // Use clean Libc.DSL syntax for multiply_add / multiply_sub / sub_multiply.
               if (cc.op == CoreOpKind::MultiplyAdd && cc.args.size() == 3) {
@@ -620,6 +699,30 @@ def kernel : Libc.UnaryKernel {} :=
                   }
                 }
               }
+              if ((cc.op == CoreOpKind::DyadicFastAs || cc.op == CoreOpKind::DyadicGenericAs ||
+                   cc.op == CoreOpKind::DyadicAs) &&
+                  cc.args.size() == 1 && cc.type_args.size() == 1) {
+                return std::format("{} config {} {} {}", cc.lean_name, cc.type_args[0],
+                                   currentModeArg(), emitArg(cc.args[0]));
+              }
+              if (cc.op == CoreOpKind::IntLogb && cc.args.size() == 1 &&
+                  cc.type_args.size() == 1) {
+                return std::format("Libc.intlogb config {} {}", cc.type_args[0],
+                                   emitArg(cc.args[0]));
+              }
+              if ((cc.op == CoreOpKind::DyadicShiftLeft || cc.op == CoreOpKind::DyadicShiftRight ||
+                   cc.op == CoreOpKind::BigIntGetBit || cc.op == CoreOpKind::BigIntSetBit) &&
+                  cc.args.size() == 2) {
+                return std::format("{} {} {}", cc.lean_name, emitArg(cc.args[0]),
+                                   emitShiftAmountNat(cc.args[1]));
+              }
+              if (cc.op == CoreOpKind::DyadicRound && cc.args.size() == 4 &&
+                  cc.type_args.size() == 1) {
+                return std::format("Libc.DyadicFloat.round {} config {} {} {} {} {}",
+                                   cc.type_args[0], currentModeArg(), emitArg(cc.args[0]),
+                                   emitArg(cc.args[1]), emitArg(cc.args[2]),
+                                   emitShiftAmountNat(cc.args[3]));
+              }
 
               std::vector<std::string> parts;
               parts.push_back(cc.lean_name);
@@ -631,6 +734,8 @@ def kernel : Libc.UnaryKernel {} :=
                 parts.emplace_back(currentModeArg());
               for (const auto &a : cc.args)
                 parts.push_back(emitArg(a));
+              for (const auto &tr : cc.trailing_args)
+                parts.push_back(tr);
               return joinWith(parts, " ");
             },
             [&](const PolyevalExpr &pe) {
@@ -1183,6 +1288,12 @@ auto dumpExprIR(const ExprPtr &e, int ind) -> std::string {
             return std::format("{}StructUpdate(.{})\n{}{}", pad, su.field,
                                dumpExprIR(su.base, ind + 1), dumpExprIR(su.value, ind + 1));
           },
+          [&](const ArrayLitExpr &al) {
+            std::string out = std::format("{}ArrayLit\n", pad);
+            for (const auto &el : al.elems)
+              out += dumpExprIR(el, ind + 1);
+            return out;
+          },
           [&](const CoreCallExpr &cc) {
             std::string out =
                 std::format("{}CoreCall({} : {}, mode={}, cfg={})\n", pad, cc.lean_name,
@@ -1405,6 +1516,7 @@ auto formatMathConfig(const ir::MathConfig &cfg) -> std::string {
   return std::format(
       R"(MathConfig:
   implVariant             = {}
+  arch                    = {} (arm_arch={}, big_endian={})
   targetTriple            = {}
   LIBC_MATH_SKIP_ACCURATE = {}
   LIBC_MATH_SMALL_TABLES  = {}
@@ -1412,21 +1524,27 @@ auto formatMathConfig(const ir::MathConfig &cfg) -> std::string {
   LIBC_MATH_NO_EXCEPT     = {}
   LIBC_MATH_INTERM_FLOAT  = {}
   LIBC_MATH_RN_ONLY       = {}
-  CPU_HAS_FMA_HALF        = {}
-  CPU_HAS_FMA_FLOAT       = {}
-  CPU_HAS_FMA_DOUBLE      = {}
+  CPU_X86_ISA             = sse2={} ssse3={} sse42={} avx={} avx2={} avx512f={}
+  CPU_HAS_FMA             = global={} half={} float={} double={}
   CPU_HAS_NEAREST_INT     = {}
-  CPU_HAS_FPU_FLOAT       = {}
-  CPU_HAS_FPU_DOUBLE      = {}
+  CPU_HAS_FPU             = float={} double={}
+  CPU_HAS_ARM_FPU         = float={} double={} neon={}
+  CPU_HAS_RISCV_FPU       = float={} double={}
   CPU_HAS_FAST_FLOAT16    = {}
   TYPES_HAS_INT128        = {}
+  FP_LOGB_NAN_MIN         = {}
 )",
-      cfg.impl_variant, cfg.target_triple, leanBool(cfg.skip_accurate_pass),
-      leanBool(cfg.small_tables), leanBool(cfg.no_errno), leanBool(cfg.no_except),
-      leanBool(cfg.intermediate_comp_in_float), leanBool(cfg.assume_round_nearest_only),
-      leanBool(cfg.has_fma_half), leanBool(cfg.has_fma_float), leanBool(cfg.has_fma_double),
-      leanBool(cfg.has_nearest_int), leanBool(cfg.has_fpu_float), leanBool(cfg.has_fpu_double),
-      leanBool(cfg.has_fast_float16), leanBool(cfg.has_int128));
+      cfg.impl_variant, cfg.arch, cfg.arm_arch_version, leanBool(cfg.is_big_endian),
+      cfg.target_triple, leanBool(cfg.skip_accurate_pass), leanBool(cfg.small_tables),
+      leanBool(cfg.no_errno), leanBool(cfg.no_except), leanBool(cfg.intermediate_comp_in_float),
+      leanBool(cfg.assume_round_nearest_only), leanBool(cfg.has_sse2), leanBool(cfg.has_ssse3),
+      leanBool(cfg.has_sse42), leanBool(cfg.has_avx), leanBool(cfg.has_avx2),
+      leanBool(cfg.has_avx512f), leanBool(cfg.has_fma_global), leanBool(cfg.has_fma_half),
+      leanBool(cfg.has_fma_float), leanBool(cfg.has_fma_double), leanBool(cfg.has_nearest_int),
+      leanBool(cfg.has_fpu_float), leanBool(cfg.has_fpu_double), leanBool(cfg.has_arm_fpu_float),
+      leanBool(cfg.has_arm_fpu_double), leanBool(cfg.has_arm_neon),
+      leanBool(cfg.has_riscv_fpu_float), leanBool(cfg.has_riscv_fpu_double),
+      leanBool(cfg.has_fast_float16), leanBool(cfg.has_int128), leanBool(cfg.fp_logb_nan_min));
 }
 
 } // namespace libc_extract
