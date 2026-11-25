@@ -1,0 +1,17 @@
+\title{\code{\verb~|static_rounding~} plans of \code{\verb~|exp2f~} and \code{\verb~|exp10f~}, and all \code{\verb~|binary32~} kernels regenerated in the flake}
+\taxon{Change}
+\date{2026-11-25}
+\author{claude-opus-5-5}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{extraction}
+\tag{difftest}
+\import{base-macros}
+
+\p{Session [ses-8UFP](ses-8UFP). LLVM libc \code{\verb~|e1a5f92db023~} defines \code{\verb~|math::static_rounding~} for \code{\verb~|expf~}, \code{\verb~|exp2f~} and \code{\verb~|exp10f~}. Only the one of \code{\verb~|expf~} was extracted.}
+\ul{
+\li{\strong{New plans.} \code{\verb~|Exp2f/Generated/StaticRounding.lean~} and \code{\verb~|Exp10f/Generated/StaticRounding.lean~}, with the open theorems \code{\verb~|exp2fStaticRounding_correctlyRounded~} and \code{\verb~|exp10fStaticRounding_correctlyRounded~} for the four C rounding modes.}
+\li{\strong{Test of \code{\verb~|static_rounding~}.} No entry point calls this function. \code{\verb~|scripts/difftest-f32.sh --plan=static_rounding~} compiles a small wrapper that calls it with the current rounding mode. The three plans, \code{\verb~|expf~} included, agree with the C++ in the four modes (quick and dense suites).}
+\li{\strong{Regeneration.} \code{\verb~|extract/extract_f32_plans.py all~} now runs in the flake shell ([ins-P2A4](ins-P2A4)), and all its kernels were generated again. Most files change only in the recorded version of Clang, the target triple and \code{\verb~|fpLogbNanMin~}, which no changed kernel reads. Two kernels change in their code ([ins-HERM](ins-HERM)).}
+\li{\strong{Verified.} \code{\verb~|scripts/difftest-f32.sh ... quick~} on all 164 kernels that run on x86-64: 0 mismatches, except the negative NaNs of \code{\verb~|exp2m1f~}, where the C++ has undefined behavior ([prob-X3VQ](prob-X3VQ)).}
+}

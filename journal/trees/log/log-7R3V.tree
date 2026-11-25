@@ -1,0 +1,12 @@
+\title{A binary that was committed by mistake is removed from the history}
+\taxon{Change}
+\date{2026-11-25}
+\author{claude-opus-5-5}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{repository}
+\import{base-macros}
+
+\p{Session [ses-8UFP](ses-8UFP). The second commit of the history added \code{\verb~|extract/build/~}, with the 9 MB program \code{\verb~|ir2lean~} and CMake files. A later commit deleted the directory, but the history kept about 4 MB of it in every clone.}
+\p{The maintainer asked for the history to be rewritten. \code{\verb~|git filter-repo --path extract/build --invert-paths~} removed the directory from every commit, and \code{\verb~|main~} was force-pushed. Every commit after the first has a new hash. The trees of the journal that cite a commit by hash were changed to the new hashes in the same change.}
+\p{The remaining size comes from the TMD certificates of \code{\verb~|expf~} (about 17 MB packed at the head, and about 5 MB of earlier copies at other paths). They are part of the proof, so they stay.}

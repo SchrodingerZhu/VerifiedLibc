@@ -1,0 +1,13 @@
+\title{Plans that only \code{\verb~|LIBC_MATH~} flags select are not extracted}
+\taxon{Problem}
+\date{2026-11-25}
+\author{claude-opus-5-5}
+\contributor{schrodingerzy}
+\tag{extraction}
+\meta{status}{open}
+\meta{created}{2026-11-25}
+\import{base-macros}
+
+\p{\strong{Status:} open.}
+\p{Every choice of \code{\verb~|LIBC_MATH_*_IMPL~} at LLVM libc \code{\verb~|e1a5f92db023~} is extracted for the \code{\verb~|binary32~} functions: \code{\verb~|double_eval~}, \code{\verb~|float_eval~}, \code{\verb~|float_eval_cr_rn~}, \code{\verb~|integer_eval~} and \code{\verb~|static_rounding~}. Functions without such a choice, such as \code{\verb~|logf~} or \code{\verb~|expm1f~}, have one implementation, so they have no other evaluation plan.}
+\p{Some of these functions still read \code{\verb~|LIBC_MATH_HAS_SKIP_ACCURATE_PASS~} or \code{\verb~|LIBC_MATH_HAS_ASSUME_ROUND_NEAREST_ONLY~} directly. Examples are \code{\verb~|acosf~}, \code{\verb~|expm1f~}, \code{\verb~|sinhf~}, \code{\verb~|erff~}, \code{\verb~|tanpif~} and the \code{\verb~|double_eval~} plans of \code{\verb~|logf~}. With these flags the result changes, but only \code{\verb~|LIBC_MATH=0~} is extracted for them. A decision is necessary: extract these variants as plans, with a statement for each, or record why they are out of scope.}

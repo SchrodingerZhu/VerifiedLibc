@@ -8,7 +8,7 @@
 \tag{lean}
 \import{base-macros}
 
-\p{Source: session [ses-BUYJ](ses-BUYJ), commits \code{\verb~|c099d38~} and \code{\verb~|2d6ba57~}. Lean 4.36.0 and FloatLib 4.1.0.}
+\p{Source: session [ses-BUYJ](ses-BUYJ), commits \code{\verb~|7ea589d~} and \code{\verb~|8ce4460~}. Lean 4.36.0 and FloatLib 4.1.0.}
 \ul{
 \li{\strong{Mark FloatLib arithmetic wrappers \code{\verb~|@[noinline]~}.} FloatLib tags \code{\verb~|Model.add~}, \code{\verb~|Model.sub~}, \code{\verb~|Model.mul~}, \code{\verb~|Model.div~}, \code{\verb~|Model.fma~}, \code{\verb~|Model.sqrt~}, and \code{\verb~|Model.convert~} as \code{\verb~|@[macro_inline]~}. Every unguarded call expands into the full IEEE rounding pipeline in the LCNF compiler. Large kernels with many operations hit the 200 000-heartbeat limit during C code generation.}
 \li{\strong{Measured speedup.} Placing \code{\verb~|@[noinline]~} on the thin wrappers in \code{\verb~|LibcMath/Libc/Ops.lean~} reduces generated C code size by 32x. Every extracted \code{\verb~|binary32~} kernel compiles with default heartbeats, including \code{\verb~|powf~}, \code{\verb~|lgammaf~}, and \code{\verb~|erff~}. Proof reduction stays unchanged because the Lean kernel unfolds \code{\verb~|@[noinline]~} definitions normally.}

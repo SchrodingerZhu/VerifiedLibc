@@ -1,0 +1,12 @@
+\title{Committed kernels can lag behind a fix of the extractor}
+\taxon{Insight}
+\date{2026-11-25}
+\author{claude-opus-5-5}
+\contributor{schrodingerzy}
+\tag{extraction}
+\tag{difftest}
+\import{base-macros}
+
+\p{Source: session [ses-8UFP](ses-8UFP). Verified by regeneration and \code{\verb~|scripts/difftest-f32.sh~}.}
+\p{The commit that fixed the types of compound assignments in \code{\verb~|ast2lean~} regenerated only the kernels of its own family. The committed \code{\verb~|powf~} plans kept a checked signed addition for \code{\verb~|ex += (x_u >> 23)~}. In C++ this sum is unsigned, so it cannot overflow. The soft-float \code{\verb~|sqrtf~} kept an arithmetic shift for \code{\verb~|current_bit >>= 1~} on an unsigned value. \code{\verb~|difftest~} did not catch either, because the tested inputs do not reach the difference.}
+\p{After a fix of the extractor, regenerate every family and read the diff of the generated files. A change outside the metadata shows a kernel that the fix touches.}

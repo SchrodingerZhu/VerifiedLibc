@@ -1,0 +1,21 @@
+\title{Gaps in the plans of \code{\verb~|binary32~} kernels, and the size of the history}
+\taxon{Session}
+\date{2026-11-25}
+\author{claude-opus-5-5}
+\contributor{schrodingerzy}
+\tag{extraction}
+\tag{expf}
+\tag{repository}
+\meta{harness}{Claude Code}
+\meta{model-id}{claude-opus-5-5}
+\import{base-macros}
+
+\p{The maintainer reported four gaps on \code{\verb~|main~}: where the \code{\verb~|float_eval~} plans are, plans that seem to be missing, kernels without a statement, and the size of the repository. The work is in commits \code{\verb~|ccd4329~} through \code{\verb~|cfc5b14~} and the commit of this tree.}
+\ul{
+\li{\strong{Survey of LLVM libc \code{\verb~|e1a5f92db023~}.} Eleven \code{\verb~|binary32~} functions choose an implementation with \code{\verb~|LIBC_MATH_*_IMPL~}. Every choice was already extracted, except \code{\verb~|static_rounding~} of \code{\verb~|exp2f~} and \code{\verb~|exp10f~}. Other functions have one implementation. Variants that only \code{\verb~|LIBC_MATH~} flags select are recorded in [prob-UZ4A](prob-UZ4A).}
+\li{\strong{Statements.} Every extracted kernel already had a statement and an open theorem, except in \code{\verb~|expf~} ([log-JUSU](log-JUSU)).}
+\li{\strong{New plans and regeneration.} [log-6MEY](log-6MEY), with the lessons [ins-P2A4](ins-P2A4) and [ins-HERM](ins-HERM).}
+\li{\strong{History.} [log-7R3V](log-7R3V).}
+\li{\strong{External kernel check.} Skipped. The new proofs compose existing lemmas in one line, and \code{\verb~|con-leche~} is not packaged ([prob-YUE1](prob-YUE1)).}
+\li{\strong{Verified.} \code{\verb~|lake build~} at the head and at each new commit that changes Lean files; \code{\verb~|lake build checkrange difftest-expf-model difftest-f32-model~}; \code{\verb~|bash extract/test/run_tests.sh~}; \code{\verb~|python3 scripts/check-open.py~} (166 open obligations); \code{\verb~|scripts/difftest-f32.sh~} on 164 kernels; \code{\verb~|git log --merges main~} (empty); the tree of the rewritten head is the same as before the rewrite.}
+}

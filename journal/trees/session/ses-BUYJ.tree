@@ -11,7 +11,7 @@
 \meta{model-id}{antigravity}
 \import{base-macros}
 
-\p{This session completed all seven items of the \code{\verb~|binary32~} extraction and microarchitecture goal in 18 strictly linear semantic commits (\code{\verb~|30fe1cd~} through \code{\verb~|c4c263c~}). See [log-PSSL](log-PSSL) for the full change summary.}
+\p{This session completed all seven items of the \code{\verb~|binary32~} extraction and microarchitecture goal in 18 strictly linear semantic commits (\code{\verb~|920dce9~} through \code{\verb~|2427212~}). See [log-PSSL](log-PSSL) for the full change summary.}
 \ul{
 \li{\strong{Core library and performance.} Eliminated LCNF heartbeat timeouts with \code{\verb~|@[noinline]~} wrappers around FloatLib arithmetic ([ins-L00D](ins-L00D)). Reused FloatLib specifications and rounding models across \code{\verb~|LibcMath/Libc/~} and \code{\verb~|LibcMath/Testing/Oracle/FloatLib.lean~}.}
 \li{\strong{Microarchitectural semantics.} Modeled x86-64 SSE2, SSSE3, SSE4.2, AVX2+FMA, AArch64, 32-bit ARMv8 hard-float, RISC-V 64GC, RV32I soft-float, and GPU targets in \code{\verb~|MathConfig~}. Proved FMA, \code{\verb~|nearest_integer~}, \code{\verb~|Frac64~} split-multiply, and \code{\verb~|BigInt~} multiplication theorems in \code{\verb~|LibcMath/Libc/Microarch.lean~}.}

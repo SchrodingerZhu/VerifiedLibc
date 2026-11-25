@@ -1,0 +1,17 @@
+\title{Every \code{\verb~|expf~} plan has a top-level theorem}
+\taxon{Change}
+\date{2026-11-25}
+\author{claude-opus-5-5}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{expf}
+\import{base-macros}
+
+\p{Session [ses-8UFP](ses-8UFP). Before this change, three plans of \code{\verb~|expf~} had only conditional reductions. Their main ranges were hypotheses, so \code{\verb~|#print axioms~} did not show what was open. Two plans had no theorem.}
+\ul{
+\li{\code{\verb~|expfDoubleEvalFma_correctlyRounded~} and \code{\verb~|expfStaticRounding_correctlyRounded~} use the new open lemmas \code{\verb~|expfDoubleEvalFma_mainRangesChecked~} and \code{\verb~|expfStaticRounding_mainRangesChecked~}.}
+\li{\code{\verb~|expfIntegerEval_correctlyRounded~} follows from the theorem of \code{\verb~|static_rounding~}.}
+\li{\code{\verb~|ExpfFloatEvalDefined~} is the new statement of \code{\verb~|float_eval~}. This plan is not correctly rounded, so the statement is that it reaches no undefined operation, as for the \code{\verb~|float_eval~} plans of the other functions.}
+\li{\code{\verb~|expfFloatEval_defined~} and \code{\verb~|expfFloatEvalCrRn_correctlyRounded~} are open.}
+}
+\p{Verified with \code{\verb~|lake build~} and \code{\verb~|python3 scripts/check-open.py~}.}
