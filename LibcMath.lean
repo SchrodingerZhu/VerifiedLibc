@@ -2,6 +2,7 @@ import LibcMath.Framework.Spec
 import LibcMath.Framework.SpecExamples
 import LibcMath.Framework.SpecLemmas
 import LibcMath.Framework.Specs
+import LibcMath.Framework.SpecialSpecs
 import LibcMath.Framework.BitRange
 import LibcMath.Framework.Correctness
 import LibcMath.Libc
@@ -19,6 +20,8 @@ import LibcMath.Analysis.ChebTmd
 import LibcMath.Kernels.Expf
 import LibcMath.Testing.Oracle.Exp
 import LibcMath.Testing.Oracle.ExpExamples
+import LibcMath.Testing.Oracle.FloatLib
+import LibcMath.Testing.FloatLibOracleExamples
 import LibcMath.Testing.Oracle.Mpfr
 import LibcMath.Testing.Oracle
 import LibcMath.Testing.Range

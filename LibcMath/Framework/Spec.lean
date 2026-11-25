@@ -65,4 +65,38 @@ def CorrectlyRounded (S : Spec fmt) (modes : Set IEEERoundingMode)
     (impl : IEEERoundingMode → Model fmt → Option (Model fmt)) : Prop :=
   ∀ mode ∈ modes, ∀ x, ∃ y, impl mode x = some y ∧ SameValue y (S.eval mode x)
 
+/-- Checks that two floating-point pairs match componentwise up to `SameValue`. -/
+@[grind]
+def SamePairValue (a b : Model fmt × Model fmt) : Prop :=
+  SameValue a.1 b.1 ∧ SameValue a.2 b.2
+
+/-- Checks that `impl` succeeds on every input and mode and satisfies `rel` against `spec`. -/
+def FnCorrectlyRounded {α β : Type} (rel : β → β → Prop)
+    (spec : IEEERoundingMode → α → β) (modes : Set IEEERoundingMode)
+    (impl : IEEERoundingMode → α → Option β) : Prop :=
+  ∀ mode ∈ modes, ∀ x, ∃ y, impl mode x = some y ∧ rel y (spec mode x)
+
+/-- Checks that a unary floating-point kernel matches `spec` up to `SameValue`. -/
+def UnaryFnCorrectlyRounded (spec : IEEERoundingMode → Model fmt → Model fmt)
+    (modes : Set IEEERoundingMode)
+    (impl : IEEERoundingMode → Model fmt → Option (Model fmt)) : Prop :=
+  FnCorrectlyRounded (SameValue (fmt := fmt)) spec modes impl
+
+/-- Checks that a binary floating-point kernel matches `spec` up to `SameValue`. -/
+def BinaryFnCorrectlyRounded (spec : IEEERoundingMode → Model fmt → Model fmt → Model fmt)
+    (modes : Set IEEERoundingMode)
+    (impl : IEEERoundingMode → Model fmt → Model fmt → Option (Model fmt)) : Prop :=
+  FnCorrectlyRounded (SameValue (fmt := fmt))
+    (fun mode (p : Model fmt × Model fmt) => spec mode p.1 p.2) modes
+    (fun mode p => impl mode p.1 p.2)
+
+/-- Checks that a ternary floating-point kernel matches `spec` up to `SameValue`. -/
+def TernaryFnCorrectlyRounded
+    (spec : IEEERoundingMode → Model fmt → Model fmt → Model fmt → Model fmt)
+    (modes : Set IEEERoundingMode)
+    (impl : IEEERoundingMode → Model fmt → Model fmt → Model fmt → Option (Model fmt)) : Prop :=
+  FnCorrectlyRounded (SameValue (fmt := fmt))
+    (fun mode (p : Model fmt × Model fmt × Model fmt) => spec mode p.1 p.2.1 p.2.2) modes
+    (fun mode p => impl mode p.1 p.2.1 p.2.2)
+
 end LibcMath

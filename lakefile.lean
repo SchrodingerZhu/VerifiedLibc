@@ -68,6 +68,10 @@ lean_exe «difftest-expf-model» where
   srcDir := "test/difftest"
   root := `ExpfModel
 
+lean_exe «difftest-f32-model» where
+  srcDir := "test/difftest"
+  root := `F32Model
+
 /-- Check that `OPEN.md` matches every `sorry` under `LibcMath/` (`lake run checkOpen`). -/
 script checkOpen (args) do
   let out ← IO.Process.output {
