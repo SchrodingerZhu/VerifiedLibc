@@ -779,6 +779,9 @@ def kernel : Libc.TernaryKernel {} :=
                 return std::format("(Libc.bitCast {} : {})", emitArg(cc.args[0]),
                                    emitType(e->type));
               }
+              if (cc.op == CoreOpKind::Unreachable) {
+                return std::string("(← (none : Option Unit))");
+              }
               if (cc.op == CoreOpKind::FPBitsOfBits && cc.args.size() == 1) {
                 if (e->type) {
                   if (const auto *ft = std::get_if<FPBitsType>(&e->type->v)) {

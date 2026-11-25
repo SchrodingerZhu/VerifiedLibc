@@ -265,6 +265,7 @@ enum class CoreOpKind : std::uint8_t {
   SignIsPos,
   SignIsNeg,
   SignNegate,
+  Unreachable,
   TransparentHint,
 };
 
@@ -552,6 +553,7 @@ inline constexpr std::array kFreeCoreOps = std::to_array<CoreOpSpec>({
     {CoreOpKind::Min, "cpp::min", "min", false, false, false, false},
     {CoreOpKind::Max, "cpp::max", "max", false, false, false, false},
     {CoreOpKind::TransparentHint, "__builtin_expect", "", false, false, false, true},
+    {CoreOpKind::Unreachable, "__builtin_unreachable", "none", false, false, false, false},
     {CoreOpKind::TransparentHint, "__builtin_expect_with_probability", "", false, false, false,
      true},
     {CoreOpKind::TransparentHint, "details::expects_bool_condition", "", false, false, false, true},
