@@ -1,11 +1,11 @@
-import LibcMath.Fn.Plans
+import LibcMath.Kernels.Fn.Plans
 import LibcMath.Framework.Specs
 
 /-!
 # Correctness statements for extracted `<fn>` kernels
 -/
 
-namespace LibcMath.Fn
+namespace LibcMath.Kernels.Fn
 
 open FloatLib.Floats.Formats.BinaryInterchange
 open Model (IEEERoundingMode)
@@ -15,4 +15,4 @@ the implementation plan name in every statement; do not define a "default" alias
 def FnPlanCorrectlyRounded : Prop :=
   CorrectlyRounded (Spec.fn .binary32) cModes Generated.Plan.fn
 
-end LibcMath.Fn
+end LibcMath.Kernels.Fn

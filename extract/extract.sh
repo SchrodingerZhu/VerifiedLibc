@@ -6,12 +6,12 @@
 #
 # Examples:
 #   extract/extract.sh ~/llvm-project/libc expf math::double_eval::expf expf \
-#     --namespace=LibcMath.Expf.Generated.DoubleEval \
-#     --out=LibcMath/Expf/Generated/DoubleEval.lean
+#     --namespace=LibcMath.Kernels.Expf.Generated.DoubleEval \
+#     --out=LibcMath/Kernels/Expf/Generated/DoubleEval.lean
 #
 #   extract/extract.sh ~/llvm-project/libc expf math::integer_eval::expf expf \
-#     --namespace=LibcMath.Expf.Generated.IntegerEval \
-#     --out=LibcMath/Expf/Generated/IntegerEval.lean \
+#     --namespace=LibcMath.Kernels.Expf.Generated.IntegerEval \
+#     --out=LibcMath/Kernels/Expf/Generated/IntegerEval.lean \
 #     -- -DLIBC_MATH_EXPF_IMPL=integer_eval -DLIBC_MATH=0x2C
 set -euo pipefail
 

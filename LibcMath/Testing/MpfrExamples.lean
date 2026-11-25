@@ -10,7 +10,7 @@ Two tests, run by compiled code with `native_decide` when this file is built:
 * on a few blocks, the result that MPFR computes is accepted by `expOracle`, whose soundness is a
   theorem. A disagreement between `c/mpfr_oracle.c` and the specification on these inputs would
   make the build fail;
-* on one block, `Expf.Generated.DoubleEval.expf` has a result that the MPFR oracle accepts.
+* on one block, `Kernels.Expf.Generated.DoubleEval.expf` has a result that the MPFR oracle accepts.
 
 These are tests of the tools. They are not part of the proof that `expf` is correctly rounded.
 -/
@@ -32,11 +32,13 @@ example : mpfrAccepted .up 2 0xc2ce8ed0 512 = true := by native_decide
 example : mpfrAccepted .down 3 0x42b17000 512 = true := by native_decide
 
 example :
-    checkBlock mpfrExpOracle.check Expf.Generated.DoubleEval.expf .nearest 0x3f800000 512 = true :=
-  by native_decide
+    checkBlock mpfrExpOracle.check Kernels.Expf.Generated.DoubleEval.expf .nearest 0x3f800000 512
+      = true := by
+  native_decide
 
 example :
-    checkBlock mpfrExpOracle.check Expf.Generated.DoubleEval.expf .up 0x3f800000 512 = true :=
-  by native_decide
+    checkBlock mpfrExpOracle.check Kernels.Expf.Generated.DoubleEval.expf .up 0x3f800000 512
+      = true := by
+  native_decide
 
 end LibcMath.Testing.MpfrExamples
