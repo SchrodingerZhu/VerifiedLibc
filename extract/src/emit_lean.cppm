@@ -1427,14 +1427,18 @@ def kernel : Libc.TernaryKernel {} :=
               std::string out = std::format("{}for _ in [:65536] do\n", pad);
               out += std::format("{}if !({}) then break\n", indentStr(ind + 1),
                                  emitInlineExpr(w.cond));
+              auto saved_muts = declared_muts_;
               for (const auto &s : w.body)
                 out += emitDoStmt(s, ind + 1);
+              declared_muts_ = saved_muts;
               return out;
             },
             [&](const DoWhileStmt &dw) {
               std::string out = std::format("{}for _ in [:65536] do\n", pad);
+              auto saved_muts = declared_muts_;
               for (const auto &s : dw.body)
                 out += emitDoStmt(s, ind + 1);
+              declared_muts_ = saved_muts;
               out += std::format("{}if !({}) then break\n", indentStr(ind + 1),
                                  emitInlineExpr(dw.cond));
               return out;
@@ -1459,8 +1463,10 @@ def kernel : Libc.TernaryKernel {} :=
                 out += std::format("{}if !({}) then break\n", indentStr(ind + 1),
                                    emitInlineExpr(*f.cond));
               }
+              auto saved_muts = declared_muts_;
               for (const auto &s : f.body)
                 out += emitDoStmt(s, ind + 1);
+              declared_muts_ = saved_muts;
               if (!has_cont && f.step && *f.step)
                 out += emitDoStmt(**f.step, ind + 1);
               return out;

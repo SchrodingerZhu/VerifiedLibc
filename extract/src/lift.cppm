@@ -1694,10 +1694,13 @@ void rewriteOutParams(Function &fn) {
   std::vector<Param> in_params;
   std::vector<Param> out_params;
   for (const auto &p : fn.params) {
-    if (p.is_out)
+    if (p.is_out) {
       out_params.push_back(p);
-    else
+      if (p.is_in_out)
+        in_params.push_back(p);
+    } else {
       in_params.push_back(p);
+    }
   }
   if (out_params.empty())
     return;
@@ -1719,8 +1722,10 @@ void rewriteOutParams(Function &fn) {
   std::vector<Stmt> prefixed;
   prefixed.reserve(out_params.size() + fn.body_stmts.size());
   for (const auto &op : out_params) {
-    prefixed.push_back(Stmt{VarDeclStmt{
-        op.name, op.type, Expr::make(VarExpr{"default"}, op.type), false, false}});
+    if (!op.is_in_out) {
+      prefixed.push_back(Stmt{VarDeclStmt{
+          op.name, op.type, Expr::make(VarExpr{"default"}, op.type), false, false}});
+    }
   }
   for (auto &st : fn.body_stmts)
     prefixed.push_back(std::move(st));

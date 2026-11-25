@@ -795,8 +795,129 @@ public:
     return ir::Type::makeTuple(std::move(elems));
   }
 
+  static auto exprMentionsDecl(const Stmt *s, const ValueDecl *target) -> bool {
+    if (!s)
+      return false;
+    if (const auto *dre = dyn_cast<DeclRefExpr>(s)) {
+      return dre->getDecl() == target;
+    }
+    for (const Stmt *child : s->children()) {
+      if (exprMentionsDecl(child, target))
+        return true;
+    }
+    return false;
+  }
+
+  // Returns +1 if `p` is unconditionally written before any read, -1 if read before write,
+  // and 0 if `p` is neither read nor definitely written on all paths.
+  auto checkParamAccess(const Stmt *s, const ParmVarDecl *p,
+                        std::unordered_set<const FunctionDecl *> &visiting) -> int {
+    if (!s)
+      return 0;
+    if (const auto *cs = dyn_cast<CompoundStmt>(s)) {
+      for (const Stmt *sub : cs->body()) {
+        int r = checkParamAccess(sub, p, visiting);
+        if (r != 0)
+          return r;
+      }
+      return 0;
+    }
+    if (const auto *e = dyn_cast<Expr>(s)) {
+      const Expr *u = unwrapExprSugar(e);
+      if (const auto *bo = dyn_cast_or_null<BinaryOperator>(u);
+          bo && bo->getOpcode() == BO_Assign) {
+        const Expr *lhs = unwrapExprSugar(bo->getLHS());
+        if (const auto *uo = dyn_cast_or_null<UnaryOperator>(lhs);
+            uo && uo->getOpcode() == UO_Deref) {
+          lhs = unwrapExprSugar(uo->getSubExpr());
+        }
+        if (const auto *dre = dyn_cast_or_null<DeclRefExpr>(lhs); dre && dre->getDecl() == p) {
+          return exprMentionsDecl(bo->getRHS(), p) ? -1 : 1;
+        }
+      }
+      if (const auto *oce = dyn_cast_or_null<CXXOperatorCallExpr>(u);
+          oce && oce->getOperator() == OO_Equal && oce->getNumArgs() == 2) {
+        const Expr *lhs = unwrapExprSugar(oce->getArg(0));
+        if (const auto *uo = dyn_cast_or_null<UnaryOperator>(lhs);
+            uo && uo->getOpcode() == UO_Deref) {
+          lhs = unwrapExprSugar(uo->getSubExpr());
+        }
+        if (const auto *dre = dyn_cast_or_null<DeclRefExpr>(lhs); dre && dre->getDecl() == p) {
+          return exprMentionsDecl(oce->getArg(1), p) ? -1 : 1;
+        }
+      }
+      if (const auto *call = dyn_cast_or_null<CallExpr>(unwrapTransparentAndCasts(u));
+          call && !isa<CXXMemberCallExpr>(call) && !isa<CXXOperatorCallExpr>(call)) {
+        if (const FunctionDecl *callee = call->getDirectCallee();
+            callee && !matchFreeCoreOp(callee->getQualifiedNameAsString())) {
+          bool written = false;
+          for (unsigned i = 0; i < call->getNumArgs() && i < callee->getNumParams(); ++i) {
+            if (!exprMentionsDecl(call->getArg(i), p))
+              continue;
+            const ParmVarDecl *cp = callee->getParamDecl(i);
+            auto tname = extractOutTargetName(call->getArg(i));
+            if (isOutParam(cp) && tname && *tname == p->getNameAsString() &&
+                !isInOutParamImpl(callee, cp, visiting)) {
+              written = true;
+            } else {
+              return -1;
+            }
+          }
+          return written ? 1 : 0;
+        }
+      }
+      return exprMentionsDecl(e, p) ? -1 : 0;
+    }
+    if (const auto *rs = dyn_cast<ReturnStmt>(s)) {
+      if (const Expr *re = rs->getRetValue())
+        return checkParamAccess(re, p, visiting);
+      return 0;
+    }
+    if (const auto *ifs = dyn_cast<clang::IfStmt>(s)) {
+      if (ifs->isConstexpr()) {
+        if (auto active = ifs->getNondiscardedCase(ctx_); active && *active)
+          return checkParamAccess(*active, p, visiting);
+        return 0;
+      }
+      if (exprMentionsDecl(ifs->getCond(), p))
+        return -1;
+      int rt = checkParamAccess(ifs->getThen(), p, visiting);
+      int re = checkParamAccess(ifs->getElse(), p, visiting);
+      if (rt == -1 || re == -1)
+        return -1;
+      if (rt == 1 && re == 1)
+        return 1;
+      return 0;
+    }
+    return exprMentionsDecl(s, p) ? -1 : 0;
+  }
+
+  auto isInOutParamImpl(const FunctionDecl *fd, const ParmVarDecl *p,
+                        std::unordered_set<const FunctionDecl *> &visiting) -> bool {
+    if (!fd || !isOutParam(p) || !fd->hasBody())
+      return false;
+    if (!visiting.insert(fd).second)
+      return false;
+    int acc = checkParamAccess(fd->getBody(), p, visiting);
+    visiting.erase(fd);
+    if (acc == -1)
+      return true;
+    // For internal helpers, an out-parameter that is only conditionally written must carry
+    // the caller's initial value into the untouched branches.
+    if (fd != root_target_ && acc == 0)
+      return true;
+    return false;
+  }
+
+  auto isInOutParam(const FunctionDecl *fd, const ParmVarDecl *p) -> bool {
+    std::unordered_set<const FunctionDecl *> visiting;
+    return isInOutParamImpl(fd, p, visiting);
+  }
+
   auto extractFunction(const FunctionDecl *fd, std::string lean_name_override = "")
       -> std::expected<void, std::string> {
+    if (!root_target_)
+      root_target_ = fd;
     if (extracted_funcs_.contains(fd))
       return {};
     extracted_funcs_.insert(fd);
@@ -818,11 +939,12 @@ public:
       if (pname.empty())
         pname = std::format("arg{}", fn.params.size());
       bool is_out = isOutParam(p);
+      bool is_in_out = is_out && isInOutParam(fd, p);
       QualType pqt = p->getType().getCanonicalType();
       if (const auto *pt = pqt->getAs<PointerType>(); pt && !pt->getPointeeType()->isVoidType()) {
         pqt = pt->getPointeeType();
       }
-      fn.params.push_back(ir::Param{pname, convertType(pqt), is_out, false});
+      fn.params.push_back(ir::Param{pname, convertType(pqt), is_out, is_in_out});
     }
 
     auto saved_lambdas = std::move(local_lambdas_);
@@ -986,7 +1108,11 @@ private:
         QualType pqt = p->getType().getCanonicalType();
         if (const auto *pt = pqt->getAs<PointerType>())
           pqt = pt->getPointeeType();
-        out_targets.emplace_back(std::move(*tname), convertType(pqt));
+        auto pty = convertType(pqt);
+        if (isInOutParam(callee, p)) {
+          in_args.push_back(ir::Expr::make(ir::VarExpr{*tname}, pty));
+        }
+        out_targets.emplace_back(std::move(*tname), std::move(pty));
       } else {
         in_args.push_back(extractExpr(call->getArg(i)));
       }
@@ -2676,6 +2802,7 @@ private:
   std::unordered_set<std::string> used_func_names_;
   std::unordered_set<const FunctionDecl *> extracted_funcs_;
   std::vector<const FunctionDecl *> pending_helpers_;
+  const FunctionDecl *root_target_ = nullptr;
   std::unordered_set<std::string> local_lambdas_;
   std::unordered_map<const FunctionDecl *, std::string> lambda_spec_names_;
   std::vector<std::string> current_diags_;
