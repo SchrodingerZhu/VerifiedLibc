@@ -1,5 +1,21 @@
 {
   "nodes": {
+    "con-leche": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1795628011,
+        "narHash": "sha256-izptadPym0gDERtjUcXsIaHHVSnqLesk12Xr/OKzLIk=",
+        "owner": "leanprover",
+        "repo": "con-leche",
+        "rev": "cfa7cd1dff6631e28da0d7b72feae9334cce297b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "leanprover",
+        "repo": "con-leche",
+        "type": "github"
+      }
+    },
     "flake-compat": {
       "flake": false,
       "locked": {
@@ -95,6 +111,38 @@
         "ref": "6.0",
         "repo": "ocaml-forester",
         "type": "sourcehut"
+      }
+    },
+    "gruszka": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1795643476,
+        "narHash": "sha256-bEJQIEok4FQrBeZyS0T3FfcjVismnkctFMlhbYryB5c=",
+        "owner": "jasisz",
+        "repo": "gruszka",
+        "rev": "da72ae16e52dfd6e79cab821cb0c274c541c5fbf",
+        "type": "github"
+      },
+      "original": {
+        "owner": "jasisz",
+        "repo": "gruszka",
+        "type": "github"
+      }
+    },
+    "lean4export": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1792003554,
+        "narHash": "sha256-XoKgms/PmMtRPQXgtjHZa1BOI3PQilyxekbDKb6s+hQ=",
+        "owner": "leanprover",
+        "repo": "lean4export",
+        "rev": "df81913eee5519d5a88ae5b0fd701b5298cc29ab",
+        "type": "github"
+      },
+      "original": {
+        "owner": "leanprover",
+        "repo": "lean4export",
+        "type": "github"
       }
     },
     "mirage-opam-overlays": {
@@ -322,8 +370,28 @@
     },
     "root": {
       "inputs": {
+        "con-leche": "con-leche",
         "forester": "forester",
-        "nixpkgs": "nixpkgs_2"
+        "gruszka": "gruszka",
+        "lean4export": "lean4export",
+        "nixpkgs": "nixpkgs_2",
+        "susz": "susz"
+      }
+    },
+    "susz": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1795637625,
+        "narHash": "sha256-W4b7tn0ObcxPzXmaScSbCOpiLxjUapPVaoCzo8Rmf7E=",
+        "owner": "jasisz",
+        "repo": "susz",
+        "rev": "74b3f605508c5939dee530db70b79e8921372364",
+        "type": "github"
+      },
+      "original": {
+        "owner": "jasisz",
+        "repo": "susz",
+        "type": "github"
       }
     },
     "systems": {

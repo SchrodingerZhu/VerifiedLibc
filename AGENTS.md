@@ -17,6 +17,9 @@ lake build             # must end with "Build completed successfully"
 - Check that `OPEN.md` matches every `sorry` under `LibcMath/`: `python3 scripts/check-open.py`
   (pass `--update` after changing open lemmas).
 - Build and smoke-test the C++23 Clang-AST extractor: `bash extract/test/run_tests.sh`.
+- Check a module and its imports with the external kernels `con-leche` and `gruszka`:
+  `kernel-check LibcMath.Kernels.Expf.Proof.DoubleEval` (after `lake build`; the flake provides
+  both kernels, `lean4export` and `susz`).
 - Warnings about files "designed for use with the module system" come from Mathlib imports and
   are expected.
 - To work on a pull request beside the main checkout, use `git worktree add` and link
@@ -67,8 +70,9 @@ lake build             # must end with "Build completed successfully"
   Put one idea in each sentence. Use consistent technical terms.
 - **Verify elaborated kernel proofs with `gruszka/con-leche`.** Check elaborated kernel proof
   terms with the formally verified external kernel in `gruszka/con-leche` to reject Lean
-  frontend bugs. You can skip this check if `con-leche` has performance issues on a kernel;
-  record the skip reason in the journal.
+  frontend bugs. Run `kernel-check <Module>`; it runs `con-leche` and `gruszka`. You can skip
+  this check only if `con-leche` has performance issues on a kernel; record the skip reason in
+  the journal. A tool that is missing is added to the flake, not skipped.
 - **Verify every extracted kernel with `difftest`.** Compare each extracted kernel against
   compiled LLVM libc C++ code under matching compiler flags and rounding modes to confirm
   faithful extraction.

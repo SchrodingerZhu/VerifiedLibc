@@ -7,9 +7,32 @@
   # against its own nixpkgs pin, which is kept so that the result comes from a binary cache.
   inputs.forester.url = "sourcehut:~jonsterling/ocaml-forester/6.0";
 
+  # External kernels that check the proofs again, apart from Lean's own kernel (see AGENTS.md).
+  # Each is pinned by flake.lock and built with the Lean of this flake.
+  inputs.con-leche = {
+    url = "github:leanprover/con-leche";
+    flake = false;
+  };
+  inputs.lean4export = {
+    url = "github:leanprover/lean4export";
+    flake = false;
+  };
+  inputs.susz = {
+    url = "github:jasisz/susz";
+    flake = false;
+  };
+  inputs.gruszka = {
+    url = "github:jasisz/gruszka";
+    flake = false;
+  };
+
   outputs = {
     nixpkgs,
     forester,
+    con-leche,
+    lean4export,
+    susz,
+    gruszka,
     ...
   }: let
     # Must agree with ./lean-toolchain.
@@ -27,6 +50,66 @@
       };
 
     foresterFor = pkgs: forester.legacyPackages.${pkgs.stdenv.hostPlatform.system}.forester;
+
+    kernelToolsFor = pkgs: let
+      lakeExe = args: pkgs.callPackage ./nix/lake-exe.nix ({lean = leanFor pkgs;} // args);
+      cargoTool = args: pkgs.callPackage ./nix/cargo-tool.nix args;
+    in rec {
+      con-leche-bin = lakeExe {
+        pname = "con-leche";
+        src = con-leche;
+        exe = "con-leche";
+        description = "External Lean checker with a proof of consistency";
+        homepage = "https://github.com/leanprover/con-leche";
+      };
+      lean4export-bin = lakeExe {
+        pname = "lean4export";
+        src = lean4export;
+        exe = "lean4export";
+        description = "Plain-text declaration export for Lean 4";
+        homepage = "https://github.com/leanprover/lean4export";
+      };
+      susz-bin = cargoTool {
+        pname = "susz";
+        src = susz;
+        description = "Binary form of lean4export files";
+        homepage = "https://github.com/jasisz/susz";
+      };
+      gruszka-bin = cargoTool {
+        pname = "gruszka";
+        src = gruszka;
+        description = "Lean 4 kernel in Rust, normalization by evaluation";
+        homepage = "https://github.com/jasisz/gruszka";
+      };
+      # kernel-check MODULE...: check the modules and all they import with both external
+      # kernels. Run it after `lake build`, from the checkout.
+      kernel-check = pkgs.writeShellApplication {
+        name = "kernel-check";
+        runtimeInputs = [(leanFor pkgs) pkgs.git];
+        # The Lean release ships an older `con-leche` of its own, first in PATH, that reads only
+        # lean4export files; each tool is named by its store path.
+        text = ''
+          if [ $# -eq 0 ]; then
+            echo "usage: kernel-check MODULE..." >&2
+            exit 2
+          fi
+          cd "$(git rev-parse --show-toplevel)"
+          search_path=$(lake env printenv LEAN_PATH)
+
+          echo "== con-leche: $*"
+          # The default stack of 1 GB overflows on the proof of `expf`.
+          export LEAN_STACK_SIZE_KB="''${LEAN_STACK_SIZE_KB:-16777216}"
+          ${nixpkgs.lib.getExe con-leche-bin} --olean --search-path="$search_path" -- "$@"
+
+          work=$(mktemp -d)
+          trap 'rm -rf "$work"' EXIT
+          echo "== gruszka: $*"
+          lake env ${nixpkgs.lib.getExe lean4export-bin} "$@" > "$work/export.ndjson"
+          ${nixpkgs.lib.getExe susz-bin} pack --no-index "$work/export.ndjson" "$work/export.susz"
+          ${nixpkgs.lib.getExe gruszka-bin} "$work/export.susz"
+        '';
+      };
+    };
 
     # The journal commands work from any directory of the checkout. Forester copies its theme
     # out of the Nix store with read-only permissions, so a previous output is made writable
@@ -90,10 +173,12 @@
       };
     };
   in {
-    packages = forAllSystems (pkgs: {
-      lean = leanFor pkgs;
-      forester = foresterFor pkgs;
-    });
+    packages = forAllSystems (pkgs:
+      {
+        lean = leanFor pkgs;
+        forester = foresterFor pkgs;
+      }
+      // kernelToolsFor pkgs);
 
     apps = forAllSystems (pkgs:
       builtins.mapAttrs (_: drv: {
@@ -140,6 +225,13 @@
           (journalTools pkgs).build
           (journalTools pkgs).serve
           (journalTools pkgs).new
+
+          # External kernels and `kernel-check` (see AGENTS.md).
+          (kernelToolsFor pkgs).con-leche-bin
+          (kernelToolsFor pkgs).lean4export-bin
+          (kernelToolsFor pkgs).susz-bin
+          (kernelToolsFor pkgs).gruszka-bin
+          (kernelToolsFor pkgs).kernel-check
         ];
 
         # The Lean release bundles a clang of its own, which comes first in PATH and cannot
