@@ -1,4 +1,5 @@
 import LibcMath.Kernels.Expf.Proof.IntegerEval.ShortPaths.Ranges
+import LibcMath.Kernels.Expf.Proof.StaticRounding
 import LibcMath.Kernels.Expf.Statement
 
 /-!
@@ -7,7 +8,8 @@ import LibcMath.Kernels.Expf.Statement
 **Not complete.** In round to nearest this plan computes what `static_rounding` computes
 (`ShortPaths.integerEval_eq_staticRounding_nearest`), so its short paths are proved, and it is
 correctly rounded if `static_rounding` is (`expfIntegerEvalCorrectlyRounded_of_staticRounding`).
-Nothing is proved about the two ranges that reach the polynomial.
+`expfIntegerEval_correctlyRounded` therefore depends on the open lemma
+`StaticRounding.expfStaticRounding_mainRangesChecked`.
 -/
 
 namespace LibcMath.Kernels.Expf.Proof.IntegerEval
@@ -39,6 +41,11 @@ theorem expfIntegerEvalCorrectlyRounded_of_staticRounding
   obtain ⟨y, hy, hsame⟩ := h .nearest (by simp [cModes]) x
   exact ⟨y, by rw [ShortPaths.integerEval_eq_staticRounding_nearest]; exact hy, hsame⟩
 
+/-- `math::integer_eval::expf` is correctly rounded in round to nearest. -/
+theorem expfIntegerEval_correctlyRounded : ExpfIntegerEvalCorrectlyRounded :=
+  expfIntegerEvalCorrectlyRounded_of_staticRounding
+    StaticRounding.expfStaticRounding_correctlyRounded
+
 /--
 info: 'LibcMath.Kernels.Expf.Proof.IntegerEval.expfIntegerEvalCorrectlyRounded_of_mainRanges' depends on axioms: [propext,
  Classical.choice,
@@ -54,5 +61,14 @@ info: 'LibcMath.Kernels.Expf.Proof.IntegerEval.expfIntegerEvalCorrectlyRounded_o
 -/
 #guard_msgs in
 #print axioms expfIntegerEvalCorrectlyRounded_of_staticRounding
+
+/--
+info: 'LibcMath.Kernels.Expf.Proof.IntegerEval.expfIntegerEval_correctlyRounded' depends on axioms: [propext,
+ sorryAx,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms expfIntegerEval_correctlyRounded
 
 end LibcMath.Kernels.Expf.Proof.IntegerEval

@@ -39,6 +39,11 @@ round-to-nearest-even mode. -/
 def ExpfFloatEvalCrRnCorrectlyRounded : Prop :=
   CorrectlyRounded (Spec.exp .binary32) {.nearest} Generated.FloatEvalCrRn.expf
 
+/-- `math::float_eval::expf` (fast single precision, `LIBC_MATH=0x3F`, RN-only) reaches no
+operation that C++ leaves undefined. The plan is not correctly rounded, so this is its statement. -/
+def ExpfFloatEvalDefined : Prop :=
+  ∀ x : Model .binary32, (Generated.FloatEval.expf .nearest x).isSome
+
 /-- `math::double_eval::expf` compiled with `-msse4.2 -mno-fma` is correctly rounded in all four
 rounding modes of C. -/
 def ExpfDoubleEvalSse42CorrectlyRounded : Prop :=

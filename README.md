@@ -123,10 +123,12 @@ using zero `sorry`s, zero `native_decide`, and only the three standard Lean axio
 | Main polynomial ranges (`2⁻²⁴ ≤ x < 88.72…`, `-103.97… < x < -2⁻²⁵`) | 520 093 927 | 12.11 % | value error (`≤ 2 · 10⁻¹⁵ · exp x`) + 278 619 Chebyshev SLZ TMD certificates (`Expf/Proof/DoubleEval/MainPath/Tmd/`) + 103 pointwise exceptions (`Expf/Proof/DoubleEval/MainPath/PointwiseExceptions.lean`) |
 
 Every statement and theorem explicitly names its extracted plan (there is no "default" plan alias).
-For `expf`, `expfDoubleEval_correctlyRounded` is complete, while statements and proved short-path
-reductions also exist for `double_eval_fma` (87.30 % proved), `static_rounding` (87.69 % proved),
-and `integer_eval` (87.69 % proved, plus `integerEval_eq_staticRounding_nearest`), along with the
-statement for `float_eval_cr_rn`.
+For `expf`, `expfDoubleEval_correctlyRounded` is complete. Every other plan has a top-level
+theorem that ends in an open lemma. The short paths of `double_eval_fma` (87.30 %),
+`static_rounding` (87.69 %) and `integer_eval` (87.69 %, through
+`integerEval_eq_staticRounding_nearest`) are proved; their main polynomial ranges are open.
+`float_eval` is not correctly rounded, so its statement is that it reaches no undefined
+operation. `OPEN.md` lists every open lemma.
 
 ## Testing a kernel
 

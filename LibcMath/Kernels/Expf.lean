@@ -5,6 +5,8 @@ import LibcMath.Kernels.Expf.Proof.DoubleEval
 import LibcMath.Kernels.Expf.Proof.DoubleEvalFma
 import LibcMath.Kernels.Expf.Proof.IntegerEval
 import LibcMath.Kernels.Expf.Proof.StaticRounding
+import LibcMath.Kernels.Expf.Proof.FloatEval
+import LibcMath.Kernels.Expf.Proof.FloatEvalCrRn
 import LibcMath.Kernels.Expf.Proof.Microarch
 
 /-!
@@ -13,13 +15,15 @@ import LibcMath.Kernels.Expf.Proof.Microarch
 Every statement and theorem names its evaluation plan; there is no default plan.
 
 * `double_eval`: **complete**, `Proof.DoubleEval.expfDoubleEval_correctlyRounded`.
-* `double_eval_fma`: short paths only,
-  `Proof.DoubleEvalFma.expfDoubleEvalFmaCorrectlyRounded_of_mainRanges`.
-* `static_rounding`: short paths only,
-  `Proof.StaticRounding.expfStaticRoundingCorrectlyRounded_of_mainRanges`.
-* `integer_eval`: short paths only,
-  `Proof.IntegerEval.expfIntegerEvalCorrectlyRounded_of_staticRounding`.
-* `float_eval`, `float_eval_cr_rn`: extracted and tested; no statement is proved.
+* `double_eval_fma`: `Proof.DoubleEvalFma.expfDoubleEvalFma_correctlyRounded`. The short paths
+  are proved; the main ranges are open (`expfDoubleEvalFma_mainRangesChecked`).
+* `static_rounding`: `Proof.StaticRounding.expfStaticRounding_correctlyRounded`. The short paths
+  are proved; the main ranges are open (`expfStaticRounding_mainRangesChecked`).
+* `integer_eval`: `Proof.IntegerEval.expfIntegerEval_correctlyRounded`, from `static_rounding`.
+* `double_eval_sse42`, `double_eval_aarch64`: open, in `Proof.Microarch`.
+* `float_eval_cr_rn`: open, `Proof.FloatEvalCrRn.expfFloatEvalCrRn_correctlyRounded`.
+* `float_eval`: not correctly rounded; its definedness is open,
+  `Proof.FloatEval.expfFloatEval_defined`.
 
 * `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
 * `Statement.lean`: what is to be proved about each plan.

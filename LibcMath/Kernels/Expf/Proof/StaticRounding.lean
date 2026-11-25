@@ -5,8 +5,8 @@ import LibcMath.Kernels.Expf.Statement
 # `math::static_rounding::expf`: short paths proved, main path not
 
 **Not complete.** The short paths are proved (87.69 % of the bit patterns). Nothing is proved
-about the two ranges that reach the polynomial:
-`expfStaticRoundingCorrectlyRounded_of_mainRanges` takes them as a hypothesis.
+about the two ranges that reach the polynomial. They are the open lemma
+`expfStaticRounding_mainRangesChecked`, and `expfStaticRounding_correctlyRounded` uses it.
 -/
 
 namespace LibcMath.Kernels.Expf.Proof.StaticRounding
@@ -34,6 +34,17 @@ theorem expfStaticRoundingCorrectlyRounded_of_mainRanges
   obtain ⟨positive, negative⟩ := h mode hmode
   exact (((low.append positive).append middle).append negative).append high
 
+/-- **Open.** Prove that `Generated.StaticRounding.kernel` is correct on both main polynomial
+ranges in each C rounding direction. A proof bounds the error of the `Frac64` polynomial and
+clears the rounding boundaries with TMD certificates. -/
+theorem expfStaticRounding_mainRangesChecked (hmode : mode ∈ cModes) :
+    ExpfStaticRoundingMainRangesChecked mode := by
+  sorry
+
+/-- `math::static_rounding::expf` is correctly rounded in the four rounding directions of C. -/
+theorem expfStaticRounding_correctlyRounded : ExpfStaticRoundingCorrectlyRounded :=
+  expfStaticRoundingCorrectlyRounded_of_mainRanges fun _ => expfStaticRounding_mainRangesChecked
+
 /--
 info: 'LibcMath.Kernels.Expf.Proof.StaticRounding.expfStaticRoundingCorrectlyRounded_of_mainRanges' depends on axioms: [propext,
  Classical.choice,
@@ -41,5 +52,14 @@ info: 'LibcMath.Kernels.Expf.Proof.StaticRounding.expfStaticRoundingCorrectlyRou
 -/
 #guard_msgs in
 #print axioms expfStaticRoundingCorrectlyRounded_of_mainRanges
+
+/--
+info: 'LibcMath.Kernels.Expf.Proof.StaticRounding.expfStaticRounding_correctlyRounded' depends on axioms: [propext,
+ sorryAx,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms expfStaticRounding_correctlyRounded
 
 end LibcMath.Kernels.Expf.Proof.StaticRounding

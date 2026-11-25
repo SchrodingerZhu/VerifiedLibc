@@ -4,7 +4,7 @@ Generated from every `sorry` under `LibcMath/` by `scripts/check-open.py`.
 Do not edit by hand; run `python3 scripts/check-open.py --update` after changing
 the open lemmas.
 
-Total open obligations: **162**.
+Total open obligations: **166**.
 
 | File | Lemma | Summary |
 |---|---|---|
@@ -66,8 +66,12 @@ Total open obligations: **162**.
 | `LibcMath/Kernels/Exp2m1f.lean` | `exp2m1fSse2_correctlyRounded_nonNegNaN` | **Open.** Prove `exp2m1f` (`sse2`) is correctly rounded on all non-negative-NaN inputs. |
 | `LibcMath/Kernels/Exp2m1f.lean` | `exp2m1fSse42_correctlyRounded_nonNegNaN` | **Open.** Prove `exp2m1f` (`sse42`) is correctly rounded on all non-negative-NaN inputs. |
 | `LibcMath/Kernels/Exp2m1f.lean` | `exp2m1fAvx2Fma_correctlyRounded_nonNegNaN` | **Open.** Prove `exp2m1f` (`avx2_fma`) is correctly rounded on all non-negative-NaN inputs. |
+| `LibcMath/Kernels/Expf/Proof/DoubleEvalFma.lean` | `expfDoubleEvalFma_mainRangesChecked` | **Open.** Prove that `Generated.DoubleEvalFma.expf` is correct on both main polynomial ranges in each C rounding direction. A proof follows `Proof.DoubleEval.MainPath` with the FMA error bounds. |
+| `LibcMath/Kernels/Expf/Proof/FloatEval.lean` | `expfFloatEval_defined` | **Open.** Prove that `math::float_eval::expf` reaches no operation that C++ leaves undefined in round to nearest. |
+| `LibcMath/Kernels/Expf/Proof/FloatEvalCrRn.lean` | `expfFloatEvalCrRn_correctlyRounded` | **Open.** Prove that `math::float_eval_cr_rn::expf` is correctly rounded in round to nearest. |
 | `LibcMath/Kernels/Expf/Proof/Microarch.lean` | `expfDoubleEvalSse42_correctlyRounded` | **Open.** Prove that `math::double_eval::expf` compiled with `-msse4.2 -mno-fma` is correctly rounded across all four IEEE rounding modes. |
 | `LibcMath/Kernels/Expf/Proof/Microarch.lean` | `expfDoubleEvalAArch64_correctlyRounded` | **Open.** Prove that `math::double_eval::expf` compiled for AArch64 is correctly rounded across all four IEEE rounding modes. |
+| `LibcMath/Kernels/Expf/Proof/StaticRounding.lean` | `expfStaticRounding_mainRangesChecked` | **Open.** Prove that `Generated.StaticRounding.kernel` is correct on both main polynomial ranges in each C rounding direction. A proof bounds the error of the `Frac64` polynomial and clears the rounding boundaries with TMD certificates. |
 | `LibcMath/Kernels/Expm1f.lean` | `expm1fSse2_correctlyRounded` | **Open.** Prove `expm1f` (`sse2`) is correctly rounded across all four C rounding modes. |
 | `LibcMath/Kernels/Expm1f.lean` | `expm1fSse42_correctlyRounded` | **Open.** Prove `expm1f` (`sse42`) is correctly rounded across all four C rounding modes. |
 | `LibcMath/Kernels/Expm1f.lean` | `expm1fAvx2Fma_correctlyRounded` | **Open.** Prove `expm1f` (`avx2_fma`) is correctly rounded across all four C rounding modes. |
