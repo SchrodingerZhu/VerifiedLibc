@@ -1,5 +1,5 @@
 import LibcMath.Framework.Correctness
-import LibcMath.Fn.Plans
+import LibcMath.Kernels.Fn.Plans
 import LibcMath.Analysis.RoundingTransfer
 import LibcMath.Analysis.RangeReduction
 import LibcMath.Analysis.Horner
@@ -8,7 +8,7 @@ import LibcMath.Analysis.ChebTmd
 /-!
 # Main-path numerical analysis steps for `<fn>`
 
-Split the main computation into one file per analytical step (see `LibcMath/Expf/MainPath/`):
+Split the main computation into one file per analytical step (see `LibcMath/Kernels/Expf/MainPath/`):
 1. `RangeReduction.lean` — UB-freedom and exact range reduction.
 2. `Polynomial.lean` — real approximation error `|poly r - f r|`.
 3. `HornerError.lean` — floating-point evaluation error across `cModes`.
@@ -21,7 +21,7 @@ Keep any unproved step as a named `sorry` lemma whose docstring begins with `**O
 `python3 scripts/check-open.py --update`.
 -/
 
-namespace LibcMath.Fn.MainPath
+namespace LibcMath.Kernels.Fn.MainPath
 
 open FloatLib.Floats.Formats.BinaryInterchange
 open Model (IEEERoundingMode)
@@ -32,4 +32,4 @@ theorem correctAt_plan_main {mode : IEEERoundingMode} (hmode : mode ∈ cModes)
     HoldsOnBits (CorrectAt (Spec.fn .binary32) Generated.Plan.fn mode) lo hi := by
   sorry
 
-end LibcMath.Fn.MainPath
+end LibcMath.Kernels.Fn.MainPath

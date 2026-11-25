@@ -22,19 +22,20 @@ Lean dependencies are pinned in `lake-manifest.json`:
 
 ## Repository layout
 
-Each verified math function lives at the top level of `LibcMath/` as an entry file
-`LibcMath/<Function>.lean` paired with a directory `LibcMath/<Function>/`:
+Each verified math function lives under `LibcMath/Kernels/` as an entry file
+`LibcMath/Kernels/<Function>.lean` paired with a directory `LibcMath/Kernels/<Function>/`:
 
 ```text
 LibcMath/
-  Expf.lean              # entry point: `expfDoubleEval_correctlyRounded`, axioms, multi-plan reductions
-  Expf/
-    Generated/           # plans emitted by `ast2lean`; never edited by hand
-    Plans.lean           # catalogue of extracted plans
-    Statement.lean       # `CorrectlyRounded` statements
-    ShortPaths/          # symbolic evaluation and whole-range short-path proofs
-    MainPath/            # one file per numerical-analysis step + `Tmd/` certificates
-    Examples.lean        # worked evaluations and `Libc.Diag` checks
+  Kernels/
+    Expf.lean            # entry point: `expfDoubleEval_correctlyRounded`, axioms, reductions
+    Expf/
+      Generated/         # plans emitted by `ast2lean`; never edited by hand
+      Plans.lean         # catalogue of extracted plans
+      Statement.lean     # `CorrectlyRounded` statements
+      ShortPaths/        # `SymbolicExecution.lean` and whole-range proofs in `Ranges.lean`
+      MainPath/          # one file per numerical-analysis step + `Tmd/` certificates
+      Examples.lean      # worked evaluations and `Libc.Diag` checks
   Libc/                  # shared LLVM libc operations (`FPBits`, `nearestInt`, `horner`, `Diag`, …)
   Analysis/              # reusable numerical analysis (`RangeReduction`, `Horner`, `RoundingTransfer`, `ChebTmd`, …)
   Framework/             # `Spec`, `Specs`, `BitRange`, `Correctness`
@@ -78,19 +79,19 @@ division by zero).
 ```bash
 # Extract a single function
 extract/extract.sh <llvm-project>/libc expf math::double_eval::expf expf \
-  --namespace=LibcMath.Expf.Generated.DoubleEval \
-  --out=LibcMath/Expf/Generated/DoubleEval.lean
+  --namespace=LibcMath.Kernels.Expf.Generated.DoubleEval \
+  --out=LibcMath/Kernels/Expf/Generated/DoubleEval.lean
 
 # Inspect active LIBC_MATH / target CPU macros without emitting Lean
 ./extract/build/ast2lean <llvm-project>/libc/src/math/generic/expf.cpp \
   --function=math::double_eval::expf --dump-config \
   -- -std=gnu++17 -mavx2 -mfma -I <llvm-project>/libc -DLIBC_NAMESPACE=__llvm_libc
 
-# Regenerate all six extracted `expf` evaluation plans under LibcMath/Expf/Generated/
+# Regenerate all six extracted `expf` evaluation plans under LibcMath/Kernels/Expf/Generated/
 extract/extract-expf-plans.sh <llvm-project>/libc
 ```
 
-The six extracted `expf` evaluation plans under `LibcMath/Expf/Generated/` are:
+The six extracted `expf` evaluation plans under `LibcMath/Kernels/Expf/Generated/` are:
 
 - `DoubleEval`: x86-64 non-FMA double-precision table+Horner (`LIBC_MATH=0`, 4 modes, CR)
 - `DoubleEvalFma`: `double_eval` with `-mavx2 -mfma` (hardware FMA + `nearest_integer`, 4 modes, CR)
@@ -101,7 +102,7 @@ The six extracted `expf` evaluation plans under `LibcMath/Expf/Generated/` are:
 
 ## What is proved
 
-**`expfDoubleEval_correctlyRounded` (`LibcMath/Expf.lean`) is complete.** It proves
+**`expfDoubleEval_correctlyRounded` (`LibcMath/Kernels/Expf.lean`) is complete.** It proves
 `ExpfDoubleEvalCorrectlyRounded` — that `math::double_eval::expf` (x86-64 non-FMA, `LIBC_MATH=0`),
 extracted from LLVM libc at `e1a5f92db023`, is correctly rounded across all `2³²` binary32 inputs
 in all four rounding directions of C (`cModes`) and reaches no operation that C++ leaves undefined,

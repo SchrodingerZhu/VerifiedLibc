@@ -8,7 +8,8 @@ import FloatLib.Floats.Formats.BinaryInterchange.Dyadic.RoundingKernel.Proof
 /-!
 # Rounding transfer from binary64 approximations to binary32
 
-This module connects the final narrowing cast of `Expf.Generated.DoubleEval.expf` to the real-valued
+This module connects the final narrowing cast of `Kernels.Expf.Generated.DoubleEval.expf` to the
+real-valued
 specification `Model.roundReal .binary32`:
 
 * `fpCast_binary32_eq_roundReal`: for a positive finite binary64 value `v` bounded by

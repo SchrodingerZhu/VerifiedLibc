@@ -16,7 +16,7 @@ import LibcMath.Analysis.RangeReduction
 import LibcMath.Analysis.Horner
 import LibcMath.Analysis.RoundingTransfer
 import LibcMath.Analysis.ChebTmd
-import LibcMath.Expf
+import LibcMath.Kernels.Expf
 import LibcMath.Testing.Oracle.Exp
 import LibcMath.Testing.Oracle.ExpExamples
 import LibcMath.Testing.Oracle.Mpfr
