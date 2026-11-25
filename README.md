@@ -27,7 +27,7 @@ Each verified math function lives at the top level of `LibcMath/` as an entry fi
 
 ```text
 LibcMath/
-  Expf.lean              # entry point: `expf_correctlyRounded`, axioms check, multi-plan reductions
+  Expf.lean              # entry point: `expfDoubleEval_correctlyRounded`, axioms, multi-plan reductions
   Expf/
     Generated/           # plans emitted by `ast2lean`; never edited by hand
     Plans.lean           # catalogue of extracted plans
@@ -92,7 +92,7 @@ extract/extract-expf-plans.sh <llvm-project>/libc
 
 The six extracted `expf` evaluation plans under `LibcMath/Expf/Generated/` are:
 
-- `DoubleEval`: default x86-64 double-precision table+Horner (`LIBC_MATH=0`, 4 modes, CR)
+- `DoubleEval`: x86-64 non-FMA double-precision table+Horner (`LIBC_MATH=0`, 4 modes, CR)
 - `DoubleEvalFma`: `double_eval` with `-mavx2 -mfma` (hardware FMA + `nearest_integer`, 4 modes, CR)
 - `IntegerEval`: pure integer `Frac64` (`LIBC_MATH_EXPF_IMPL=integer_eval`, `LIBC_MATH=0x2C`, RN, CR)
 - `StaticRounding`: 4-mode pure integer `Frac64` (`math::static_rounding::expf`, `LIBC_MATH=0x0C`, 4 modes, CR)
@@ -101,11 +101,12 @@ The six extracted `expf` evaluation plans under `LibcMath/Expf/Generated/` are:
 
 ## What is proved
 
-**`expf_correctlyRounded` (`LibcMath/Expf.lean`) is complete.** It proves that
-`math::double_eval::expf`, extracted from LLVM libc at `e1a5f92db023`, is correctly rounded across
-all `2³²` binary32 inputs in all four rounding directions of C (`cModes`) and reaches no operation
-that C++ leaves undefined, using zero `sorry`s, zero `native_decide`, and only the three standard
-Lean axioms `[propext, Classical.choice, Quot.sound]`.
+**`expfDoubleEval_correctlyRounded` (`LibcMath/Expf.lean`) is complete.** It proves
+`ExpfDoubleEvalCorrectlyRounded` — that `math::double_eval::expf` (x86-64 non-FMA, `LIBC_MATH=0`),
+extracted from LLVM libc at `e1a5f92db023`, is correctly rounded across all `2³²` binary32 inputs
+in all four rounding directions of C (`cModes`) and reaches no operation that C++ leaves undefined,
+using zero `sorry`s, zero `native_decide`, and only the three standard Lean axioms
+`[propext, Classical.choice, Quot.sound]`.
 
 | Inputs | Bit patterns | Share | Proof |
 |---|---|---|---|
@@ -113,10 +114,11 @@ Lean axioms `[propext, Classical.choice, Quot.sound]`.
 | Tiny & near-underflow main-path intervals | 25 256 675 | 0.59 % | analytic (`Expf/MainPath/ProductError.lean`) |
 | Main polynomial ranges (`2⁻²⁴ ≤ x < 88.72…`, `-103.97… < x < -2⁻²⁵`) | 520 093 927 | 12.11 % | value error (`≤ 2 · 10⁻¹⁵ · exp x`) + 278 619 Chebyshev SLZ TMD certificates (`Expf/MainPath/Tmd/`) + 103 pointwise exceptions (`Expf/MainPath/PointwiseExceptions.lean`) |
 
-The primary full proof targets `double_eval`. Statements and proved short-path reductions also exist
-for `double_eval_fma` (87.30 % proved), `static_rounding` (87.69 % proved), and `integer_eval`
-(87.69 % proved, plus `integerEval_eq_staticRounding_nearest`), along with the statement for
-`float_eval_cr_rn`.
+Every statement and theorem explicitly names its extracted plan (there is no "default" plan alias).
+For `expf`, `expfDoubleEval_correctlyRounded` is complete, while statements and proved short-path
+reductions also exist for `double_eval_fma` (87.30 % proved), `static_rounding` (87.69 % proved),
+and `integer_eval` (87.69 % proved, plus `integerEval_eq_staticRounding_nearest`), along with the
+statement for `float_eval_cr_rn`.
 
 ## Testing a kernel
 
@@ -141,13 +143,13 @@ Differential testing checks that each AST-extracted Lean kernel agrees bit-for-b
 with `expf.cpp` compiled by Clang with the matching `LIBC_MATH` and CPU flags:
 
 ```bash
-scripts/difftest-expf.sh <llvm-project>/libc quick
+scripts/difftest-expf.sh --plan=double_eval <llvm-project>/libc quick
 scripts/difftest-expf.sh --plan=double_eval_fma <llvm-project>/libc quick
 scripts/difftest-expf.sh --plan=integer_eval <llvm-project>/libc quick
 scripts/difftest-expf.sh --plan=float_eval <llvm-project>/libc quick
 scripts/difftest-expf.sh --plan=float_eval_cr_rn <llvm-project>/libc quick
-scripts/difftest-expf.sh <llvm-project>/libc dense 51
-scripts/difftest-expf.sh <llvm-project>/libc range 3F800000 3FFFFFFF
+scripts/difftest-expf.sh --plan=double_eval <llvm-project>/libc dense 51
+scripts/difftest-expf.sh --plan=double_eval <llvm-project>/libc range 3F800000 3FFFFFFF
 ```
 
 `double_eval` and `double_eval_fma` test all four IEEE rounding modes (`nearest`, `up`, `down`,

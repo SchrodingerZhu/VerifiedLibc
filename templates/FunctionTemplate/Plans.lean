@@ -1,4 +1,4 @@
-import LibcMath.Fn.Generated.Default
+import LibcMath.Fn.Generated.Plan
 
 /-!
 # Extracted `<fn>` evaluation plans
@@ -14,6 +14,6 @@ open LibcMath.Fn.Generated
 
 /-- All extracted `<fn>` evaluation plans. -/
 def allPlans : List (UnaryKernel .binary32) :=
-  [ Default.kernel ]
+  [ Plan.kernel ]
 
 end LibcMath.Fn

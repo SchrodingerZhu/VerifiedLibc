@@ -47,10 +47,16 @@ lake build             # must end with "Build completed successfully"
   - `LibcMath/Expf/MainPath/Tmd/Certs/` holds generated Chebyshev SLZ TMD certificate chunks.
 - Lean, C++ and Nix sources stay within 100 columns. The exceptions are expected messages under
   `#guard_msgs`, string literals, and long expressions in generated files.
+- **Always name the implementation plan; no "default" aliases.** LLVM libc selects different
+  evaluation plans depending on target and `LIBC_MATH_*` flags. Every statement, theorem, short-path
+  lemma, and CLI `--plan=<name>` invocation names the specific extracted plan (for example
+  `ExpfDoubleEvalCorrectlyRounded`, `expfDoubleEval_correctlyRounded`,
+  `correctAt_doubleEval_main_pos`, `holdsOnBits_short_paths_doubleEval`, `--plan=double_eval`). Do
+  not add plan-less "default" abbreviations or implicit plan fallbacks.
 - **Keep a strictly linear history on `main`.** Do not create merge commits on `main`: rebase
   feature branches (`git rebase`) or squash-merge pull requests so `git log --merges main` remains
   empty and every commit on `main` builds cleanly.
-- When a status is reported, say first whether the main theorem is complete, and name what is
+- When a status is reported, say first which implementation theorem is complete, and name what is
   open. "No errors" and "standard axioms" are not a status.
 
 ## Testing a kernel
@@ -78,9 +84,11 @@ it after any change to `extract/` or to `LibcMath/Libc/`.
   - `LibcMath/Expf.lean` and `LibcMath/Expf/` are the worked example; copy
     `templates/FunctionTemplate/` and follow `journal/trees/note/note-adding-a-function.tree` when
     adding a new function.
-- The primary full proof targets the default plan (`double_eval`); other extracted plans keep
-  correctness statements, short-path proofs, conditional reductions, and inter-plan equivalence
-  theorems where applicable.
+- Each extracted evaluation plan carries its own plan-qualified statement
+  (`ExpfDoubleEvalCorrectlyRounded`, `ExpfDoubleEvalFmaCorrectlyRounded`, …). Currently
+  `double_eval` has a complete proof (`expfDoubleEval_correctlyRounded`), while the other extracted
+  plans keep short-path proofs, conditional reductions, and inter-plan equivalence theorems where
+  applicable.
 - What does not depend on the function stays outside:
   - `LibcMath/Libc/` (the operations of libc that extracted code refers to),
   - `LibcMath/Analysis/` (reusable facts about rounding, real functions, range reduction, Horner

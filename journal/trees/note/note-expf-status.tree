@@ -7,13 +7,13 @@
 \contributor{antigravity}
 \tag{exp}
 \tag{status}
-\meta{updated}{2026-11-24}
+\meta{updated}{2026-11-25}
 \meta{pr}{17}
 \import{base-macros}
 
-\p{Updated on 2026-11-24 in session [ses-ZW59](ses-ZW59) ([log-I6C0](log-I6C0)) after closing both remaining main-path lemmas and reorganising the tree for issue \issue{22}.}
+\p{Updated on 2026-11-25 ([log-PIWX](log-PIWX), [dec-RLMN](dec-RLMN)) after closing both main-path lemmas of \code{\verb~|double_eval~}, reorganising the tree for issue \issue{22} ([log-I6C0](log-I6C0)), and removing plan-less "default" aliases.}
 
-\p{\strong{The proof is complete.} \code{\verb~|expf_correctlyRounded~} in \code{\verb~|LibcMath/Expf.lean~} proves that \code{\verb~|math::double_eval::expf~}, extracted from LLVM libc at \code{\verb~|e1a5f92db023~}, is correctly rounded across all \code{\verb~|2³²~} binary32 inputs in all four rounding directions of C and reaches no operation that C++ leaves undefined. It uses zero \code{\verb~|sorry~}, zero \code{\verb~|native_decide~}, and depends solely on the three standard Lean axioms \code{\verb~|[propext, Classical.choice, Quot.sound]~}.}
+\p{\strong{The proof for \code{\verb~|math::double_eval::expf~} is complete.} \code{\verb~|expfDoubleEval_correctlyRounded : ExpfDoubleEvalCorrectlyRounded~} in \code{\verb~|LibcMath/Expf.lean~} proves that \code{\verb~|math::double_eval::expf~} (x86-64 non-FMA, \code{\verb~|LIBC_MATH=0~}), extracted from LLVM libc at \code{\verb~|e1a5f92db023~}, is correctly rounded across all \code{\verb~|2³²~} binary32 inputs in all four rounding directions of C and reaches no operation that C++ leaves undefined. It uses zero \code{\verb~|sorry~}, zero \code{\verb~|native_decide~}, and depends solely on the three standard Lean axioms \code{\verb~|[propext, Classical.choice, Quot.sound]~}.}
 
 \table{
 \tr{\th{Inputs}\th{Bit patterns}\th{Share}\th{State}}

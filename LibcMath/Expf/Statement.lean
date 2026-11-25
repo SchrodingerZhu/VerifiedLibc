@@ -14,8 +14,8 @@ namespace LibcMath.Expf
 open FloatLib.Floats.Formats.BinaryInterchange
 open Model (IEEERoundingMode)
 
-/-- `math::double_eval::expf` (default x86-64, non-FMA) is correctly rounded in the four rounding
-directions of C. -/
+/-- `math::double_eval::expf` (x86-64, non-FMA, `LIBC_MATH=0`) is correctly rounded in the four
+rounding directions of C. -/
 def ExpfDoubleEvalCorrectlyRounded : Prop :=
   CorrectlyRounded (Spec.exp .binary32) cModes Generated.DoubleEval.expf
 
@@ -38,9 +38,5 @@ def ExpfIntegerEvalCorrectlyRounded : Prop :=
 round-to-nearest-even mode. -/
 def ExpfFloatEvalCrRnCorrectlyRounded : Prop :=
   CorrectlyRounded (Spec.exp .binary32) {.nearest} Generated.FloatEvalCrRn.expf
-
-/-- The default statement about `expf`: that of `double_eval`, across all four C rounding modes. -/
-abbrev ExpfCorrectlyRounded : Prop :=
-  ExpfDoubleEvalCorrectlyRounded
 
 end LibcMath.Expf

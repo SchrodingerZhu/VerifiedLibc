@@ -5,7 +5,7 @@ import LibcMath.Testing.Oracle.Mpfr
 /-!
 # `checkrange`: compiled evaluation of `checkRange`
 
-    checkrange [--oracle=<name>] [--plan=<name>] <mode> <first> <count> [<block>]
+    checkrange [--oracle=<name>] --plan=<name> <mode> <first> <count> [<block>]
 
 evaluates `checkRange O impl mode b block` (through `checkBlock`) for the consecutive
 blocks `b = first, first + block, …` covering `count` bit patterns, printing one tab-separated
@@ -15,7 +15,7 @@ line per block on stdout:
 
 * `--oracle=<name>` selects the oracle `O`: `lean` [default] is `Testing.oracle`, which is proved
   sound in Lean; `mpfr` is `mpfrExpOracle`, which trusts MPFR and is much faster.
-* `--plan=<name>` selects the extracted `expf` evaluation plan (`double_eval` [default],
+* `--plan=<name>` (required) selects the extracted `expf` evaluation plan (`double_eval`,
   `double_eval_fma`, `integer_eval`, `static_rounding`, `float_eval`, `float_eval_cr_rn`).
 * `mode` is `nearest`, `towardZero`, `up`, or `down`.
 * On any failing block, prints a detailed diagnostic of the first failing bit pattern (hex bits,
@@ -34,8 +34,8 @@ def parseMode : String → Option IEEERoundingMode
   | _ => none
 
 def usage : String :=
-  "usage: checkrange [--oracle=lean|mpfr] [--plan=double_eval|double_eval_fma|integer_eval|" ++
-    "static_rounding|float_eval|float_eval_cr_rn] <nearest|towardZero|up|down> <first> <count> " ++
+  "usage: checkrange [--oracle=lean|mpfr] --plan=double_eval|double_eval_fma|integer_eval|" ++
+    "static_rounding|float_eval|float_eval_cr_rn <nearest|towardZero|up|down> <first> <count> " ++
     "[<block>]"
 
 /-- The test of an oracle, by its name on the command line. -/
@@ -65,7 +65,7 @@ def parsePlanFlag (args : List String) :
         | some k => some (name, k, rest)
         | none => none
       else
-        some ("double_eval", Expf.Generated.DoubleEval.kernel, args)
+        none
   | [] => none
 
 def main (args : List String) : IO UInt32 := do

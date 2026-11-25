@@ -11,8 +11,8 @@ import LibcMath.Expf.Generated.FloatEvalCrRn
 Umbrella module collecting all six upstream LLVM libc `expf` evaluation plans extracted by
 `ast2lean` (`extract/extract-expf-plans.sh`):
 
-* `DoubleEval`: default x86-64 double-precision table+Horner plan (all 4 IEEE rounding modes,
-  correctly rounded, no hardware FMA).
+* `DoubleEval`: x86-64 non-FMA double-precision table+Horner plan (`LIBC_MATH=0`, all 4 IEEE
+  rounding modes, correctly rounded).
 * `DoubleEvalFma`: same `double_eval` plan compiled with `-mavx2 -mfma` (hardware FMA and
   `nearest_integer`).
 * `IntegerEval`: integer-only `Frac64` plan (`LIBC_MATH_EXPF_IMPL=integer_eval`, `LIBC_MATH=0x2C`,

@@ -1,0 +1,17 @@
+\title{Remove default plan aliases and require explicit implementation names}
+\taxon{Change}
+\date{2026-11-25}
+\author{antigravity}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{expf}
+\tag{naming}
+\import{base-macros}
+
+\p{Implements [dec-RLMN](dec-RLMN).}
+\ul{
+\li{\strong{\code{\verb~|LibcMath/Expf/~}.} Removed \code{\verb~|abbrev ExpfCorrectlyRounded~} from \code{\verb~|LibcMath/Expf/Statement.lean~}. Renamed \code{\verb~|expf_correctlyRounded~} to \code{\verb~|expfDoubleEval_correctlyRounded~}, \code{\verb~|expf_correct_on_short_paths~} to \code{\verb~|expfDoubleEval_correct_on_short_paths~}, \code{\verb~|correctAt_main_pos~} / \code{\verb~|correctAt_main_neg~} to \code{\verb~|correctAt_doubleEval_main_pos~} / \code{\verb~|correctAt_doubleEval_main_neg~}, and \code{\verb~|ExpfFmaMainRangesChecked~} to \code{\verb~|ExpfDoubleEvalFmaMainRangesChecked~} in \code{\verb~|LibcMath/Expf.lean~}. Renamed the \code{\verb~|DoubleEval~} and \code{\verb~|DoubleEvalFma~} short-path range lemmas in \code{\verb~|LibcMath/Expf/ShortPaths/Ranges.lean~} to include \code{\verb~|doubleEval~} / \code{\verb~|doubleEvalFma~}.}
+\li{\strong{Testing and differential test CLIs.} Removed \code{\verb~|Testing.run~} from \code{\verb~|LibcMath/Testing/Target.lean~} (using \code{\verb~|Expf.Generated.DoubleEval.expf~} explicitly in \code{\verb~|LibcMath/Testing/MpfrExamples.lean~}), and made \code{\verb~|--plan=<name>~} required in \code{\verb~|checkrange~}, \code{\verb~|difftest-expf-model~}, and \code{\verb~|scripts/difftest-expf.sh~}.}
+\li{\strong{Templates, docs, and journal.} Replaced \code{\verb~|Default~} / \code{\verb~|FnCorrectlyRounded~} / \code{\verb~|fn_correctlyRounded~} placeholders in \code{\verb~|templates/FunctionTemplate/~} with \code{\verb~|Plan~} / \code{\verb~|FnPlanCorrectlyRounded~} / \code{\verb~|fnPlan_correctlyRounded~}, recorded the rule in \code{\verb~|AGENTS.md~}, \code{\verb~|README.md~}, [note-adding-a-function](note-adding-a-function), and [note-expf-status](note-expf-status), and appended the closing 2026-11-24 timeline entry to [prob-48KJ](prob-48KJ).}
+\li{\strong{Verified.} \code{\verb~|lake build LibcMath checkrange difftest-expf-model~}, \code{\verb~|python3 scripts/check-open.py~} (0 open obligations), \code{\verb~|checkrange --plan=double_eval~}, and \code{\verb~|journal-build~} all pass cleanly.}
+}

@@ -1,0 +1,18 @@
+\title{Always name the implementation plan; no "default" aliases}
+\taxon{Decision}
+\date{2026-11-25}
+\author{antigravity}
+\contributor{schrodingerzy}
+\tag{architecture}
+\tag{naming}
+\tag{process}
+\meta{status}{accepted}
+\import{base-macros}
+
+\p{\strong{Status:} accepted. Decided by the maintainer on 2026-11-25.}
+\p{LLVM libc compiles multiple distinct implementations of each math function depending on the target architecture and \code{\verb~|LIBC_MATH_*~} flags (for \code{\verb~|expf~}: \code{\verb~|double_eval~}, \code{\verb~|double_eval_fma~}, \code{\verb~|static_rounding~}, \code{\verb~|integer_eval~}, \code{\verb~|float_eval~}, \code{\verb~|float_eval_cr_rn~}). Designating one plan as "default" via plan-less aliases hides which implementation a theorem or tool actually covers.}
+\ul{
+\li{\strong{Statements and theorems.} Always include the implementation plan name in every statement, theorem, short-path lemma, and main-path lemma (for example \code{\verb~|ExpfDoubleEvalCorrectlyRounded~}, \code{\verb~|expfDoubleEval_correctlyRounded~}, \code{\verb~|correctAt_doubleEval_main_pos~}, \code{\verb~|holdsOnBits_short_paths_doubleEval~}). Do not define plan-less "default" abbreviations such as \code{\verb~|ExpfCorrectlyRounded~} or \code{\verb~|expf_correctlyRounded~}.}
+\li{\strong{Testing tools.} Do not expose a "default" kernel alias such as \code{\verb~|Testing.run~}, and require \code{\verb~|--plan=<name>~} explicitly in \code{\verb~|checkrange~}, \code{\verb~|difftest-expf-model~}, and \code{\verb~|scripts/difftest-expf.sh~}.}
+\li{\strong{Templates and docs.} New functions copied from \code{\verb~|templates/FunctionTemplate/~} and documented in [note-adding-a-function](note-adding-a-function) follow the same rule (\code{\verb~|<Function><Plan>CorrectlyRounded~}, \code{\verb~|<fn><Plan>_correctlyRounded~}).}
+}

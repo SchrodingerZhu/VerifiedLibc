@@ -14,6 +14,6 @@ namespace LibcMath.Fn.ShortPaths
 open FloatLib.Floats.Formats.BinaryInterchange Model
 open LibcMath.Libc.DSL
 
--- Add `holdsOnBits_short_paths` here (see `LibcMath/Expf/ShortPaths/Ranges.lean`).
+-- Add `holdsOnBits_short_paths_<plan>` here (see `LibcMath/Expf/ShortPaths/Ranges.lean`).
 
 end LibcMath.Fn.ShortPaths
