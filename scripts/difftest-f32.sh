@@ -77,6 +77,8 @@ case "$plan" in
   integer_eval)
     extra_flags=(-mno-sse4.2 -mno-fma "-DLIBC_MATH_${upper_fn}_IMPL=integer_eval" -DLIBC_MATH=0x2C)
     modes="nearest" ;;
+  static_rounding)
+    extra_flags=(-mno-sse4.2 -mno-fma "-DLIBC_MATH_${upper_fn}_IMPL=integer_eval" -DLIBC_MATH=0x0C) ;;
   float_eval)
     extra_flags=(-mavx2 -mfma "-DLIBC_MATH_${upper_fn}_IMPL=float_eval" -DLIBC_MATH=0x3F)
     modes="nearest" ;;
@@ -92,9 +94,36 @@ case "$plan" in
     exit 2 ;;
 esac
 
+# The compiler wrapper of Nix turns on `_FORTIFY_SOURCE`. The fortified glibc headers then reject
+# the `MB_LEN_MAX` of the full build of LLVM libc.
+if [[ -n ${NIX_HARDENING_ENABLE:-} ]]; then
+  NIX_HARDENING_ENABLE=$(tr ' ' '\n' <<<"$NIX_HARDENING_ENABLE" | grep -v '^fortify' | tr '\n' ' ')
+  export NIX_HARDENING_ENABLE
+fi
 libc_flags=(-std=gnu++17 -O3 -fno-vectorize -fno-slp-vectorize -I "$libc" \
   -DLIBC_NAMESPACE=__llvm_libc -DLIBC_FULL_BUILD -DNDEBUG "${extra_flags[@]}")
-clang++ "${libc_flags[@]}" -c -o "$out/fn.o" "$libc/src/math/generic/${fn}.cpp"
+if [[ "$plan" == static_rounding ]]; then
+  # No entry point calls `math::static_rounding`. One unit exposes it with libc headers; the
+  # other passes the current rounding mode from <fenv.h>, whose `FE_*` values match on x86-64.
+  cat >"$out/static_rounding.cpp" <<CPP
+#include "src/__support/math/${fn}_integer_eval.h"
+float static_rounding_${fn}(float x, int rounding) {
+  return LIBC_NAMESPACE::math::static_rounding::${fn}(x, rounding);
+}
+CPP
+  cat >"$out/static_rounding_mode.cpp" <<CPP
+#include <cfenv>
+float static_rounding_${fn}(float x, int rounding);
+namespace __llvm_libc {
+float ${fn}(float x) { return static_rounding_${fn}(x, std::fegetround()); }
+} // namespace __llvm_libc
+CPP
+  clang++ "${libc_flags[@]}" -c -o "$out/fn_impl.o" "$out/static_rounding.cpp"
+  clang++ -O2 -c -o "$out/fn_mode.o" "$out/static_rounding_mode.cpp"
+  ld -r -o "$out/fn.o" "$out/fn_impl.o" "$out/fn_mode.o"
+else
+  clang++ "${libc_flags[@]}" -c -o "$out/fn.o" "$libc/src/math/generic/${fn}.cpp"
+fi
 clang++ "${libc_flags[@]}" -c -o "$out/libc_errno.o" "$libc/src/errno/libc_errno.cpp"
 clang++ -O2 -frounding-math "-DFN_NAME=${fn}" "-DFN_SIG=${sig}" \
   -c -o "$out/native.o" "$root/test/difftest/f32_native.cpp"
