@@ -45,6 +45,14 @@ import LibcMath.Kernels.Atanf
 import LibcMath.Kernels.Atan2f
 import LibcMath.Kernels.Asinpif
 import LibcMath.Kernels.Acospif
+import LibcMath.Kernels.Sinhf
+import LibcMath.Kernels.Coshf
+import LibcMath.Kernels.Tanhf
+import LibcMath.Kernels.Asinhf
+import LibcMath.Kernels.Acoshf
+import LibcMath.Kernels.Atanhf
+import LibcMath.Kernels.Erff
+import LibcMath.Kernels.Lgammaf
 import LibcMath.Testing.Oracle.Exp
 import LibcMath.Testing.Oracle.ExpExamples
 import LibcMath.Testing.Oracle.FloatLib

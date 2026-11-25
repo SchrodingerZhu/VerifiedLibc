@@ -76,6 +76,25 @@ import LibcMath.Kernels.Asinpif.Generated.Sse2
 import LibcMath.Kernels.Asinpif.Generated.Avx2Fma
 import LibcMath.Kernels.Acospif.Generated.Sse2
 import LibcMath.Kernels.Acospif.Generated.Avx2Fma
+import LibcMath.Kernels.Sinhf.Generated.Sse2
+import LibcMath.Kernels.Sinhf.Generated.Sse42
+import LibcMath.Kernels.Sinhf.Generated.Avx2Fma
+import LibcMath.Kernels.Coshf.Generated.Sse2
+import LibcMath.Kernels.Coshf.Generated.Sse42
+import LibcMath.Kernels.Coshf.Generated.Avx2Fma
+import LibcMath.Kernels.Tanhf.Generated.Sse2
+import LibcMath.Kernels.Tanhf.Generated.Sse42
+import LibcMath.Kernels.Tanhf.Generated.Avx2Fma
+import LibcMath.Kernels.Asinhf.Generated.Sse2
+import LibcMath.Kernels.Asinhf.Generated.Avx2Fma
+import LibcMath.Kernels.Acoshf.Generated.Sse2
+import LibcMath.Kernels.Acoshf.Generated.Avx2Fma
+import LibcMath.Kernels.Atanhf.Generated.Sse2
+import LibcMath.Kernels.Atanhf.Generated.Avx2Fma
+import LibcMath.Kernels.Erff.Generated.Sse2
+import LibcMath.Kernels.Erff.Generated.Avx2Fma
+import LibcMath.Kernels.Lgammaf.Generated.Sse2
+import LibcMath.Kernels.Lgammaf.Generated.Avx2Fma
 
 /-!
 # Generic Lean model runner for binary32 differential testing
@@ -308,6 +327,44 @@ def lookupKernel (fn plan : String) : Option F32Entry :=
       some (.uF32 LibcMath.Kernels.Acospif.Generated.Sse2.kernel.eval)
   | "acospif", "avx2_fma" =>
       some (.uF32 LibcMath.Kernels.Acospif.Generated.Avx2Fma.kernel.eval)
+  | "sinhf", "sse2" =>
+      some (.uF32 LibcMath.Kernels.Sinhf.Generated.Sse2.kernel.eval)
+  | "sinhf", "sse42" =>
+      some (.uF32 LibcMath.Kernels.Sinhf.Generated.Sse42.kernel.eval)
+  | "sinhf", "avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Sinhf.Generated.Avx2Fma.kernel.eval)
+  | "coshf", "sse2" =>
+      some (.uF32 LibcMath.Kernels.Coshf.Generated.Sse2.kernel.eval)
+  | "coshf", "sse42" =>
+      some (.uF32 LibcMath.Kernels.Coshf.Generated.Sse42.kernel.eval)
+  | "coshf", "avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Coshf.Generated.Avx2Fma.kernel.eval)
+  | "tanhf", "sse2" =>
+      some (.uF32 LibcMath.Kernels.Tanhf.Generated.Sse2.kernel.eval)
+  | "tanhf", "sse42" =>
+      some (.uF32 LibcMath.Kernels.Tanhf.Generated.Sse42.kernel.eval)
+  | "tanhf", "avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Tanhf.Generated.Avx2Fma.kernel.eval)
+  | "asinhf", "sse2" =>
+      some (.uF32 LibcMath.Kernels.Asinhf.Generated.Sse2.kernel.eval)
+  | "asinhf", "avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Asinhf.Generated.Avx2Fma.kernel.eval)
+  | "acoshf", "sse2" =>
+      some (.uF32 LibcMath.Kernels.Acoshf.Generated.Sse2.kernel.eval)
+  | "acoshf", "avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Acoshf.Generated.Avx2Fma.kernel.eval)
+  | "atanhf", "sse2" =>
+      some (.uF32 LibcMath.Kernels.Atanhf.Generated.Sse2.kernel.eval)
+  | "atanhf", "avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Atanhf.Generated.Avx2Fma.kernel.eval)
+  | "erff", "sse2" =>
+      some (.uF32 LibcMath.Kernels.Erff.Generated.Sse2.kernel.eval)
+  | "erff", "avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Erff.Generated.Avx2Fma.kernel.eval)
+  | "lgammaf", "sse2" =>
+      some (.uF32 LibcMath.Kernels.Lgammaf.Generated.Sse2.kernel.eval)
+  | "lgammaf", "avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Lgammaf.Generated.Avx2Fma.kernel.eval)
   | _, _ => none
 
 def evalUnaryLine (entry : F32Entry) (mode : IEEERoundingMode) (bx : BitVec 32) : String :=

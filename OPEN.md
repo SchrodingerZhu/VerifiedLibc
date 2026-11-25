@@ -4,16 +4,20 @@ Generated from every `sorry` under `LibcMath/` by `scripts/check-open.py`.
 Do not edit by hand; run `python3 scripts/check-open.py --update` after changing
 the open lemmas.
 
-Total open obligations: **81**.
+Total open obligations: **100**.
 
 | File | Lemma | Summary |
 |---|---|---|
 | `LibcMath/Kernels/Acosf.lean` | `acosfSse2_correctlyRounded` | **Open.** Prove `acosf` (`sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Acosf.lean` | `acosfAvx2Fma_correctlyRounded` | **Open.** Prove `acosf` (`avx2_fma`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Acoshf.lean` | `acoshfSse2_correctlyRounded` | **Open.** Prove `acoshf` (`sse2`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Acoshf.lean` | `acoshfAvx2Fma_correctlyRounded` | **Open.** Prove `acoshf` (`avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Acospif.lean` | `acospifSse2_correctlyRounded` | **Open.** Prove `acospif` (`sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Acospif.lean` | `acospifAvx2Fma_correctlyRounded` | **Open.** Prove `acospif` (`avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Asinf.lean` | `asinfSse2_correctlyRounded` | **Open.** Prove `asinf` (`sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Asinf.lean` | `asinfAvx2Fma_correctlyRounded` | **Open.** Prove `asinf` (`avx2_fma`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Asinhf.lean` | `asinhfSse2_correctlyRounded` | **Open.** Prove `asinhf` (`sse2`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Asinhf.lean` | `asinhfAvx2Fma_correctlyRounded` | **Open.** Prove `asinhf` (`avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Asinpif.lean` | `asinpifSse2_correctlyRounded` | **Open.** Prove `asinpif` (`sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Asinpif.lean` | `asinpifAvx2Fma_correctlyRounded` | **Open.** Prove `asinpif` (`avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Atan2f.lean` | `atan2fDoubleEvalSse2_correctlyRounded` | **Open.** Prove `atan2f` (`double_eval_sse2`) is correctly rounded in all four C modes. |
@@ -22,15 +26,22 @@ Total open obligations: **81**.
 | `LibcMath/Kernels/Atanf.lean` | `atanfDoubleEvalSse2_correctlyRounded` | **Open.** Prove `atanf` (`double_eval_sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Atanf.lean` | `atanfDoubleEvalAvx2Fma_correctlyRounded` | **Open.** Prove `atanf` (`double_eval_avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Atanf.lean` | `atanfFloatEval_defined` | **Open.** Prove `atanf` (`float_eval`) executes without C++ undefined behavior. |
+| `LibcMath/Kernels/Atanhf.lean` | `atanhfSse2_correctlyRounded` | **Open.** Prove `atanhf` (`sse2`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Atanhf.lean` | `atanhfAvx2Fma_correctlyRounded` | **Open.** Prove `atanhf` (`avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Cbrtf.lean` | `cbrtfSse2_correctlyRounded` | **Open.** Prove `cbrtf` (`sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Cbrtf.lean` | `cbrtfAvx2Fma_correctlyRounded` | **Open.** Prove `cbrtf` (`avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Cosf.lean` | `cosfDoubleEvalSse2_correctlyRounded` | **Open.** Prove `cosf` (`double_eval_sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Cosf.lean` | `cosfDoubleEvalSse42_correctlyRounded` | **Open.** Prove `cosf` (`double_eval_sse42`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Cosf.lean` | `cosfDoubleEvalAvx2Fma_correctlyRounded` | **Open.** Prove `cosf` (`double_eval_avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Cosf.lean` | `cosfFloatEval_defined` | **Open.** Prove `cosf` (`float_eval`) executes without C++ undefined behavior. |
+| `LibcMath/Kernels/Coshf.lean` | `coshfSse2_correctlyRounded` | **Open.** Prove `coshf` (`sse2`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Coshf.lean` | `coshfSse42_correctlyRounded` | **Open.** Prove `coshf` (`sse42`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Coshf.lean` | `coshfAvx2Fma_correctlyRounded` | **Open.** Prove `coshf` (`avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Cospif.lean` | `cospifSse2_correctlyRounded` | **Open.** Prove `cospif` (`sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Cospif.lean` | `cospifSse42_correctlyRounded` | **Open.** Prove `cospif` (`sse42`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Cospif.lean` | `cospifAvx2Fma_correctlyRounded` | **Open.** Prove `cospif` (`avx2_fma`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Erff.lean` | `erffSse2_correctlyRounded` | **Open.** Prove `erff` (`sse2`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Erff.lean` | `erffAvx2Fma_correctlyRounded` | **Open.** Prove `erff` (`avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Exp10f.lean` | `exp10fDoubleEvalSse2_correctlyRounded` | **Open.** Prove `exp10f` (`double_eval_sse2`) is correctly rounded across all four C modes. |
 | `LibcMath/Kernels/Exp10f.lean` | `exp10fDoubleEvalSse42_correctlyRounded` | **Open.** Prove `exp10f` (`double_eval_sse42`) is correctly rounded across all four modes. |
 | `LibcMath/Kernels/Exp10f.lean` | `exp10fDoubleEvalAvx2Fma_correctlyRounded` | **Open.** Prove `exp10f` (`double_eval_avx2_fma`) is correctly rounded across all modes. |
@@ -56,6 +67,8 @@ Total open obligations: **81**.
 | `LibcMath/Kernels/Expm1f.lean` | `expm1fAvx2Fma_correctlyRounded` | **Open.** Prove `expm1f` (`avx2_fma`) is correctly rounded across all four C rounding modes. |
 | `LibcMath/Kernels/Hypotf.lean` | `hypotfGenericSse2_correctlyRounded` | **Open.** Prove `hypotf` (`generic_sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Hypotf.lean` | `hypotfAvx2Fma_correctlyRounded` | **Open.** Prove `hypotf` (`avx2_fma`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Lgammaf.lean` | `lgammafSse2_correctlyRounded` | **Open.** Prove `lgammaf` (`sse2`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Lgammaf.lean` | `lgammafAvx2Fma_correctlyRounded` | **Open.** Prove `lgammaf` (`avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Log10f.lean` | `log10fDoubleEvalSse2_correctlyRounded` | **Open.** Prove `log10f` (`double_eval_sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Log10f.lean` | `log10fDoubleEvalAvx2Fma_correctlyRounded` | **Open.** Prove `log10f` (`double_eval_avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Log1pf.lean` | `log1pfDoubleEvalSse2_correctlyRounded` | **Open.** Prove `log1pf` (`double_eval_sse2`) is correctly rounded in all four C modes. |
@@ -77,6 +90,9 @@ Total open obligations: **81**.
 | `LibcMath/Kernels/Sinf.lean` | `sinfDoubleEvalSse42_correctlyRounded` | **Open.** Prove `sinf` (`double_eval_sse42`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Sinf.lean` | `sinfDoubleEvalAvx2Fma_correctlyRounded` | **Open.** Prove `sinf` (`double_eval_avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Sinf.lean` | `sinfFloatEval_defined` | **Open.** Prove `sinf` (`float_eval`) executes without C++ undefined behavior. |
+| `LibcMath/Kernels/Sinhf.lean` | `sinhfSse2_correctlyRounded` | **Open.** Prove `sinhf` (`sse2`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Sinhf.lean` | `sinhfSse42_correctlyRounded` | **Open.** Prove `sinhf` (`sse42`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Sinhf.lean` | `sinhfAvx2Fma_correctlyRounded` | **Open.** Prove `sinhf` (`avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Sinpif.lean` | `sinpifSse2_correctlyRounded` | **Open.** Prove `sinpif` (`sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Sinpif.lean` | `sinpifSse42_correctlyRounded` | **Open.** Prove `sinpif` (`sse42`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Sinpif.lean` | `sinpifAvx2Fma_correctlyRounded` | **Open.** Prove `sinpif` (`avx2_fma`) is correctly rounded in all four C modes. |
@@ -86,6 +102,9 @@ Total open obligations: **81**.
 | `LibcMath/Kernels/Tanf.lean` | `tanfDoubleEvalSse42_correctlyRounded` | **Open.** Prove `tanf` (`double_eval_sse42`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Tanf.lean` | `tanfDoubleEvalAvx2Fma_correctlyRounded` | **Open.** Prove `tanf` (`double_eval_avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Tanf.lean` | `tanfFloatEval_defined` | **Open.** Prove `tanf` (`float_eval`) executes without C++ undefined behavior. |
+| `LibcMath/Kernels/Tanhf.lean` | `tanhfSse2_correctlyRounded` | **Open.** Prove `tanhf` (`sse2`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Tanhf.lean` | `tanhfSse42_correctlyRounded` | **Open.** Prove `tanhf` (`sse42`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Tanhf.lean` | `tanhfAvx2Fma_correctlyRounded` | **Open.** Prove `tanhf` (`avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Tanpif.lean` | `tanpifSse2_correctlyRounded` | **Open.** Prove `tanpif` (`sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Tanpif.lean` | `tanpifSse42_correctlyRounded` | **Open.** Prove `tanpif` (`sse42`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Tanpif.lean` | `tanpifAvx2Fma_correctlyRounded` | **Open.** Prove `tanpif` (`avx2_fma`) is correctly rounded in all four C modes. |

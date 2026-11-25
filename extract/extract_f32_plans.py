@@ -99,6 +99,26 @@ PLANS: list[tuple[str, str, str, str, str, str, str, str | None]] = [
     ("trig", "Asinpif", "asinpif", "asinpif", "Avx2Fma", "avx2_fma", "avx2_fma", None),
     ("trig", "Acospif", "acospif", "acospif", "Sse2", "sse2", "sse2", None),
     ("trig", "Acospif", "acospif", "acospif", "Avx2Fma", "avx2_fma", "avx2_fma", None),
+    # Hyperbolic, inverse-hyperbolic, and special family
+    ("hypspec", "Sinhf", "sinhf", "sinhf", "Sse2", "sse2", "sse2", None),
+    ("hypspec", "Sinhf", "sinhf", "sinhf", "Sse42", "sse42", "sse42", None),
+    ("hypspec", "Sinhf", "sinhf", "sinhf", "Avx2Fma", "avx2_fma", "avx2_fma", None),
+    ("hypspec", "Coshf", "coshf", "coshf", "Sse2", "sse2", "sse2", None),
+    ("hypspec", "Coshf", "coshf", "coshf", "Sse42", "sse42", "sse42", None),
+    ("hypspec", "Coshf", "coshf", "coshf", "Avx2Fma", "avx2_fma", "avx2_fma", None),
+    ("hypspec", "Tanhf", "tanhf", "tanhf", "Sse2", "sse2", "sse2", None),
+    ("hypspec", "Tanhf", "tanhf", "tanhf", "Sse42", "sse42", "sse42", None),
+    ("hypspec", "Tanhf", "tanhf", "tanhf", "Avx2Fma", "avx2_fma", "avx2_fma", None),
+    ("hypspec", "Asinhf", "asinhf", "asinhf", "Sse2", "sse2", "sse2", None),
+    ("hypspec", "Asinhf", "asinhf", "asinhf", "Avx2Fma", "avx2_fma", "avx2_fma", None),
+    ("hypspec", "Acoshf", "acoshf", "acoshf", "Sse2", "sse2", "sse2", None),
+    ("hypspec", "Acoshf", "acoshf", "acoshf", "Avx2Fma", "avx2_fma", "avx2_fma", None),
+    ("hypspec", "Atanhf", "atanhf", "atanhf", "Sse2", "sse2", "sse2", None),
+    ("hypspec", "Atanhf", "atanhf", "atanhf", "Avx2Fma", "avx2_fma", "avx2_fma", None),
+    ("hypspec", "Erff", "erff", "erff", "Sse2", "sse2", "sse2", None),
+    ("hypspec", "Erff", "erff", "erff", "Avx2Fma", "avx2_fma", "avx2_fma", None),
+    ("hypspec", "Lgammaf", "lgammaf", "lgammaf", "Sse2", "sse2", "sse2", None),
+    ("hypspec", "Lgammaf", "lgammaf", "lgammaf", "Avx2Fma", "avx2_fma", "avx2_fma", None),
 ]
 
 
