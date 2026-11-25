@@ -597,13 +597,15 @@ def ldexp {w : Nat} (cfg : MathConfig) (mode : IEEERoundingMode)
 def logb (x : Model fmt) : Model fmt :=
   Model.logB x
 
-/-- `fputil::intlogb`: returns the binary exponent of `x` as a signed `w`-bit integer via FloatLib
-`Model.logBInt`. Uses `cfg.fpLogbNanMin` (`INT_MIN` on glibc Linux, `INT_MAX` otherwise). -/
+/-- `fputil::intlogb` computes the binary exponent of `x` as a signed `w`-bit integer. Zero
+returns 32-bit `INT_MIN` sign-extended to `w` bits. NaN returns 32-bit `INT_MIN` when
+`cfg.fpLogbNanMin` holds, or 32-bit `INT_MAX` otherwise, sign-extended to `w` bits. Infinity
+returns `w`-bit `T_MAX`. Finite non-zero inputs use FloatLib `Model.logBInt`. -/
 def intlogb (cfg : MathConfig) (w : Nat) (x : Model fmt) : BitVec w :=
   if Model.isZero x then
-    BitVec.intMin w
+    BitVec.signExtend w (BitVec.intMin 32)
   else if Model.isNaN x then
-    if cfg.fpLogbNanMin then BitVec.intMin w else BitVec.intMax w
+    BitVec.signExtend w (if cfg.fpLogbNanMin then BitVec.intMin 32 else BitVec.intMax 32)
   else if Model.isInfinite x then
     BitVec.intMax w
   else

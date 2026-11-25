@@ -126,6 +126,12 @@ example : Libc.ldexp MathConfig.defaultX86_64 .nearest f32(0x3FC00000#32) (2#32)
     f32(0x40C00000#32) := by decide +kernel
 example : Libc.logb f32(0x41000000#32) = f32(0x40400000#32) := by decide +kernel
 example : Libc.intlogb MathConfig.x86_64Sse2 32 f32(0x41000000#32) = 3#32 := by decide +kernel
+example : Libc.intlogb { MathConfig.x86_64Sse2 with fpLogbNanMin := false } 32 f32(0x7FC00000#32) =
+    0x7FFFFFFF#32 := by decide +kernel
+example : Libc.intlogb { MathConfig.x86_64Sse2 with fpLogbNanMin := false } 64 f32(0x00000000#32) =
+    0xFFFFFFFF80000000#64 := by decide +kernel
+example : Libc.intlogb { MathConfig.x86_64Sse2 with fpLogbNanMin := false } 64 f32(0x7F800000#32) =
+    0x7FFFFFFFFFFFFFFF#64 := by decide +kernel
 example : Libc.remainder f32(0x40A00000#32) f32(0x40000000#32) = f32(0x3F800000#32) := by
   decide +kernel
 example : Libc.nextUp f32(0x3F800000#32) = f32(0x3F800001#32) := by decide +kernel
