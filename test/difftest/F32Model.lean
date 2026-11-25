@@ -38,6 +38,44 @@ import LibcMath.Kernels.Powf.Generated.DoubleEvalSse2
 import LibcMath.Kernels.Powf.Generated.DoubleEvalSse42
 import LibcMath.Kernels.Powf.Generated.DoubleEvalAvx2Fma
 import LibcMath.Kernels.Powf.Generated.FloatEval
+import LibcMath.Kernels.Sinf.Generated.DoubleEvalSse2
+import LibcMath.Kernels.Sinf.Generated.DoubleEvalSse42
+import LibcMath.Kernels.Sinf.Generated.DoubleEvalAvx2Fma
+import LibcMath.Kernels.Sinf.Generated.FloatEval
+import LibcMath.Kernels.Cosf.Generated.DoubleEvalSse2
+import LibcMath.Kernels.Cosf.Generated.DoubleEvalSse42
+import LibcMath.Kernels.Cosf.Generated.DoubleEvalAvx2Fma
+import LibcMath.Kernels.Cosf.Generated.FloatEval
+import LibcMath.Kernels.Tanf.Generated.DoubleEvalSse2
+import LibcMath.Kernels.Tanf.Generated.DoubleEvalSse42
+import LibcMath.Kernels.Tanf.Generated.DoubleEvalAvx2Fma
+import LibcMath.Kernels.Tanf.Generated.FloatEval
+import LibcMath.Kernels.Sincosf.Generated.Sse2
+import LibcMath.Kernels.Sincosf.Generated.Sse42
+import LibcMath.Kernels.Sincosf.Generated.Avx2Fma
+import LibcMath.Kernels.Sinpif.Generated.Sse2
+import LibcMath.Kernels.Sinpif.Generated.Sse42
+import LibcMath.Kernels.Sinpif.Generated.Avx2Fma
+import LibcMath.Kernels.Cospif.Generated.Sse2
+import LibcMath.Kernels.Cospif.Generated.Sse42
+import LibcMath.Kernels.Cospif.Generated.Avx2Fma
+import LibcMath.Kernels.Tanpif.Generated.Sse2
+import LibcMath.Kernels.Tanpif.Generated.Sse42
+import LibcMath.Kernels.Tanpif.Generated.Avx2Fma
+import LibcMath.Kernels.Asinf.Generated.Sse2
+import LibcMath.Kernels.Asinf.Generated.Avx2Fma
+import LibcMath.Kernels.Acosf.Generated.Sse2
+import LibcMath.Kernels.Acosf.Generated.Avx2Fma
+import LibcMath.Kernels.Atanf.Generated.DoubleEvalSse2
+import LibcMath.Kernels.Atanf.Generated.DoubleEvalAvx2Fma
+import LibcMath.Kernels.Atanf.Generated.FloatEval
+import LibcMath.Kernels.Atan2f.Generated.DoubleEvalSse2
+import LibcMath.Kernels.Atan2f.Generated.DoubleEvalAvx2Fma
+import LibcMath.Kernels.Atan2f.Generated.FloatEval
+import LibcMath.Kernels.Asinpif.Generated.Sse2
+import LibcMath.Kernels.Asinpif.Generated.Avx2Fma
+import LibcMath.Kernels.Acospif.Generated.Sse2
+import LibcMath.Kernels.Acospif.Generated.Avx2Fma
 
 /-!
 # Generic Lean model runner for binary32 differential testing
@@ -193,6 +231,83 @@ def lookupKernel (fn plan : String) : Option F32Entry :=
       some (.bF32 LibcMath.Kernels.Powf.Generated.DoubleEvalAvx2Fma.kernel.eval)
   | "powf", "float_eval" =>
       some (.bF32 LibcMath.Kernels.Powf.Generated.FloatEval.kernel.eval)
+  | "sinf", "double_eval_sse2" =>
+      some (.uF32 LibcMath.Kernels.Sinf.Generated.DoubleEvalSse2.kernel.eval)
+  | "sinf", "double_eval_sse42" =>
+      some (.uF32 LibcMath.Kernels.Sinf.Generated.DoubleEvalSse42.kernel.eval)
+  | "sinf", "double_eval_avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Sinf.Generated.DoubleEvalAvx2Fma.kernel.eval)
+  | "sinf", "float_eval" =>
+      some (.uF32 LibcMath.Kernels.Sinf.Generated.FloatEval.kernel.eval)
+  | "cosf", "double_eval_sse2" =>
+      some (.uF32 LibcMath.Kernels.Cosf.Generated.DoubleEvalSse2.kernel.eval)
+  | "cosf", "double_eval_sse42" =>
+      some (.uF32 LibcMath.Kernels.Cosf.Generated.DoubleEvalSse42.kernel.eval)
+  | "cosf", "double_eval_avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Cosf.Generated.DoubleEvalAvx2Fma.kernel.eval)
+  | "cosf", "float_eval" =>
+      some (.uF32 LibcMath.Kernels.Cosf.Generated.FloatEval.kernel.eval)
+  | "tanf", "double_eval_sse2" =>
+      some (.uF32 LibcMath.Kernels.Tanf.Generated.DoubleEvalSse2.kernel.eval)
+  | "tanf", "double_eval_sse42" =>
+      some (.uF32 LibcMath.Kernels.Tanf.Generated.DoubleEvalSse42.kernel.eval)
+  | "tanf", "double_eval_avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Tanf.Generated.DoubleEvalAvx2Fma.kernel.eval)
+  | "tanf", "float_eval" =>
+      some (.uF32 LibcMath.Kernels.Tanf.Generated.FloatEval.kernel.eval)
+  | "sincosf", "sse2" =>
+      some (.uF32OutF32 fun m x => LibcMath.Kernels.Sincosf.Generated.Sse2.sincosf m x default default)
+  | "sincosf", "sse42" =>
+      some (.uF32OutF32 fun m x => LibcMath.Kernels.Sincosf.Generated.Sse42.sincosf m x default default)
+  | "sincosf", "avx2_fma" =>
+      some (.uF32OutF32 fun m x =>
+        LibcMath.Kernels.Sincosf.Generated.Avx2Fma.sincosf m x default default)
+  | "sinpif", "sse2" =>
+      some (.uF32 LibcMath.Kernels.Sinpif.Generated.Sse2.kernel.eval)
+  | "sinpif", "sse42" =>
+      some (.uF32 LibcMath.Kernels.Sinpif.Generated.Sse42.kernel.eval)
+  | "sinpif", "avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Sinpif.Generated.Avx2Fma.kernel.eval)
+  | "cospif", "sse2" =>
+      some (.uF32 LibcMath.Kernels.Cospif.Generated.Sse2.kernel.eval)
+  | "cospif", "sse42" =>
+      some (.uF32 LibcMath.Kernels.Cospif.Generated.Sse42.kernel.eval)
+  | "cospif", "avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Cospif.Generated.Avx2Fma.kernel.eval)
+  | "tanpif", "sse2" =>
+      some (.uF32 LibcMath.Kernels.Tanpif.Generated.Sse2.kernel.eval)
+  | "tanpif", "sse42" =>
+      some (.uF32 LibcMath.Kernels.Tanpif.Generated.Sse42.kernel.eval)
+  | "tanpif", "avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Tanpif.Generated.Avx2Fma.kernel.eval)
+  | "asinf", "sse2" =>
+      some (.uF32 LibcMath.Kernels.Asinf.Generated.Sse2.kernel.eval)
+  | "asinf", "avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Asinf.Generated.Avx2Fma.kernel.eval)
+  | "acosf", "sse2" =>
+      some (.uF32 LibcMath.Kernels.Acosf.Generated.Sse2.kernel.eval)
+  | "acosf", "avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Acosf.Generated.Avx2Fma.kernel.eval)
+  | "atanf", "double_eval_sse2" =>
+      some (.uF32 LibcMath.Kernels.Atanf.Generated.DoubleEvalSse2.kernel.eval)
+  | "atanf", "double_eval_avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Atanf.Generated.DoubleEvalAvx2Fma.kernel.eval)
+  | "atanf", "float_eval" =>
+      some (.uF32 LibcMath.Kernels.Atanf.Generated.FloatEval.kernel.eval)
+  | "atan2f", "double_eval_sse2" =>
+      some (.bF32 LibcMath.Kernels.Atan2f.Generated.DoubleEvalSse2.kernel.eval)
+  | "atan2f", "double_eval_avx2_fma" =>
+      some (.bF32 LibcMath.Kernels.Atan2f.Generated.DoubleEvalAvx2Fma.kernel.eval)
+  | "atan2f", "float_eval" =>
+      some (.bF32 LibcMath.Kernels.Atan2f.Generated.FloatEval.kernel.eval)
+  | "asinpif", "sse2" =>
+      some (.uF32 LibcMath.Kernels.Asinpif.Generated.Sse2.kernel.eval)
+  | "asinpif", "avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Asinpif.Generated.Avx2Fma.kernel.eval)
+  | "acospif", "sse2" =>
+      some (.uF32 LibcMath.Kernels.Acospif.Generated.Sse2.kernel.eval)
+  | "acospif", "avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Acospif.Generated.Avx2Fma.kernel.eval)
   | _, _ => none
 
 def evalUnaryLine (entry : F32Entry) (mode : IEEERoundingMode) (bx : BitVec 32) : String :=
