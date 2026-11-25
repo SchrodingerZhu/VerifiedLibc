@@ -146,6 +146,9 @@
         # build C++ against the system headers. The extraction scripts use these instead.
         AST2LEAN_CC = "${pkgs.llvmPackages_23.clang}/bin/clang";
         AST2LEAN_CXX = "${pkgs.llvmPackages_23.clang}/bin/clang++";
+        # The unwrapped `clang-scan-deps` of `clang` comes first in PATH and does not find the C++
+        # standard headers; the one of `clang-tools` is wrapped.
+        AST2LEAN_CLANG_SCAN_DEPS = "${pkgs.llvmPackages_23.clang-tools}/bin/clang-scan-deps";
         LLVM_DIR = "${pkgs.llvmPackages_23.llvm.dev}/lib/cmake/llvm";
         Clang_DIR = "${pkgs.llvmPackages_23.libclang.dev}/lib/cmake/clang";
       };
