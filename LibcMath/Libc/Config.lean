@@ -24,11 +24,35 @@ namespace LibcMath.Libc
 open FloatLib.Floats.Formats.BinaryInterchange
 open Model (IEEERoundingMode)
 
-/-- Snapshot of LLVM libc's `LIBC_MATH_*` optimization flags and target CPU feature macros
+/-- Target CPU or GPU architecture family from `src/__support/macros/properties/architectures.h`. -/
+inductive TargetArch where
+  | x86_64
+  | x86_32
+  | aarch64
+  | arm
+  | riscv64
+  | riscv32
+  | gpu
+  | wasm
+  | other
+  deriving DecidableEq, Repr, Inhabited
+
+/-- Microarchitectural lowering selected by `src/__support/FPUtil/nearest_integer.h`. -/
+inductive NearestIntKind where
+  /-- Hardware ties-to-even instruction (`roundss`/`roundsd`, `frintn`, or ARMv8 `roundeven`). -/
+  | hwTiesToEven
+  /-- GPU `__builtin_rintf` / `__builtin_rint`, which uses the dynamic rounding mode. -/
+  | gpuDynamicRint
+  /-- Software `±2^fracWidth` shift-and-back trick with optional `±0.5` fixup. -/
+  | genericMagic
+  deriving DecidableEq, Repr, Inhabited
+
+/-- Snapshot of LLVM libc `LIBC_MATH_*` flags and target microarchitecture macros
 captured from Clang's preprocessor during extraction.
 
-Each boolean matches the corresponding `#ifdef` in LLVM libc's
-`src/__support/macros/optimization.h`, `src/__support/macros/properties/cpu_features.h`, and
+Each field matches a macro in `src/__support/macros/optimization.h`,
+`src/__support/macros/properties/architectures.h`,
+`src/__support/macros/properties/cpu_features.h`, or
 `src/__support/macros/properties/types.h`. -/
 structure MathConfig where
   /-- `LIBC_MATH_HAS_SKIP_ACCURATE_PASS` (`LIBC_MATH & 0x01`). -/
@@ -43,38 +67,151 @@ structure MathConfig where
   intermediateCompInFloat : Bool := false
   /-- `LIBC_MATH_HAS_ASSUME_ROUND_NEAREST_ONLY` (`LIBC_MATH & 0x20`). -/
   assumeRoundNearestOnly : Bool := false
+  /-- Target architecture family (`LIBC_TARGET_ARCH_IS_*`). -/
+  arch : TargetArch := .x86_64
+  /-- `__ARM_ARCH` level for 32-bit ARM targets (`0` on non-ARM targets). -/
+  armArchVersion : Nat := 0
+  /-- `LIBC_TARGET_IS_BIG_ENDIAN`. -/
+  isBigEndian : Bool := false
+  /-- `LIBC_TARGET_CPU_HAS_SSE2`. -/
+  hasSse2 : Bool := true
+  /-- `__SSSE3__`. -/
+  hasSsse3 : Bool := false
+  /-- `LIBC_TARGET_CPU_HAS_SSE4_2`. -/
+  hasSse42 : Bool := false
+  /-- `LIBC_TARGET_CPU_HAS_AVX`. -/
+  hasAvx : Bool := false
+  /-- `LIBC_TARGET_CPU_HAS_AVX2`. -/
+  hasAvx2 : Bool := false
+  /-- `LIBC_TARGET_CPU_HAS_AVX512F`. -/
+  hasAvx512f : Bool := false
+  /-- Coarse `LIBC_TARGET_CPU_HAS_FMA` macro (checked by `double_double.h:292`). -/
+  hasFmaGlobal : Bool := false
   /-- `LIBC_TARGET_CPU_HAS_FMA_HALF`. -/
   hasFmaHalf : Bool := false
   /-- `LIBC_TARGET_CPU_HAS_FMA_FLOAT`. -/
   hasFmaFloat : Bool := false
   /-- `LIBC_TARGET_CPU_HAS_FMA_DOUBLE`. -/
   hasFmaDouble : Bool := false
-  /-- `LIBC_TARGET_CPU_HAS_NEAREST_INT` (SSE4.2 on x86-64 or AArch64). -/
+  /-- `LIBC_TARGET_CPU_HAS_NEAREST_INT` (x86-64 SSE4.2 or AArch64). -/
   hasNearestInt : Bool := false
   /-- `LIBC_TARGET_CPU_HAS_FPU_FLOAT`. -/
   hasFpuFloat : Bool := true
   /-- `LIBC_TARGET_CPU_HAS_FPU_DOUBLE`. -/
   hasFpuDouble : Bool := true
+  /-- `LIBC_TARGET_CPU_HAS_ARM_FPU_FLOAT`. -/
+  hasArmFpuFloat : Bool := false
+  /-- `LIBC_TARGET_CPU_HAS_ARM_FPU_DOUBLE`. -/
+  hasArmFpuDouble : Bool := false
+  /-- `LIBC_TARGET_CPU_HAS_ARM_NEON`. -/
+  hasArmNeon : Bool := false
+  /-- `LIBC_TARGET_CPU_HAS_RISCV_FPU_FLOAT`. -/
+  hasRiscVFpuFloat : Bool := false
+  /-- `LIBC_TARGET_CPU_HAS_RISCV_FPU_DOUBLE`. -/
+  hasRiscVFpuDouble : Bool := false
   /-- `LIBC_TARGET_CPU_HAS_FAST_FLOAT16_OPS`. -/
   hasFastFloat16 : Bool := false
-  /-- `LIBC_TYPES_HAS_INT128` (selects native 64x64→128 vs 32-bit split `quick_mul_hi`). -/
+  /-- `LIBC_TYPES_HAS_INT128` (selects exact 128-bit vs 32-bit split `quick_mul_hi`). -/
   hasInt128 : Bool := true
-  /-- Clang target triple (e.g. `x86_64-unknown-linux-gnu`). -/
+  /-- `__FP_LOGBNAN_MIN` (returns `INT_MIN` for `ilogb(NaN)` on glibc Linux). -/
+  fpLogbNanMin : Bool := true
+  /-- Clang target triple (for example `x86_64-unknown-linux-gnu`). -/
   targetTriple : String := "x86_64-unknown-linux-gnu"
-  /-- Selected implementation plan / namespace (e.g. `double_eval`, `integer_eval`). -/
+  /-- Selected implementation plan name (for example `double_eval`, `integer_eval`). -/
   implVariant : String := "default"
   deriving DecidableEq, Repr, Inhabited
 
 namespace MathConfig
 
-/-- Default x86-64 baseline configuration (`LIBC_MATH = 0`, no FMA, no SSE4.2). -/
-def defaultX86_64 : MathConfig := {}
+/-- Baseline x86-64 SSE2 configuration (`LIBC_MATH = 0`, no SSE4.2, no FMA). -/
+def x86_64Sse2 : MathConfig := {}
 
-/-- x86-64 with AVX2 + FMA + SSE4.2 (`-march=x86-64-v3`). -/
-def x86_64Fma : MathConfig :=
-  { hasFmaFloat := true
+/-- Compatibility alias for baseline x86-64 SSE2 configuration. -/
+abbrev defaultX86_64 : MathConfig := x86_64Sse2
+
+/-- x86-64 with SSSE3 (`-mssse3 -mno-sse4.2 -mno-fma`). -/
+def x86_64Ssse3 : MathConfig :=
+  { hasSsse3 := true }
+
+/-- x86-64 with SSE4.2 (`-msse4.2 -mno-fma`): hardware `roundss`/`roundsd`, no FMA. -/
+def x86_64Sse42 : MathConfig :=
+  { hasSsse3 := true
+    hasSse42 := true
+    hasNearestInt := true }
+
+/-- x86-64 with AVX2, FMA, and SSE4.2 (`-march=x86-64-v3`). -/
+def x86_64Avx2Fma : MathConfig :=
+  { hasSsse3 := true
+    hasSse42 := true
+    hasAvx := true
+    hasAvx2 := true
+    hasFmaGlobal := true
+    hasFmaFloat := true
     hasFmaDouble := true
     hasNearestInt := true }
+
+/-- Compatibility alias for x86-64 AVX2 + FMA configuration. -/
+abbrev x86_64Fma : MathConfig := x86_64Avx2Fma
+
+/-- AArch64 with NEON, FMA, `frintn`, and fast float16 operations. -/
+def aarch64 : MathConfig :=
+  { arch := .aarch64
+    hasSse2 := false
+    hasFmaGlobal := true
+    hasFmaHalf := true
+    hasFmaFloat := true
+    hasFmaDouble := true
+    hasNearestInt := true
+    hasArmFpuFloat := true
+    hasArmFpuDouble := true
+    hasArmNeon := true
+    hasFastFloat16 := true
+    targetTriple := "aarch64-unknown-none-elf" }
+
+/-- 32-bit ARMv8 hard-float (`__ARM_ARCH = 8`, VFP/NEON, FMA, no 128-bit integer). -/
+def armV8HardFloat : MathConfig :=
+  { arch := .arm
+    armArchVersion := 8
+    hasSse2 := false
+    hasFmaGlobal := true
+    hasFmaHalf := true
+    hasFmaFloat := true
+    hasFmaDouble := true
+    hasArmFpuFloat := true
+    hasArmFpuDouble := true
+    hasArmNeon := true
+    hasInt128 := false
+    targetTriple := "armv8a-unknown-none-eabihf" }
+
+/-- RISC-V 64-bit GC (`rv64gc`): F/D hardware FPU and FMA, software `nearest_integer`. -/
+def riscv64G : MathConfig :=
+  { arch := .riscv64
+    hasSse2 := false
+    hasFmaGlobal := true
+    hasFmaFloat := true
+    hasFmaDouble := true
+    hasRiscVFpuFloat := true
+    hasRiscVFpuDouble := true
+    targetTriple := "riscv64-unknown-none-elf" }
+
+/-- GPU target (NVPTX / AMDGPU / SPIR-V): FMA and dynamic-mode `__builtin_rintf`. -/
+def gpuNvptx : MathConfig :=
+  { arch := .gpu
+    hasSse2 := false
+    hasFmaGlobal := true
+    hasFmaFloat := true
+    hasFmaDouble := true
+    hasFastFloat16 := true
+    targetTriple := "nvptx64-nvidia-cuda" }
+
+/-- Generic soft-float 32-bit target (`rv32i`): no FPU, no FMA, no 128-bit integer. -/
+def genericSoftFloat : MathConfig :=
+  { arch := .riscv32
+    hasSse2 := false
+    hasFpuFloat := false
+    hasFpuDouble := false
+    hasInt128 := false
+    targetTriple := "riscv32-unknown-none-elf" }
 
 /-- Whether hardware FMA is enabled for binary interchange format `fmt`, matching
 `fputil::internal::HasHardwareFma<T>` in LLVM libc's `multiply_add.h`. -/
@@ -84,6 +221,33 @@ def hasFma (cfg : MathConfig) (fmt : FloatFormat) : Bool :=
   else if fmt == .binary32 then cfg.hasFmaFloat
   else if fmt == .binary64 then cfg.hasFmaDouble
   else false
+
+/-- Whether coarse `LIBC_TARGET_CPU_HAS_FMA` is active (`double_double.h:292`). -/
+@[inline, grind]
+def hasAnyFma (cfg : MathConfig) : Bool :=
+  cfg.hasFmaGlobal || cfg.hasFmaHalf || cfg.hasFmaFloat || cfg.hasFmaDouble
+
+/-- Whether ARM hardware FPU is active for `fmt`. -/
+@[inline, grind]
+def hasArmFpu (cfg : MathConfig) (fmt : FloatFormat) : Bool :=
+  if fmt == .binary32 then cfg.hasArmFpuFloat
+  else if fmt == .binary64 then cfg.hasArmFpuDouble
+  else false
+
+/-- Selects the exact microarchitectural `fputil::nearest_integer` strategy for `fmt`,
+matching `src/__support/FPUtil/nearest_integer.h`. -/
+@[inline, grind]
+def nearestIntKind (cfg : MathConfig) (fmt : FloatFormat) : NearestIntKind :=
+  if cfg.hasNearestInt ||
+      (cfg.arch == .x86_64 && cfg.hasSse42) ||
+      (cfg.arch == .aarch64 && cfg.hasFpuFloat && cfg.hasFpuDouble) then
+    .hwTiesToEven
+  else if cfg.arch == .gpu then
+    .gpuDynamicRint
+  else if cfg.arch == .arm && cfg.armArchVersion ≥ 8 && cfg.hasArmFpu fmt then
+    .hwTiesToEven
+  else
+    .genericMagic
 
 /-- Whether hardware FPU operations are assumed for `fmt`, matching `fputil::internal::HAS_HW_FPU`.
 -/
@@ -194,5 +358,39 @@ abbrev UnaryKernel.supportedModes {fmt : FloatFormat} (k : UnaryKernel fmt) :
 def UnaryKernel.CorrectlyRounded {fmt : FloatFormat} (k : UnaryKernel fmt)
     (S : Spec fmt) (modes : Set IEEERoundingMode := k.supportedModes) : Prop :=
   LibcMath.CorrectlyRounded S modes k.eval
+
+/-- Common representation for a binary math kernel extracted from LLVM libc. -/
+structure BinaryKernel (fmt : FloatFormat) where
+  /-- Extraction metadata and active `LIBC_MATH` / CPU configuration. -/
+  info : KernelMeta
+  /-- Executable high-level Lean model of the C++ function. -/
+  eval : IEEERoundingMode → Model fmt → Model fmt → Option (Model fmt)
+
+instance {fmt : FloatFormat} :
+    CoeFun (BinaryKernel fmt)
+      (fun _ => IEEERoundingMode → Model fmt → Model fmt → Option (Model fmt)) where
+  coe k := k.eval
+
+/-- The rounding directions this binary kernel's configuration claims to support. -/
+abbrev BinaryKernel.supportedModes {fmt : FloatFormat} (k : BinaryKernel fmt) :
+    Set IEEERoundingMode :=
+  k.info.config.supportedModes
+
+/-- Common representation for a ternary math kernel extracted from LLVM libc. -/
+structure TernaryKernel (fmt : FloatFormat) where
+  /-- Extraction metadata and active `LIBC_MATH` / CPU configuration. -/
+  info : KernelMeta
+  /-- Executable high-level Lean model of the C++ function. -/
+  eval : IEEERoundingMode → Model fmt → Model fmt → Model fmt → Option (Model fmt)
+
+instance {fmt : FloatFormat} :
+    CoeFun (TernaryKernel fmt)
+      (fun _ => IEEERoundingMode → Model fmt → Model fmt → Model fmt → Option (Model fmt)) where
+  coe k := k.eval
+
+/-- The rounding directions this ternary kernel's configuration claims to support. -/
+abbrev TernaryKernel.supportedModes {fmt : FloatFormat} (k : TernaryKernel fmt) :
+    Set IEEERoundingMode :=
+  k.info.config.supportedModes
 
 end LibcMath.Libc

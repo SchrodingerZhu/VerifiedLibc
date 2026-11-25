@@ -193,4 +193,15 @@ def inspectKernel {fmt : FloatFormat} (k : UnaryKernel fmt) : String :=
   s!"  Config       : {k.info.config.summary}\n" ++
   s!"  Tables       : {k.info.tables}"
 
+/-- Evaluates a config-parameterized operation across named microarchitecture profiles
+and formats the result matrix for one input. -/
+def diagnoseMicroarchMatrix {fmt : FloatFormat}
+    (op : MathConfig → IEEERoundingMode → Model fmt → Model fmt)
+    (profiles : List (String × MathConfig))
+    (mode : IEEERoundingMode) (x : Model fmt) : String :=
+  let header := s!"[microarch-matrix] mode={modeName mode} input={describeFloat x}"
+  let rows := profiles.map fun (label, cfg) =>
+    s!"  {label}: {describeFloat (op cfg mode x)}"
+  String.intercalate "\n" (header :: rows)
+
 end LibcMath.Libc.Diag

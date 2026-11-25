@@ -409,14 +409,19 @@ def genericNearestInt {fmt : FloatFormat} (assumeRN : Bool)
   else
     x
 
-/-- `fputil::nearest_integer`: uses hardware ties-to-even (`roundss`/`frintn`) when
-`cfg.hasNearestInt` is `true`, otherwise runs `genericNearestInt`. -/
+/-- `fputil::nearest_integer`: dispatches by `cfg.nearestIntKind fmt` to match
+`src/__support/FPUtil/nearest_integer.h`:
+* `.hwTiesToEven` (x86-64 SSE4.2 `roundss`/`roundsd`, AArch64 `frintn`, ARMv8 `roundeven`):
+  ties-to-even integral rounding independent of `mode`.
+* `.gpuDynamicRint` (NVPTX / AMDGPU / SPIR-V `__builtin_rintf`/`rint`):
+  dynamic-mode integral rounding.
+* `.genericMagic` (x86-64 SSE2/SSSE3, RISC-V, soft-float): `genericNearestInt`. -/
 def nearestInt {fmt : FloatFormat} (cfg : MathConfig)
     (mode : IEEERoundingMode) (x : Model fmt) : Model fmt :=
-  if cfg.hasNearestInt then
-    Model.roundToIntegral x (mode := .nearest)
-  else
-    genericNearestInt cfg.assumeRoundNearestOnly mode x
+  match cfg.nearestIntKind fmt with
+  | .hwTiesToEven => Model.roundToIntegral x (mode := .nearest)
+  | .gpuDynamicRint => Model.roundToIntegral x (mode := mode)
+  | .genericMagic => genericNearestInt cfg.assumeRoundNearestOnly mode x
 
 /-! ## Rounding-mode queries (`src/__support/FPUtil/rounding_mode.h`) -/
 
@@ -568,10 +573,12 @@ def logb (x : Model fmt) : Model fmt :=
   Model.logB x
 
 /-- `fputil::intlogb`: returns the binary exponent of `x` as a signed `w`-bit integer via FloatLib
-`Model.logBInt`. Uses Linux glibc `FP_ILOGB0 = INT_MIN` and `FP_ILOGBNAN = INT_MIN`. -/
-def intlogb (w : Nat) (x : Model fmt) : BitVec w :=
-  if Model.isZero x || Model.isNaN x then
+`Model.logBInt`. Uses `cfg.fpLogbNanMin` (`INT_MIN` on glibc Linux, `INT_MAX` otherwise). -/
+def intlogb (cfg : MathConfig) (w : Nat) (x : Model fmt) : BitVec w :=
+  if Model.isZero x then
     BitVec.intMin w
+  else if Model.isNaN x then
+    if cfg.fpLogbNanMin then BitVec.intMin w else BitVec.intMax w
   else if Model.isInfinite x then
     BitVec.intMax w
   else

@@ -125,7 +125,7 @@ example : Libc.isOddInteger f32(0x40000000#32) = false := by decide +kernel
 example : Libc.ldexp MathConfig.defaultX86_64 .nearest f32(0x3FC00000#32) (2#32) =
     f32(0x40C00000#32) := by decide +kernel
 example : Libc.logb f32(0x41000000#32) = f32(0x40400000#32) := by decide +kernel
-example : Libc.intlogb 32 f32(0x41000000#32) = 3#32 := by decide +kernel
+example : Libc.intlogb MathConfig.x86_64Sse2 32 f32(0x41000000#32) = 3#32 := by decide +kernel
 example : Libc.remainder f32(0x40A00000#32) f32(0x40000000#32) = f32(0x3F800000#32) := by
   decide +kernel
 example : Libc.nextUp f32(0x3F800000#32) = f32(0x3F800001#32) := by decide +kernel
@@ -177,5 +177,42 @@ info: 'LibcMath.Libc.setUnderflow_binary32_pos_eq' depends on axioms: [propext, 
 -/
 #guard_msgs in
 #print axioms LibcMath.Libc.setUnderflow_binary32_pos_eq
+
+/-- `NumberPair.subScalar`, `scalarSub`, and `PolyElem.msub` on `DoubleDouble`. -/
+example :
+    (NumberPair.subScalar .nearest
+      ({ lo := f64(0x0000000000000000#64), hi := f64(0x4008000000000000#64) } : DoubleDouble)
+      f64(0x3FF0000000000000#64)).hi = f64(0x4000000000000000#64) := by
+  decide +kernel
+
+example :
+    (msub[MathConfig.x86_64Avx2Fma, .nearest](
+      ({ lo := f64(0x0000000000000000#64), hi := f64(0x4000000000000000#64) } : DoubleDouble),
+      ({ lo := f64(0x0000000000000000#64), hi := f64(0x4008000000000000#64) } : DoubleDouble),
+      ({ lo := f64(0x0000000000000000#64), hi := f64(0x3FF0000000000000#64) } : DoubleDouble)
+    )).hi = f64(0x4014000000000000#64) := by
+  decide +kernel
+
+/-- Faithful `DyadicFloat.quickMul` (limb-truncated `quickMulHi` + 1-bit shift) and `asFloat`. -/
+example :
+    let a : DyadicFloat 128 := DyadicFloat.ofFloat 128 f32(0x40400000#32)
+    let b : DyadicFloat 128 := DyadicFloat.ofFloat 128 f32(0x40000000#32)
+    DyadicFloat.asFloat MathConfig.x86_64Sse2 .binary32 .nearest
+      (DyadicFloat.quickMul MathConfig.x86_64Sse2 a b) = f32(0x40C00000#32) := by
+  decide +kernel
+
+/-! ### Microarch error-bound axiom checks -/
+
+/--
+info: 'LibcMath.Libc.Microarch.frac64_mulHiSplit32_error_bound' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in
+#print axioms LibcMath.Libc.Microarch.frac64_mulHiSplit32_error_bound
+
+/--
+info: 'LibcMath.Libc.Microarch.bigInt_quickMulHi_128_error_bound' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in
+#print axioms LibcMath.Libc.Microarch.bigInt_quickMulHi_128_error_bound
 
 end LibcMath.Libc.Examples

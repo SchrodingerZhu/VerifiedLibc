@@ -247,11 +247,11 @@ private theorem nearestInt_spec (mode : IEEERoundingMode) (y : Model .binary32)
       (Libc.nearestInt Generated.DoubleEval.config mode y).toReal = (k : ℝ) ∧
       |y.toReal - (k : ℝ)| ≤ 1 / 2 ∧
       (|y.toReal| ≤ 1 / 2 - (2 : ℝ) ^ (-24 : ℤ) → k = 0) := by
-  have hcfg_ni : Generated.DoubleEval.config.hasNearestInt = false := rfl
+  have hcfg_kind : Generated.DoubleEval.config.nearestIntKind .binary32 = .genericMagic := rfl
   have hcfg_rn : Generated.DoubleEval.config.assumeRoundNearestOnly = false := rfl
   have heq : Libc.nearestInt Generated.DoubleEval.config mode y =
       Libc.genericNearestInt false mode y := by
-    simp only [Libc.nearestInt, hcfg_ni, hcfg_rn, Bool.false_eq_true, ↓reduceIte]
+    simp only [Libc.nearestInt, hcfg_kind, hcfg_rn]
   rw [heq]
   exact Analysis.RangeReduction.genericNearestInt_binary32_spec mode y (lo := -13312) (hi := 11392)
     (by omega) (by omega) (by omega) (by omega) hy_fin (by exact_mod_cast hy_lo)

@@ -70,7 +70,7 @@ scoped macro_rules
 scoped syntax "msub[" term "," term "](" term "," term "," term ")" : term
 scoped macro_rules
   | `(msub[$cfg, $mode]($x, $y, $z)) =>
-      `(LibcMath.Libc.multiplySub $cfg $mode $x $y $z)
+      `(LibcMath.Libc.PolyElem.msub $cfg $mode $x $y $z)
 
 /-- Config-aware `sub_multiply(x, y, z) = x - y * z`. -/
 scoped syntax "submul[" term "," term "](" term "," term "," term ")" : term

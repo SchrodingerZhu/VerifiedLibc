@@ -24,6 +24,8 @@ open Model (IEEERoundingMode)
 class PolyElem (α : Type) where
   /-- `multiply_add(x, y, z) = x * y + z`. -/
   madd : MathConfig → IEEERoundingMode → α → α → α → α
+  /-- `multiply_sub(x, y, z) = x * y - z`. -/
+  msub : MathConfig → IEEERoundingMode → α → α → α → α
   /-- `sub_multiply(x, y, z) = x - y * z`. -/
   subMul : MathConfig → IEEERoundingMode → α → α → α → α
   /-- Squaring / multiplication `x * y` (used by Estrin to form dyadic powers `x^(2^k)`). -/
@@ -33,28 +35,30 @@ class PolyElem (α : Type) where
 
 instance {fmt : FloatFormat} : PolyElem (Model fmt) where
   madd cfg mode x y z := multiplyAdd cfg mode x y z
+  msub cfg mode x y z := multiplySub cfg mode x y z
   subMul cfg mode x y z := subMultiply cfg mode x y z
   pmul _ mode x y := fmul mode x y
   zero := Model.posZero fmt
 
 instance : PolyElem Frac64 where
   madd cfg _ x y z := Frac64.add (Frac64.mul cfg x y) z
+  msub cfg _ x y z := Frac64.sub (Frac64.mul cfg x y) z
   subMul cfg _ x y z := Frac64.sub x (Frac64.mul cfg y z)
   pmul cfg _ x y := Frac64.mul cfg x y
   zero := ⟨0⟩
 
 instance {fmt : FloatFormat} : PolyElem (NumberPair (Model fmt)) where
   madd cfg mode x y z := NumberPair.add mode z (NumberPair.quickMult cfg mode x y)
+  msub cfg mode x y z := NumberPair.sub mode (NumberPair.quickMult cfg mode x y) z
   subMul cfg mode x y z := NumberPair.sub mode x (NumberPair.quickMult cfg mode y z)
   pmul cfg mode x y := NumberPair.quickMult cfg mode x y
   zero := { lo := Model.posZero fmt, hi := Model.posZero fmt }
 
 instance {bits : Nat} : PolyElem (DyadicFloat bits) where
-  madd _ _ x y z := DyadicFloat.quickAdd (DyadicFloat.quickMul x y) z
-  subMul _ _ x y z :=
-    let prod := DyadicFloat.quickMul y z
-    DyadicFloat.quickAdd x { prod with sign := prod.sign.negate }
-  pmul _ _ x y := DyadicFloat.quickMul x y
+  madd cfg _ x y z := DyadicFloat.quickAdd z (DyadicFloat.quickMul cfg x y)
+  msub cfg _ x y z := DyadicFloat.quickSub (DyadicFloat.quickMul cfg x y) z
+  subMul cfg _ x y z := DyadicFloat.quickSub x (DyadicFloat.quickMul cfg y z)
+  pmul cfg _ x y := DyadicFloat.quickMul cfg x y
   zero := {}
 
 /-! ## Horner's scheme (`fputil::polyeval` / `fputil::altpolyeval`) -/
