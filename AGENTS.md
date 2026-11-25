@@ -57,6 +57,21 @@ lake build             # must end with "Build completed successfully"
 - **Keep a strictly linear history on `main`.** Do not create merge commits on `main`: rebase
   feature branches (`git rebase`) or squash-merge pull requests so `git log --merges main` remains
   empty and every commit on `main` builds cleanly.
+- **Use semantic commit messages.** Write every commit subject in Conventional Commits format:
+  `<type>(<scope>): <summary>` (for example `feat(extract): ...`, `fix(libc): ...`,
+  `perf(libc): ...`, `docs(agents): ...`, `test(difftest): ...`, `refactor(kernels): ...`).
+  Make gradual, focused commits. Do not bundle unrelated changes into one commit.
+- **Follow ASD-STE100 for prose.** Write all new code comments, Lean docstrings, documentation,
+  and journal trees in ASD-STE100 (Simplified Technical English). Use short sentences (at most
+  20 words for instructions and 25 words for descriptions). Use active voice and present tense.
+  Put one idea in each sentence. Use consistent technical terms.
+- **Verify elaborated kernel proofs with `gruszka/con-leche`.** Check elaborated kernel proof
+  terms with the formally verified external kernel in `gruszka/con-leche` to reject Lean
+  frontend bugs. You can skip this check if `con-leche` has performance issues on a kernel;
+  record the skip reason in the journal.
+- **Verify every extracted kernel with `difftest`.** Compare each extracted kernel against
+  compiled LLVM libc C++ code under matching compiler flags and rounding modes to confirm
+  faithful extraction.
 - When a status is reported, say first which implementation theorem is complete, and name what is
   open. "No errors" and "standard axioms" are not a status.
 
@@ -220,7 +235,8 @@ Outside the flake shell: `nix run .#new -- <kind>`, `nix run .#build`, `nix run 
   the first paragraph. Do not delete a closed problem or a decision; mark it and link what
   replaced it. Use `Hypothesis` for a lesson that was not verified.
 - Write for a reader with no access to any conversation: cite pull requests (`\pr{1}`) and session
-  trees, never a chat. Say what was verified and how.
+  trees, never a chat. Say what was verified and how. Follow ASD-STE100 rules: use short,
+  active-voice sentences in present tense, with one idea per sentence.
 - Markup: wrap every paragraph in `\p{...}`, one paragraph per line; `%` starts a comment, write
   `\%`; put code, and any of `{ } [ ] \ #`, in `\code{\verb~|...~}`; lists are
   `\ul{\li{...}}`; a link to a tree is `[text](address)`.

@@ -1,0 +1,18 @@
+\title{Repository standards: semantic commits, ASD-STE100 prose, con-leche audit, and difftest verification}
+\taxon{Decision}
+\date{2026-11-25}
+\author{antigravity}
+\contributor{schrodingerzy}
+\tag{process}
+\tag{documentation}
+\tag{verification}
+\meta{status}{accepted}
+\import{base-macros}
+
+\p{\strong{Status:} accepted. The maintainer set these rules on 2026-11-25 and recorded them in \code{\verb~|AGENTS.md~}.}
+\ul{
+\li{\strong{Semantic commits.} Write every commit subject in Conventional Commits format (\code{\verb~|<type>(<scope>): <summary>~}). Make gradual commits. Keep each commit focused and buildable.}
+\li{\strong{ASD-STE100 prose.} Regulate all future code comments, docstrings, documentation, and journal trees by ASD-STE100. Use short sentences, active voice, and present tense. Put one idea in each sentence.}
+\li{\strong{External kernel check.} Check elaborated kernel proofs with the formally verified external kernel in \code{\verb~|gruszka/con-leche~}. This check rejects Lean frontend bugs. Skip this check if \code{\verb~|con-leche~} has performance issues on a kernel, and record the reason.}
+\li{\strong{Differential testing.} Verify every extracted kernel against compiled LLVM libc C++ code with \code{\verb~|difftest~} under matching flags and rounding modes.}
+}
