@@ -102,6 +102,48 @@ example :
       f32(0x3F800000#32) := by
   decide +kernel
 
+/-! ### FloatLib-backed rounding, extrema, payload, total order, and bit utilities -/
+
+/-- `floor`, `ceil`, `trunc`, `round`, `roundEven` on `1.5f` and `-1.5f`. -/
+example : Libc.floor f32(0x3FC00000#32) = f32(0x3F800000#32) := by decide +kernel
+example : Libc.ceil f32(0x3FC00000#32) = f32(0x40000000#32) := by decide +kernel
+example : Libc.trunc f32(0xBFC00000#32) = f32(0xBF800000#32) := by decide +kernel
+example : Libc.round f32(0x3FC00000#32) = f32(0x40000000#32) := by decide +kernel
+example : Libc.roundEven f32(0x40200000#32) = f32(0x40000000#32) := by decide +kernel
+example : Libc.roundToIntMode f32(0x3FC00000#32) Libc.fpIntDownward = f32(0x3F800000#32) := by
+  decide +kernel
+example : Libc.roundToInt MathConfig.defaultX86_64 .up f32(0x3FC00000#32) = f32(0x40000000#32) := by
+  decide +kernel
+
+/-- `isInteger` and `isOddInteger` on `2.0f`, `3.0f`, and `1.5f`. -/
+example : Libc.isInteger f32(0x40000000#32) = true := by decide +kernel
+example : Libc.isInteger f32(0x3FC00000#32) = false := by decide +kernel
+example : Libc.isOddInteger f32(0x40400000#32) = true := by decide +kernel
+example : Libc.isOddInteger f32(0x40000000#32) = false := by decide +kernel
+
+/-- `ldexp`, `logb`, `intlogb`, `remainder`, `nextUp`, `nextDown`, and `nextAfter`. -/
+example : Libc.ldexp MathConfig.defaultX86_64 .nearest f32(0x3FC00000#32) (2#32) =
+    f32(0x40C00000#32) := by decide +kernel
+example : Libc.logb f32(0x41000000#32) = f32(0x40400000#32) := by decide +kernel
+example : Libc.intlogb 32 f32(0x41000000#32) = 3#32 := by decide +kernel
+example : Libc.remainder f32(0x40A00000#32) f32(0x40000000#32) = f32(0x3F800000#32) := by
+  decide +kernel
+example : Libc.nextUp f32(0x3F800000#32) = f32(0x3F800001#32) := by decide +kernel
+example : Libc.nextDown f32(0x3F800000#32) = f32(0x3F7FFFFF#32) := by decide +kernel
+example : Libc.nextAfter f32(0x3F800000#32) f32(0x40000000#32) = f32(0x3F800001#32) := by
+  decide +kernel
+
+/-- Extrema, payload, total order, bitwise ops, and C++20 bit utilities. -/
+example : Libc.fmax f32(0xBF800000#32) f32(0x3F800000#32) = f32(0x3F800000#32) := by decide +kernel
+example : Libc.fminimumMag f32(0xBF800000#32) f32(0x40000000#32) = f32(0xBF800000#32) := by
+  decide +kernel
+example : Libc.getPayload f32(0x7FC00005#32) = f32(0x40A00000#32) := by decide +kernel
+example : Libc.totalOrder f32(0x80000000#32) f32(0x00000000#32) = true := by decide +kernel
+example : Libc.totalOrderMag f32(0xBF800000#32) f32(0x40000000#32) = true := by decide +kernel
+example : Libc.fpAnd f32(0xBF800000#32) f32(0x7FFFFFFF#32) = f32(0x3F800000#32) := by decide +kernel
+example : Libc.hasSingleBit (8#32) = true ∧ Libc.hasSingleBit (6#32) = false := by decide +kernel
+example : Libc.countrZero (8#32) = 3#32 ∧ Libc.bitWidth (8#32) = 4#32 := by decide +kernel
+
 /-! ### Agent-friendly diagnostics -/
 
 /--

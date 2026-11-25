@@ -34,7 +34,7 @@ class PolyElem (α : Type) where
 instance {fmt : FloatFormat} : PolyElem (Model fmt) where
   madd cfg mode x y z := multiplyAdd cfg mode x y z
   subMul cfg mode x y z := subMultiply cfg mode x y z
-  pmul _ mode x y := Model.mul x y mode
+  pmul _ mode x y := fmul mode x y
   zero := Model.posZero fmt
 
 instance : PolyElem Frac64 where

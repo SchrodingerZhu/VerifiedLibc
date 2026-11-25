@@ -2,7 +2,10 @@ import FloatLib.Floats.Formats.BinaryInterchange.Arithmetic.Runtime
 import FloatLib.Floats.Formats.BinaryInterchange.Conversion.Cast.Runtime
 import FloatLib.Floats.Formats.BinaryInterchange.DType.Cast
 import FloatLib.Floats.Formats.BinaryInterchange.Operations.Compare.Runtime
+import FloatLib.Floats.Formats.BinaryInterchange.Operations.MagnitudeExtrema.Runtime
+import FloatLib.Floats.Formats.BinaryInterchange.Operations.Payload.Runtime
 import FloatLib.Floats.Formats.BinaryInterchange.Operations.Runtime
+import FloatLib.Floats.Formats.BinaryInterchange.Operations.TotalOrder.Runtime
 import LibcMath.Libc.Config
 
 /-!
@@ -97,11 +100,15 @@ variable {fmt : FloatFormat}
 @[inline, simp, grind] def isQuietNaN (x : FPBits fmt) : Bool := Model.isQNaN x
 @[inline, simp, grind] def isSignalingNaN (x : FPBits fmt) : Bool := Model.isSignaling x
 @[inline, simp, grind] def isFinite (x : FPBits fmt) : Bool := Model.isFinite x
+@[inline, simp, grind] def isNormal (x : FPBits fmt) : Bool := Model.isNormal x
 @[inline, simp, grind] def isInfOrNaN (x : FPBits fmt) : Bool := !Model.isFinite x
 @[inline, simp, grind] def isSubnormal (x : FPBits fmt) : Bool := Model.isSubnormal x
+@[inline, simp, grind] def isSubnormalOrZero (x : FPBits fmt) : Bool :=
+  Model.isZero x || Model.isSubnormal x
 
 @[inline, simp, grind] def abs (x : FPBits fmt) : FPBits fmt := Model.abs x
 @[inline, simp, grind] def neg (x : FPBits fmt) : FPBits fmt := Model.neg x
+@[inline, simp, grind] def copySign (x y : FPBits fmt) : FPBits fmt := Model.copySign x y
 
 /-- Biased exponent field as `BitVec 16`, matching `FPBits<T>::get_biased_exponent()` (`uint16_t`).
 -/
@@ -111,6 +118,15 @@ variable {fmt : FloatFormat}
 /-- Fraction / mantissa bits as `BitVec w`, matching `FPBits<T>::get_mantissa()`. -/
 @[inline, simp, grind] def mantissa {w : Nat} [FmtBitWidth fmt w] (x : FPBits fmt) : BitVec w :=
   BitVec.ofNat w x.fracField
+
+/-- Explicit significand bits (with implicit bit set for normal values), matching
+`FPBits<T>::get_explicit_mantissa()`. -/
+@[inline, simp, grind] def explicitMantissa {w : Nat} [FmtBitWidth fmt w]
+    (x : FPBits fmt) : BitVec w :=
+  if x.expField == 0 then
+    BitVec.ofNat w x.fracField
+  else
+    BitVec.ofNat w ((1 <<< fmt.fracWidth) ||| x.fracField)
 
 /-- Explicit unbiased exponent (`int`), matching `FPBits<T>::get_explicit_exponent()`. -/
 @[inline] def explicitExponent (x : FPBits fmt) : BitVec 32 :=
@@ -148,11 +164,15 @@ variable {fmt : FloatFormat}
 @[inline] def setSign (x : FPBits fmt) (s : Sign) : FPBits fmt :=
   Model.ofFields fmt s.isNeg x.expField x.fracField
 
-@[inline] def setBiasedExp (x : FPBits fmt) (e : BitVec fmt.bitWidth) : FPBits fmt :=
+@[inline] def setBiasedExp {w : Nat} (x : FPBits fmt) (e : BitVec w) : FPBits fmt :=
   Model.ofFields fmt x.signBit e.toNat x.fracField
 
-@[inline] def setMantissa (x : FPBits fmt) (m : BitVec fmt.bitWidth) : FPBits fmt :=
+@[inline] def setMantissa {w : Nat} (x : FPBits fmt) (m : BitVec w) : FPBits fmt :=
   Model.ofFields fmt x.signBit x.expField m.toNat
+
+@[inline] def setUintval {w : Nat} [h : FmtBitWidth fmt w] (_ : FPBits fmt) (b : BitVec w) :
+    FPBits fmt :=
+  ofBits b
 
 @[inline] def createValue (fmt : FloatFormat) (s : Sign) (biasedExp : Nat) (mant : Nat) :
     FPBits fmt :=
@@ -166,22 +186,22 @@ section Arithmetic
 
 variable {fmt : FloatFormat}
 
-@[inline, simp, grind] def fadd (mode : IEEERoundingMode) (x y : Model fmt) : Model fmt :=
+@[noinline, simp, grind] def fadd (mode : IEEERoundingMode) (x y : Model fmt) : Model fmt :=
   Model.add x y mode
 
-@[inline, simp, grind] def fsub (mode : IEEERoundingMode) (x y : Model fmt) : Model fmt :=
+@[noinline, simp, grind] def fsub (mode : IEEERoundingMode) (x y : Model fmt) : Model fmt :=
   Model.sub x y mode
 
-@[inline, simp, grind] def fmul (mode : IEEERoundingMode) (x y : Model fmt) : Model fmt :=
+@[noinline, simp, grind] def fmul (mode : IEEERoundingMode) (x y : Model fmt) : Model fmt :=
   Model.mul x y mode
 
-@[inline, simp, grind] def fdiv (mode : IEEERoundingMode) (x y : Model fmt) : Model fmt :=
+@[noinline, simp, grind] def fdiv (mode : IEEERoundingMode) (x y : Model fmt) : Model fmt :=
   Model.div x y mode
 
-@[inline, simp, grind] def fsqrt (mode : IEEERoundingMode) (x : Model fmt) : Model fmt :=
+@[noinline, simp, grind] def fsqrt (mode : IEEERoundingMode) (x : Model fmt) : Model fmt :=
   Model.sqrt x mode
 
-@[inline, simp, grind] def fma (mode : IEEERoundingMode) (x y z : Model fmt) : Model fmt :=
+@[noinline, simp, grind] def fma (mode : IEEERoundingMode) (x y z : Model fmt) : Model fmt :=
   Model.fma x y z mode
 
 @[inline, simp, grind] def fneg (x : Model fmt) : Model fmt := Model.neg x
@@ -189,7 +209,7 @@ variable {fmt : FloatFormat}
 @[inline, simp, grind] def copysign (x y : Model fmt) : Model fmt := Model.copySign x y
 
 /-- IEEE floating-point format conversion (`static_cast<Dst>(x)` / `fputil::cast<Dst>(x)`). -/
-@[inline, simp, grind] def fpCast {src : FloatFormat} (dst : FloatFormat)
+@[noinline, simp, grind] def fpCast {src : FloatFormat} (dst : FloatFormat)
     (mode : IEEERoundingMode) (x : Model src) : Model dst :=
   Model.cast src dst x mode
 
@@ -320,24 +340,24 @@ section MultiplyAdd
 
 variable {fmt : FloatFormat}
 
-@[inline] def multiplyAdd (cfg : MathConfig) (mode : IEEERoundingMode)
+def multiplyAdd (cfg : MathConfig) (mode : IEEERoundingMode)
     (x y z : Model fmt) : Model fmt :=
-  if cfg.hasFma fmt then Model.fma x y z mode
-  else Model.add (Model.mul x y mode) z mode
+  if cfg.hasFma fmt then fma mode x y z
+  else fadd mode (fmul mode x y) z
 
-@[inline] def multiplySub (cfg : MathConfig) (mode : IEEERoundingMode)
+def multiplySub (cfg : MathConfig) (mode : IEEERoundingMode)
     (x y z : Model fmt) : Model fmt :=
-  if cfg.hasFma fmt then Model.fma x y (Model.neg z) mode
-  else Model.sub (Model.mul x y mode) z mode
+  if cfg.hasFma fmt then fma mode x y (Model.neg z)
+  else fsub mode (fmul mode x y) z
 
-@[inline] def subMultiply (cfg : MathConfig) (mode : IEEERoundingMode)
+def subMultiply (cfg : MathConfig) (mode : IEEERoundingMode)
     (x y z : Model fmt) : Model fmt :=
   if cfg.hasFma fmt then
-    Model.fma (Model.neg y) z x mode
+    fma mode (Model.neg y) z x
   else if cfg.assumeRoundNearestOnly then
-    Model.sub x (Model.mul y z mode) mode
+    fsub mode x (fmul mode y z)
   else
-    Model.add x (Model.mul (Model.neg y) z mode) mode
+    fadd mode x (fmul mode (Model.neg y) z)
 
 @[simp, grind =] theorem multiplyAdd_of_noFma {cfg : MathConfig} (h : cfg.hasFma fmt = false)
     (mode : IEEERoundingMode) (x y z : Model fmt) :
@@ -364,34 +384,34 @@ end MultiplyAdd
 
 /-! ## Config-aware `fputil::nearest_integer` (`src/__support/FPUtil/nearest_integer.h`) -/
 
-/-- Generic software `fputil::generic::nearest_integer` for any IEEE format:
-shifts by `2^fracWidth` and back in the dynamic rounding mode, then corrects by `±1` if
-`|x - r| > 0.5` when `!assumeRoundNearestOnly`. -/
-@[inline] def genericNearestInt {fmt : FloatFormat} (assumeRN : Bool)
+/-- Generic software `fputil::generic::nearest_integer` for any IEEE format.
+Shifts `x` by `2^fracWidth` and back in `mode`, then adds or subtracts `1` if `|x - r| > 0.5`
+when `assumeRN` is `false`. -/
+def genericNearestInt {fmt : FloatFormat} (assumeRN : Bool)
     (mode : IEEERoundingMode) (x : Model fmt) : Model fmt :=
   let limit : Model fmt := Model.ofFields fmt false (fmt.exponentBias + fmt.fracWidth + 1) 0
   let magic : Model fmt := Model.ofFields fmt false (fmt.exponentBias + fmt.fracWidth) 0
   if flt x limit && fgt x (Model.neg limit) then
     let r :=
       if flt x (Model.posZero fmt) then
-        Model.add (Model.sub x magic mode) magic mode
+        fadd mode (fsub mode x magic) magic
       else
-        Model.sub (Model.add x magic mode) magic mode
+        fsub mode (fadd mode x magic) magic
     if assumeRN then
       r
     else
       let half : Model fmt := Model.ofFields fmt false (fmt.exponentBias - 1) 0
       let one : Model fmt := Model.posOne fmt
-      let diff := Model.sub x r mode
-      if fgt diff half then Model.add r one mode
-      else if flt diff (Model.neg half) then Model.sub r one mode
+      let diff := fsub mode x r
+      if fgt diff half then fadd mode r one
+      else if flt diff (Model.neg half) then fsub mode r one
       else r
   else
     x
 
-/-- `fputil::nearest_integer`: hardware round-to-nearest-even (`roundss`/`frintn`) when
-`cfg.hasNearestInt`, otherwise `genericNearestInt`. -/
-@[inline] def nearestInt {fmt : FloatFormat} (cfg : MathConfig)
+/-- `fputil::nearest_integer`: uses hardware ties-to-even (`roundss`/`frintn`) when
+`cfg.hasNearestInt` is `true`, otherwise runs `genericNearestInt`. -/
+def nearestInt {fmt : FloatFormat} (cfg : MathConfig)
     (mode : IEEERoundingMode) (x : Model fmt) : Model fmt :=
   if cfg.hasNearestInt then
     Model.roundToIntegral x (mode := .nearest)
@@ -421,9 +441,8 @@ shifts by `2^fracWidth` and back in the dynamic rounding mode, then corrects by 
 
 /-! ## Exceptional-result helpers (`src/__support/FPUtil/except_value_utils.h`) -/
 
-/-- `fputil::set_overflow<T>(sign)`: returns `±inf` or `±max_normal` according to `mode` and `cfg`.
--/
-@[inline] def setOverflow {fmt : FloatFormat} (cfg : MathConfig)
+/-- `fputil::set_overflow<T>(sign)`: returns `±inf` or `±max_normal` for `mode` and `cfg`. -/
+def setOverflow {fmt : FloatFormat} (cfg : MathConfig)
     (mode : IEEERoundingMode) (sign : Sign := .pos) : Model fmt :=
   if cfg.assumeRoundNearestOnly then
     FPBits.inf fmt sign
@@ -434,9 +453,8 @@ shifts by `2^fracWidth` and back in the dynamic rounding mode, then corrects by 
     | .up => if sign.isNeg then FPBits.maxNormal fmt sign else FPBits.inf fmt sign
     | _ => FPBits.inf fmt sign
 
-/-- `fputil::set_underflow<T>(sign)`: returns `±0.0` or `±min_subnormal` according to `mode` and
-`cfg`. -/
-@[inline] def setUnderflow {fmt : FloatFormat} (cfg : MathConfig)
+/-- `fputil::set_underflow<T>(sign)`: returns `±0.0` or `±min_subnormal` for `mode` and `cfg`. -/
+def setUnderflow {fmt : FloatFormat} (cfg : MathConfig)
     (mode : IEEERoundingMode) (sign : Sign := .pos) : Model fmt :=
   if cfg.assumeRoundNearestOnly then
     FPBits.zero fmt sign
@@ -447,16 +465,230 @@ shifts by `2^fracWidth` and back in the dynamic rounding mode, then corrects by 
     | _ => FPBits.zero fmt sign
 
 /-- `fputil::round_result_slightly_down(value_rn)`. -/
-@[inline] def roundResultSlightlyDown {fmt : FloatFormat} (cfg : MathConfig)
+def roundResultSlightlyDown {fmt : FloatFormat} (cfg : MathConfig)
     (mode : IEEERoundingMode) (valueRn : Model fmt) : Model fmt :=
   if cfg.assumeRoundNearestOnly then valueRn
-  else Model.sub valueRn (FPBits.minNormal fmt) mode
+  else fsub mode valueRn (FPBits.minNormal fmt)
 
 /-- `fputil::round_result_slightly_up(value_rn)`. -/
-@[inline] def roundResultSlightlyUp {fmt : FloatFormat} (cfg : MathConfig)
+def roundResultSlightlyUp {fmt : FloatFormat} (cfg : MathConfig)
     (mode : IEEERoundingMode) (valueRn : Model fmt) : Model fmt :=
   if cfg.assumeRoundNearestOnly then valueRn
-  else Model.add valueRn (FPBits.minNormal fmt) mode
+  else fadd mode valueRn (FPBits.minNormal fmt)
+
+/-! ## Integral rounding and classification (backed by FloatLib) -/
+
+section IntegralAndIEEE
+
+variable {fmt : FloatFormat}
+
+/-- C23 `FP_INT_*` constants from `hdr/math_macros.h`. -/
+@[inline, simp, grind] def fpIntUpward : BitVec 32 := 0#32
+@[inline, simp, grind] def fpIntDownward : BitVec 32 := 1#32
+@[inline, simp, grind] def fpIntTowardzero : BitVec 32 := 2#32
+@[inline, simp, grind] def fpIntTonearestFromZero : BitVec 32 := 3#32
+@[inline, simp, grind] def fpIntTonearest : BitVec 32 := 4#32
+
+/-- Maps a C23 `FP_INT_*` code to `IEEERoundingMode`. -/
+@[simp, grind] def decodeFpIntMode (rnd : BitVec 32) : IEEERoundingMode :=
+  if rnd == fpIntUpward then .up
+  else if rnd == fpIntDownward then .down
+  else if rnd == fpIntTowardzero then .towardZero
+  else if rnd == fpIntTonearestFromZero then .nearestAway
+  else .nearest
+
+/-- `fputil::floor`: rounds toward negative infinity via FloatLib. -/
+def floor (x : Model fmt) : Model fmt :=
+  Model.roundToIntegral x (mode := .down)
+
+/-- `fputil::ceil`: rounds toward positive infinity via FloatLib. -/
+def ceil (x : Model fmt) : Model fmt :=
+  Model.roundToIntegral x (mode := .up)
+
+/-- `fputil::trunc`: rounds toward zero via FloatLib. -/
+def trunc (x : Model fmt) : Model fmt :=
+  Model.roundToIntegral x (mode := .towardZero)
+
+/-- `fputil::round`: rounds to nearest integer, ties away from zero, via FloatLib. -/
+def round (x : Model fmt) : Model fmt :=
+  Model.roundToIntegral x (mode := .nearestAway)
+
+/-- `fputil::roundeven`: rounds to nearest integer, ties to even, via FloatLib. -/
+def roundEven (x : Model fmt) : Model fmt :=
+  Model.roundToIntegral x (mode := .nearest)
+
+/-- `fputil::round_using_specific_rounding_mode(x, rnd)` via FloatLib. -/
+def roundToIntMode (x : Model fmt) (rnd : BitVec 32) : Model fmt :=
+  Model.roundToIntegral x (mode := decodeFpIntMode rnd)
+
+/-- `fputil::round_using_current_rounding_mode(x)` via FloatLib.
+Uses `.nearest` when `cfg.assumeRoundNearestOnly` is `true`. -/
+def roundToInt (cfg : MathConfig) (mode : IEEERoundingMode) (x : Model fmt) : Model fmt :=
+  Model.roundToIntegral x (mode := if cfg.assumeRoundNearestOnly then .nearest else mode)
+
+/-- `fputil::is_integer`: tests if finite `x` is an integer via FloatLib `Model.dyadicIsIntegral`.
+Returns `true` for infinity and NaN to match `src/__support/FPUtil/is_integer.h`. -/
+def isInteger (x : Model fmt) : Bool :=
+  match Model.exactValue x with
+  | .finite d => Model.dyadicIsIntegral d
+  | .infinity _ | .nan _ _ _ => true
+
+/-- `fputil::is_odd_integer`: tests if finite `x` is an odd integer via FloatLib. -/
+def isOddInteger (x : Model fmt) : Bool :=
+  match Model.exactValue x with
+  | .finite d =>
+      Model.dyadicIsIntegral d && (Model.roundDyadicToInt .towardZero d % 2 != 0)
+  | .infinity _ | .nan _ _ _ => false
+
+/-- Converts `x` to a signed `width`-bit integer under `mode` via FloatLib.
+Returns `none` if `x` is NaN, infinite, or out of range. -/
+def roundToSignedInt? (width : Nat) (mode : IEEERoundingMode) (x : Model fmt) :
+    Option (BitVec width) :=
+  match ExecDType.convertToInteger (width := width) x mode with
+  | .success n _ => some n.bits
+  | .failure _ => none
+
+/-- `fputil::ldexp` / `scale_exp2`: multiplies `x` by `2^exp` via FloatLib `Model.scale`. -/
+def ldexp {w : Nat} (cfg : MathConfig) (mode : IEEERoundingMode)
+    (x : Model fmt) (exp : BitVec w) : Model fmt :=
+  if exp == 0 || Model.isZero x || !Model.isFinite x then
+    x
+  else
+    let e := exp.toInt
+    let limit : Int := Int.ofNat (fmt.expAllOnesNat + fmt.fracWidth + 1)
+    if e > limit then
+      setOverflow cfg mode (FPBits.sign x)
+    else if e < -limit then
+      setUnderflow cfg mode (FPBits.sign x)
+    else
+      Model.scale x e (mode := mode)
+
+/-- `fputil::logb`: returns the binary exponent of `x` as a float via FloatLib `Model.logB`. -/
+def logb (x : Model fmt) : Model fmt :=
+  Model.logB x
+
+/-- `fputil::intlogb`: returns the binary exponent of `x` as a signed `w`-bit integer via FloatLib
+`Model.logBInt`. Uses Linux glibc `FP_ILOGB0 = INT_MIN` and `FP_ILOGBNAN = INT_MIN`. -/
+def intlogb (w : Nat) (x : Model fmt) : BitVec w :=
+  if Model.isZero x || Model.isNaN x then
+    BitVec.intMin w
+  else if Model.isInfinite x then
+    BitVec.intMax w
+  else
+    BitVec.ofInt w (Model.logBInt x).value
+
+/-- IEEE 754 `remainder` via FloatLib `Model.remainder`. -/
+def remainder (x y : Model fmt) : Model fmt :=
+  Model.remainder x y
+
+/-- IEEE 754 `nextUp` via FloatLib `Model.nextUp`. -/
+def nextUp (x : Model fmt) : Model fmt :=
+  Model.nextUp x
+
+/-- IEEE 754 `nextDown` via FloatLib `Model.nextDown`. -/
+def nextDown (x : Model fmt) : Model fmt :=
+  Model.nextDown x
+
+/-- `fputil::nextafter(from, to)` via FloatLib `Model.nextUp` / `Model.nextDown`. -/
+def nextAfter {dst : FloatFormat} (x : Model fmt) (y : Model dst) : Model fmt :=
+  if Model.isNaN x then x
+  else if Model.isNaN y then fpCast fmt .nearest y
+  else
+    let xWid := fpCast dst .nearest x
+    match Model.compare xWid y with
+    | some .eq => fpCast fmt .nearest y
+    | some .lt => Model.nextUp x
+    | some .gt => Model.nextDown x
+    | none => Model.canonicalNaN fmt
+
+/-! ### IEEE 754-2019 extrema, NaN payload, and total order (backed by FloatLib) -/
+
+/-- `fputil::fmax` via FloatLib `Model.maximumNumber`. -/
+def fmax (x y : Model fmt) : Model fmt := Model.maximumNumber x y
+
+/-- `fputil::fmin` via FloatLib `Model.minimumNumber`. -/
+def fmin (x y : Model fmt) : Model fmt := Model.minimumNumber x y
+
+/-- `fputil::fmaximum` via FloatLib `Model.maximum`. -/
+def fmaximum (x y : Model fmt) : Model fmt := Model.maximum x y
+
+/-- `fputil::fminimum` via FloatLib `Model.minimum`. -/
+def fminimum (x y : Model fmt) : Model fmt := Model.minimum x y
+
+/-- `fputil::fmaximum_num` via FloatLib `Model.maximumNumber`. -/
+def fmaximumNum (x y : Model fmt) : Model fmt := Model.maximumNumber x y
+
+/-- `fputil::fminimum_num` via FloatLib `Model.minimumNumber`. -/
+def fminimumNum (x y : Model fmt) : Model fmt := Model.minimumNumber x y
+
+/-- `fputil::fmaximum_mag` via FloatLib `Model.maximumMagnitude`. -/
+def fmaximumMag (x y : Model fmt) : Model fmt := Model.maximumMagnitude x y
+
+/-- `fputil::fminimum_mag` via FloatLib `Model.minimumMagnitude`. -/
+def fminimumMag (x y : Model fmt) : Model fmt := Model.minimumMagnitude x y
+
+/-- `fputil::fmaximum_mag_num` via FloatLib `Model.maximumMagnitudeNumber`. -/
+def fmaximumMagNum (x y : Model fmt) : Model fmt := Model.maximumMagnitudeNumber x y
+
+/-- `fputil::fminimum_mag_num` via FloatLib `Model.minimumMagnitudeNumber`. -/
+def fminimumMagNum (x y : Model fmt) : Model fmt := Model.minimumMagnitudeNumber x y
+
+/-- `fputil::getpayload` via FloatLib `Model.getPayload`. -/
+def getPayload (x : Model fmt) : Model fmt := Model.getPayload x
+
+/-- `fputil::setpayload` via FloatLib `Model.setPayload`. -/
+def setPayload (x : Model fmt) : Model fmt := Model.setPayload x
+
+/-- `fputil::setpayloadsig` via FloatLib `Model.setPayloadSignaling`. -/
+def setPayloadSignaling (x : Model fmt) : Model fmt := Model.setPayloadSignaling x
+
+/-- `fputil::totalorder` via FloatLib `Model.totalOrder`. -/
+def totalOrder (x y : Model fmt) : Bool := Model.totalOrder x y
+
+/-- `fputil::totalordermag` via FloatLib `Model.totalOrderMag`. -/
+def totalOrderMag (x y : Model fmt) : Bool := Model.totalOrderMag x y
+
+/-! ### Floating-point bitwise operations (`src/__support/FPUtil/fp_bitwise.h`) -/
+
+/-- `fputil::fp_and`: bitwise AND of IEEE encodings. -/
+@[simp, grind] def fpAnd (a b : Model fmt) : Model fmt :=
+  Model.ofBits (a.toBits &&& b.toBits)
+
+/-- `fputil::fp_or`: bitwise OR of IEEE encodings. -/
+@[simp, grind] def fpOr (a b : Model fmt) : Model fmt :=
+  Model.ofBits (a.toBits ||| b.toBits)
+
+/-- `fputil::fp_xor`: bitwise XOR of IEEE encodings. -/
+@[simp, grind] def fpXor (a b : Model fmt) : Model fmt :=
+  Model.ofBits (a.toBits ^^^ b.toBits)
+
+/-- `fputil::fp_andnot`: bitwise `(~a) & b` of IEEE encodings. -/
+@[simp, grind] def fpAndNot (a b : Model fmt) : Model fmt :=
+  Model.ofBits ((~~~a.toBits) &&& b.toBits)
+
+end IntegralAndIEEE
+
+/-! ## C++20 bit utilities (`src/__support/CPP/bit.h` and Clang 23 builtins) -/
+
+/-- `cpp::countl_zero` / `__builtin_clzg` as `BitVec 32`. -/
+@[inline, simp, grind] def countlZero {w : Nat} (x : BitVec w) : BitVec 32 :=
+  BitVec.ofNat 32 x.clz.toNat
+
+/-- `cpp::countr_zero` / `__builtin_ctzg` as `BitVec 32`. -/
+@[inline, simp, grind] def countrZero {w : Nat} (x : BitVec w) : BitVec 32 :=
+  BitVec.ofNat 32 x.ctz.toNat
+
+/-- `cpp::popcount` / `__builtin_popcountg` as `BitVec 32`. -/
+@[inline, simp, grind] def popcount {w : Nat} (x : BitVec w) : BitVec 32 :=
+  BitVec.ofNat 32 x.cpop.toNat
+
+/-- `cpp::has_single_bit`: tests whether `x` is a power of two. -/
+@[inline, simp, grind] def hasSingleBit {w : Nat} (x : BitVec w) : Bool :=
+  x != 0 && (x &&& (x - 1)) == 0
+
+/-- `cpp::bit_width`: number of bits needed to represent `x`. -/
+@[inline, simp, grind] def bitWidth {w : Nat} (x : BitVec w) : BitVec 32 :=
+  BitVec.ofNat 32 (w - x.clz.toNat)
 
 /-- Exact equivalence of the hardware-FPU multiplication trick in `set_overflow<float>` with
 `setOverflow` for all four C rounding modes. -/

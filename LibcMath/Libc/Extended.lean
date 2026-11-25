@@ -92,62 +92,62 @@ Knuth's TwoSum (`fast2sum = false`). -/
 def exactAdd (mode : IEEERoundingMode) (a b : Model fmt) (fast2sum : Bool := true) :
     NumberPair (Model fmt) :=
   if fast2sum then
-    let hi := Model.add a b mode
-    let t := Model.sub hi a mode
-    let lo := Model.sub b t mode
+    let hi := fadd mode a b
+    let t := fsub mode hi a
+    let lo := fsub mode b t
     { lo, hi }
   else
-    let hi := Model.add a b mode
-    let t1 := Model.sub hi a mode
-    let t2 := Model.sub hi t1 mode
-    let t3 := Model.sub b t1 mode
-    let t4 := Model.sub a t2 mode
-    { lo := Model.add t3 t4 mode, hi }
+    let hi := fadd mode a b
+    let t1 := fsub mode hi a
+    let t2 := fsub mode hi t1
+    let t3 := fsub mode b t1
+    let t4 := fsub mode a t2
+    { lo := fadd mode t3 t4, hi }
 
 /-- `fputil::exact_sub<FAST2SUM>(a, b)`. -/
 def exactSub (mode : IEEERoundingMode) (a b : Model fmt) (fast2sum : Bool := true) :
     NumberPair (Model fmt) :=
   if fast2sum then
-    let hi := Model.sub a b mode
-    let t := Model.sub a hi mode
-    let lo := Model.sub t b mode
+    let hi := fsub mode a b
+    let t := fsub mode a hi
+    let lo := fsub mode t b
     { lo, hi }
   else
-    let hi := Model.sub a b mode
-    let t1 := Model.sub hi a mode
-    let t2 := Model.sub hi t1 mode
-    let t3 := Model.sub a t2 mode
-    let t4 := Model.add b t1 mode
-    { lo := Model.sub t3 t4 mode, hi }
+    let hi := fsub mode a b
+    let t1 := fsub mode hi a
+    let t2 := fsub mode hi t1
+    let t3 := fsub mode a t2
+    let t4 := fadd mode b t1
+    { lo := fsub mode t3 t4, hi }
 
 /-- `fputil::add(a, b)` for two `NumberPair`s. -/
 def add (mode : IEEERoundingMode) (a b : NumberPair (Model fmt))
     (fast2sum : Bool := true) : NumberPair (Model fmt) :=
   let r := exactAdd mode a.hi b.hi fast2sum
-  let lo := Model.add a.lo b.lo mode
-  let rLo := Model.add r.lo lo mode
+  let lo := fadd mode a.lo b.lo
+  let rLo := fadd mode r.lo lo
   exactAdd mode r.hi rLo fast2sum
 
 /-- `fputil::add(a, b)` for `NumberPair` + scalar. -/
 def addScalar (mode : IEEERoundingMode) (a : NumberPair (Model fmt)) (b : Model fmt)
     (fast2sum : Bool := true) : NumberPair (Model fmt) :=
   let r := exactAdd mode a.hi b fast2sum
-  let rLo := Model.add r.lo a.lo mode
+  let rLo := fadd mode r.lo a.lo
   exactAdd mode r.hi rLo fast2sum
 
 /-- `fputil::add(a, b)` for scalar + `NumberPair`. -/
 def scalarAdd (mode : IEEERoundingMode) (a : Model fmt) (b : NumberPair (Model fmt))
     (fast2sum : Bool := true) : NumberPair (Model fmt) :=
   let r := exactAdd mode a b.hi fast2sum
-  let rLo := Model.add r.lo b.lo mode
+  let rLo := fadd mode r.lo b.lo
   exactAdd mode r.hi rLo fast2sum
 
 /-- `fputil::sub(a, b)` for two `NumberPair`s. -/
 def sub (mode : IEEERoundingMode) (a b : NumberPair (Model fmt))
     (fast2sum : Bool := true) : NumberPair (Model fmt) :=
   let r := exactSub mode a.hi b.hi fast2sum
-  let lo := Model.sub a.lo b.lo mode
-  let rLo := Model.add r.lo lo mode
+  let lo := fsub mode a.lo b.lo
+  let rLo := fadd mode r.lo lo
   exactAdd mode r.hi rLo fast2sum
 
 /-- Default Veltkamp split exponent (`12` for `binary32`, `27` for `binary64`). -/
@@ -158,28 +158,28 @@ def sub (mode : IEEERoundingMode) (a b : NumberPair (Model fmt))
 def split (mode : IEEERoundingMode) (a : Model fmt)
     (splitBits : Nat := defaultSplit fmt) : NumberPair (Model fmt) :=
   let cn : Model fmt := Model.ofFields fmt false (fmt.exponentBias + splitBits) 0
-  let c := Model.add cn (Model.posOne fmt) mode
-  let t1 := Model.mul c a mode
-  let t2 := Model.sub a t1 mode
-  let hi := Model.add t1 t2 mode
-  let lo := Model.sub a hi mode
+  let c := fadd mode cn (Model.posOne fmt)
+  let t1 := fmul mode c a
+  let t2 := fsub mode a t1
+  let hi := fadd mode t1 t2
+  let lo := fsub mode a hi
   { lo, hi }
 
 /-- `fputil::exact_mult(a, b)`: FMA TwoProd when `cfg.hasFma fmt`, else Dekker's product. -/
 def exactMult (cfg : MathConfig) (mode : IEEERoundingMode) (a b : Model fmt)
     (splitBits : Nat := defaultSplit fmt) : NumberPair (Model fmt) :=
   if cfg.hasFma fmt then
-    let hi := Model.mul a b mode
+    let hi := fmul mode a b
     let lo := multiplySub cfg mode a b hi
     { lo, hi }
   else
-    let as := split mode a splitBits
+    let as := split mode a (defaultSplit fmt)
     let bs := split mode b splitBits
-    let hi := Model.mul a b mode
-    let t1 := Model.sub (Model.mul as.hi bs.hi mode) hi mode
-    let t2 := Model.add (Model.mul as.hi bs.lo mode) t1 mode
-    let t3 := Model.add (Model.mul as.lo bs.hi mode) t2 mode
-    let lo := Model.add (Model.mul as.lo bs.lo mode) t3 mode
+    let hi := fmul mode a b
+    let t1 := fsub mode (fmul mode as.hi bs.hi) hi
+    let t2 := fadd mode (fmul mode as.hi bs.lo) t1
+    let t3 := fadd mode (fmul mode as.lo bs.hi) t2
+    let lo := fadd mode (fmul mode as.lo bs.lo) t3
     { lo, hi }
 
 /-- `fputil::quick_mult(a, b)` for scalar `a` and `NumberPair` `b`. -/
@@ -200,17 +200,17 @@ def quickMult (cfg : MathConfig) (mode : IEEERoundingMode)
 /-- `fputil::div(a, b)` (Karp–Markstein division, `double_double.h:285-304`). -/
 def div (cfg : MathConfig) (mode : IEEERoundingMode)
     (a b : NumberPair (Model fmt)) : NumberPair (Model fmt) :=
-  let q := Model.div (Model.posOne fmt) b.hi mode
-  let hi := Model.mul a.hi q mode
+  let q := fdiv mode (Model.posOne fmt) b.hi
+  let hi := fmul mode a.hi q
   let (eHi, eLo) :=
     if cfg.hasFma fmt then
       (subMultiply cfg mode a.hi b.hi hi, subMultiply cfg mode a.lo b.lo hi)
     else
       let pHi := exactMult cfg mode b.hi (Model.neg hi)
       let pLo := exactMult cfg mode b.lo (Model.neg hi)
-      (Model.add (Model.add a.hi pHi.hi mode) pHi.lo mode,
-       Model.add (Model.add a.lo pLo.hi mode) pLo.lo mode)
-  { lo := Model.mul q (Model.add eHi eLo mode) mode, hi }
+      (fadd mode (fadd mode a.hi pHi.hi) pHi.lo,
+       fadd mode (fadd mode a.lo pLo.hi) pLo.lo)
+  { lo := fmul mode q (fadd mode eHi eLo), hi }
 
 end NumberPair
 
