@@ -95,6 +95,34 @@ import LibcMath.Kernels.Erff.Generated.Sse2
 import LibcMath.Kernels.Erff.Generated.Avx2Fma
 import LibcMath.Kernels.Lgammaf.Generated.Sse2
 import LibcMath.Kernels.Lgammaf.Generated.Avx2Fma
+import LibcMath.Kernels.Fmaf.Generated.GenericSse2
+import LibcMath.Kernels.Fmaf.Generated.Avx2Fma
+import LibcMath.Kernels.Fabsf.Generated.GenericSse2
+import LibcMath.Kernels.Copysignf.Generated.GenericSse2
+import LibcMath.Kernels.Fdimf.Generated.GenericSse2
+import LibcMath.Kernels.Floorf.Generated.GenericSse2
+import LibcMath.Kernels.Floorf.Generated.BuiltinSse42
+import LibcMath.Kernels.Ceilf.Generated.GenericSse2
+import LibcMath.Kernels.Ceilf.Generated.BuiltinSse42
+import LibcMath.Kernels.Truncf.Generated.GenericSse2
+import LibcMath.Kernels.Truncf.Generated.BuiltinSse42
+import LibcMath.Kernels.Roundevenf.Generated.GenericSse2
+import LibcMath.Kernels.Roundevenf.Generated.BuiltinSse42
+import LibcMath.Kernels.Rintf.Generated.GenericSse2
+import LibcMath.Kernels.Rintf.Generated.BuiltinSse42
+import LibcMath.Kernels.Nearbyintf.Generated.GenericSse2
+import LibcMath.Kernels.Nearbyintf.Generated.BuiltinSse42
+import LibcMath.Kernels.Roundf.Generated.GenericSse2
+import LibcMath.Kernels.Fmaxf.Generated.GenericSse2
+import LibcMath.Kernels.Fminf.Generated.GenericSse2
+import LibcMath.Kernels.Fmaximumf.Generated.GenericSse2
+import LibcMath.Kernels.Fminimumf.Generated.GenericSse2
+import LibcMath.Kernels.FmaximumNumf.Generated.GenericSse2
+import LibcMath.Kernels.FminimumNumf.Generated.GenericSse2
+import LibcMath.Kernels.FmaximumMagf.Generated.GenericSse2
+import LibcMath.Kernels.FminimumMagf.Generated.GenericSse2
+import LibcMath.Kernels.FmaximumMagNumf.Generated.GenericSse2
+import LibcMath.Kernels.FminimumMagNumf.Generated.GenericSse2
 
 /-!
 # Generic Lean model runner for binary32 differential testing
@@ -365,6 +393,62 @@ def lookupKernel (fn plan : String) : Option F32Entry :=
       some (.uF32 LibcMath.Kernels.Lgammaf.Generated.Sse2.kernel.eval)
   | "lgammaf", "avx2_fma" =>
       some (.uF32 LibcMath.Kernels.Lgammaf.Generated.Avx2Fma.kernel.eval)
+  | "fmaf", "generic_sse2" =>
+      some (.tF32 LibcMath.Kernels.Fmaf.Generated.GenericSse2.kernel.eval)
+  | "fmaf", "avx2_fma" =>
+      some (.tF32 LibcMath.Kernels.Fmaf.Generated.Avx2Fma.kernel.eval)
+  | "fabsf", "generic_sse2" =>
+      some (.uF32 LibcMath.Kernels.Fabsf.Generated.GenericSse2.kernel.eval)
+  | "copysignf", "generic_sse2" =>
+      some (.bF32 LibcMath.Kernels.Copysignf.Generated.GenericSse2.kernel.eval)
+  | "fdimf", "generic_sse2" =>
+      some (.bF32 LibcMath.Kernels.Fdimf.Generated.GenericSse2.kernel.eval)
+  | "floorf", "generic_sse2" =>
+      some (.uF32 LibcMath.Kernels.Floorf.Generated.GenericSse2.kernel.eval)
+  | "floorf", "builtin_sse42" =>
+      some (.uF32 LibcMath.Kernels.Floorf.Generated.BuiltinSse42.kernel.eval)
+  | "ceilf", "generic_sse2" =>
+      some (.uF32 LibcMath.Kernels.Ceilf.Generated.GenericSse2.kernel.eval)
+  | "ceilf", "builtin_sse42" =>
+      some (.uF32 LibcMath.Kernels.Ceilf.Generated.BuiltinSse42.kernel.eval)
+  | "truncf", "generic_sse2" =>
+      some (.uF32 LibcMath.Kernels.Truncf.Generated.GenericSse2.kernel.eval)
+  | "truncf", "builtin_sse42" =>
+      some (.uF32 LibcMath.Kernels.Truncf.Generated.BuiltinSse42.kernel.eval)
+  | "roundevenf", "generic_sse2" =>
+      some (.uF32 LibcMath.Kernels.Roundevenf.Generated.GenericSse2.kernel.eval)
+  | "roundevenf", "builtin_sse42" =>
+      some (.uF32 LibcMath.Kernels.Roundevenf.Generated.BuiltinSse42.kernel.eval)
+  | "rintf", "generic_sse2" =>
+      some (.uF32 LibcMath.Kernels.Rintf.Generated.GenericSse2.kernel.eval)
+  | "rintf", "builtin_sse42" =>
+      some (.uF32 LibcMath.Kernels.Rintf.Generated.BuiltinSse42.kernel.eval)
+  | "nearbyintf", "generic_sse2" =>
+      some (.uF32 LibcMath.Kernels.Nearbyintf.Generated.GenericSse2.kernel.eval)
+  | "nearbyintf", "builtin_sse42" =>
+      some (.uF32 LibcMath.Kernels.Nearbyintf.Generated.BuiltinSse42.kernel.eval)
+  | "roundf", "generic_sse2" =>
+      some (.uF32 LibcMath.Kernels.Roundf.Generated.GenericSse2.kernel.eval)
+  | "fmaxf", "generic_sse2" =>
+      some (.bF32 LibcMath.Kernels.Fmaxf.Generated.GenericSse2.kernel.eval)
+  | "fminf", "generic_sse2" =>
+      some (.bF32 LibcMath.Kernels.Fminf.Generated.GenericSse2.kernel.eval)
+  | "fmaximumf", "generic_sse2" =>
+      some (.bF32 LibcMath.Kernels.Fmaximumf.Generated.GenericSse2.kernel.eval)
+  | "fminimumf", "generic_sse2" =>
+      some (.bF32 LibcMath.Kernels.Fminimumf.Generated.GenericSse2.kernel.eval)
+  | "fmaximum_numf", "generic_sse2" =>
+      some (.bF32 LibcMath.Kernels.FmaximumNumf.Generated.GenericSse2.kernel.eval)
+  | "fminimum_numf", "generic_sse2" =>
+      some (.bF32 LibcMath.Kernels.FminimumNumf.Generated.GenericSse2.kernel.eval)
+  | "fmaximum_magf", "generic_sse2" =>
+      some (.bF32 LibcMath.Kernels.FmaximumMagf.Generated.GenericSse2.kernel.eval)
+  | "fminimum_magf", "generic_sse2" =>
+      some (.bF32 LibcMath.Kernels.FminimumMagf.Generated.GenericSse2.kernel.eval)
+  | "fmaximum_mag_numf", "generic_sse2" =>
+      some (.bF32 LibcMath.Kernels.FmaximumMagNumf.Generated.GenericSse2.kernel.eval)
+  | "fminimum_mag_numf", "generic_sse2" =>
+      some (.bF32 LibcMath.Kernels.FminimumMagNumf.Generated.GenericSse2.kernel.eval)
   | _, _ => none
 
 def evalUnaryLine (entry : F32Entry) (mode : IEEERoundingMode) (bx : BitVec 32) : String :=
