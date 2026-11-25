@@ -17,12 +17,13 @@
 \p{Copy \code{\verb~|templates/FunctionTemplate/~} to \code{\verb~|LibcMath/Kernels/<Function>/~} and \code{\verb~|templates/FunctionTemplate.lean~} to \code{\verb~|LibcMath/Kernels/<Function>.lean~}, replacing \code{\verb~|Fn~} / \code{\verb~|fn~} with your function name (for example, \code{\verb~|Exp2f~} / \code{\verb~|exp2f~}) and \code{\verb~|Plan~} / \code{\verb~|plan~} with the explicit evaluation plan name (for example, \code{\verb~|DoubleEval~} / \code{\verb~|doubleEval~}); per [dec-RLMN](dec-RLMN), never define a plan-less "default" alias:}
 
 \ul{
-\li{\code{\verb~|LibcMath/Kernels/<Function>.lean~} — entry point: imports the short paths and main path, states and proves the top-level theorem, and carries \code{\verb~|#guard_msgs in #print axioms~}.}
+\li{\code{\verb~|LibcMath/Kernels/<Function>.lean~} — where to start: lists each plan, its state and its theorem.}
+\li{\code{\verb~|LibcMath/Kernels/<Function>/Proof/<Plan>.lean~} — the theorem for one evaluation plan, with \code{\verb~|#guard_msgs in #print axioms~}. What several plans share is in \code{\verb~|Proof/Common.lean~}.}
 \li{\code{\verb~|LibcMath/Kernels/<Function>/Generated/~} — plans emitted by \code{\verb~|ast2lean~}; never edited by hand and never mixed with hand-written files.}
 \li{\code{\verb~|LibcMath/Kernels/<Function>/Plans.lean~} — hand-written catalogue collecting \code{\verb~|allPlans~}.}
 \li{\code{\verb~|LibcMath/Kernels/<Function>/Statement.lean~} — \code{\verb~|CorrectlyRounded~} statements for the extracted evaluation plans.}
-\li{\code{\verb~|LibcMath/Kernels/<Function>/ShortPaths/{SymbolicExecution,Ranges}.lean~} — symbolic evaluation and whole-range correctness for zeros, infinities, NaNs, tiny arguments, overflow, and underflow.}
-\li{\code{\verb~|LibcMath/Kernels/<Function>/MainPath/~} — one file per numerical-analysis step (range reduction and UB-freedom, real polynomial approximation, floating-point Horner evaluation error, table bounds, combined value error, isolated pointwise exceptions, and TMD rounding clearance; generated certificate chunks stay isolated under \code{\verb~|MainPath/Tmd/Certs/~}).}
+\li{\code{\verb~|LibcMath/Kernels/<Function>/Proof/<Plan>/ShortPaths/{SymbolicExecution,Ranges}.lean~} — symbolic evaluation and whole-range correctness for zeros, infinities, NaNs, tiny arguments, overflow, and underflow.}
+\li{\code{\verb~|LibcMath/Kernels/<Function>/Proof/<Plan>/MainPath/~} — one file per numerical-analysis step (range reduction and UB-freedom, real polynomial approximation, floating-point Horner evaluation error, table bounds, combined value error, isolated pointwise exceptions, and TMD rounding clearance; generated certificate chunks stay isolated under \code{\verb~|MainPath/Tmd/Certs/~}).}
 \li{\code{\verb~|LibcMath/Kernels/<Function>/Examples.lean~} — worked evaluations and \code{\verb~|Libc.Diag~} checks compiled as part of \code{\verb~|lake build~}.}
 }
 }
@@ -35,7 +36,7 @@
 \li{\strong{Extract the plans with \code{\verb~|ast2lean~}.} Write an extraction script modelled on \code{\verb~|extract/extract-expf-plans.sh~} that emits each build plan into \code{\verb~|LibcMath/Kernels/<Function>/Generated/~} with \code{\verb~|--namespace=LibcMath.Kernels.<Function>.Generated.<Plan>~}. Add \code{\verb~|Plans.lean~} next to \code{\verb~|Generated/~} collecting \code{\verb~|allPlans~}.}
 \li{\strong{Write the statement.} In \code{\verb~|Statement.lean~}, define \code{\verb~|<Function><Plan>CorrectlyRounded~} against \code{\verb~|Spec.<fn>~} and \code{\verb~|cModes~} (or \code{\verb~|{.nearest}~} for RN-only plans), always naming the implementation plan explicitly ([dec-RLMN](dec-RLMN)).}
 \li{\strong{Prove the short paths for whole ranges.} Add closed-form range theorems for the real function under \code{\verb~|LibcMath/Analysis/~} (modelled on \code{\verb~|Analysis/ExpRanges.lean~}). Evaluate the extracted kernel symbolically in \code{\verb~|ShortPaths/SymbolicExecution.lean~} and join the ranges with \code{\verb~|HoldsOnBits.append~} in \code{\verb~|ShortPaths/Ranges.lean~}.}
-\li{\strong{Decompose the main path into analytical steps.} Create one file per step under \code{\verb~|MainPath/~}:
+\li{\strong{Decompose the main path into analytical steps.} Create one file per step under \code{\verb~|Proof/<Plan>/MainPath/~}:
   \ul{
   \li{\strong{Range reduction & UB-freedom} (\code{\verb~|MainPath/RangeReduction.lean~}): reuse \code{\verb~|Analysis/RangeReduction.lean~} for exact power-of-two scaling, \code{\verb~|genericNearestInt~}, Sterbenz subtraction, widening casts, and checked \code{\verb~|fptosi?~} / \code{\verb~|sadd?~} / table bounds. Note any isolated rounding edge cases (like \code{\verb~|0x3B7FFFFF~} and \code{\verb~|0xBB7FFFFF~} in \code{\verb~|expf~}) early.}
   \li{\strong{Real polynomial bound} (\code{\verb~|MainPath/Polynomial.lean~}): bound \code{\verb~||poly r - f r|~} on the reduced interval via FloatLib's \code{\verb~|interval~} tactic and Taylor bounds.}
