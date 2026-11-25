@@ -1314,8 +1314,9 @@ def kernel : Libc.TernaryKernel {} :=
             },
             [&](const AssignStmt &a) {
               if (a.compound_op) {
-                auto lhs = Expr::make(VarExpr{a.target}, a.value->type);
-                auto combined = Expr::make(BinaryExpr{*a.compound_op, lhs, a.value}, a.value->type);
+                auto lhs_ty = a.target_type ? a.target_type : a.value->type;
+                auto lhs = Expr::make(VarExpr{a.target}, lhs_ty);
+                auto combined = Expr::make(BinaryExpr{*a.compound_op, lhs, a.value}, lhs_ty);
                 return std::format("{}{} := {}\n", pad, leanIdent(a.target),
                                    emitInlineExpr(combined));
               }
@@ -1371,8 +1372,9 @@ def kernel : Libc.TernaryKernel {} :=
             [&](const FieldAssignStmt &fa) {
               ExprPtr rhs = fa.value;
               if (fa.compound_op) {
-                auto cur = Expr::make(FieldExpr{fa.base, fa.field}, fa.value->type);
-                rhs = Expr::make(BinaryExpr{*fa.compound_op, std::move(cur), rhs}, fa.value->type);
+                auto fty = fa.field_type ? fa.field_type : fa.value->type;
+                auto cur = Expr::make(FieldExpr{fa.base, fa.field}, fty);
+                rhs = Expr::make(BinaryExpr{*fa.compound_op, std::move(cur), rhs}, fty);
               }
               auto base_s = emitInlineExpr(fa.base);
               return std::format("{}{} := {{ {} with {} := {} }}\n", pad, base_s, base_s,

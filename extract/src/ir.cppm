@@ -434,6 +434,7 @@ struct AssignStmt {
   std::string target;
   std::optional<BinaryOp> compound_op;
   ExprPtr value;
+  TypePtr target_type = {};
 };
 struct AssignTupleStmt {
   std::vector<std::string> targets;
@@ -451,6 +452,7 @@ struct FieldAssignStmt {
   std::string field;
   std::optional<BinaryOp> compound_op;
   ExprPtr value;
+  TypePtr field_type = {};
 };
 struct ExprStmt {
   ExprPtr expr;

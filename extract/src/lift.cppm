@@ -1042,7 +1042,7 @@ public:
                                 std::move(body_ty));
             },
             [&](const AssignStmt &a) -> std::optional<ExprPtr> {
-              auto vty = lookupType(a.target, a.value->type);
+              auto vty = a.target_type ? a.target_type : lookupType(a.target, a.value->type);
               ExprPtr rhs = a.value;
               if (a.compound_op) {
                 auto lhs = Expr::make(VarExpr{a.target}, vty);
@@ -1099,10 +1099,11 @@ public:
               auto vty = lookupType(vr->name, fa.base->type);
               ExprPtr new_field_val = fa.value;
               if (fa.compound_op) {
-                auto cur_field = Expr::make(FieldExpr{fa.base, fa.field}, fa.value->type);
+                auto fty = fa.field_type ? fa.field_type : fa.value->type;
+                auto cur_field = Expr::make(FieldExpr{fa.base, fa.field}, fty);
                 new_field_val = Expr::make(
                     BinaryExpr{*fa.compound_op, std::move(cur_field), std::move(new_field_val)},
-                    fa.value->type);
+                    fty);
               }
               auto upd =
                   Expr::make(StructUpdateExpr{fa.base, fa.field, std::move(new_field_val)}, vty);

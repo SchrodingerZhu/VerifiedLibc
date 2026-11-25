@@ -224,8 +224,8 @@ auto captureMathConfig(CompilerInstance &ci) -> ir::MathConfig {
   cfg.has_riscv_fpu_double = hasMacro("LIBC_TARGET_CPU_HAS_RISCV_FPU_DOUBLE");
   cfg.has_fast_float16 = hasMacro("LIBC_TARGET_CPU_HAS_FAST_FLOAT16_OPS");
   cfg.has_int128 = hasMacro("LIBC_TYPES_HAS_INT128");
-  cfg.fp_logb_nan_min = !hasMacro("FP_ILOGBNAN") || hasMacro("__FP_LOGBNAN_MIN") ||
-                        triple.isOSLinux();
+  cfg.fp_logb_nan_min =
+      hasMacro("__FP_LOGBNAN_MIN") || (!hasMacro("LIBC_FULL_BUILD") && triple.isOSLinux());
   cfg.target_triple = triple.str();
   return cfg;
 }
@@ -1381,8 +1381,10 @@ private:
       if (fs->getInc()) {
         std::vector<ir::Stmt> steps;
         extractStmtInto(fs->getInc(), steps);
-        if (!steps.empty()) {
+        if (steps.size() == 1) {
           node.step = std::make_shared<ir::Stmt>(std::move(steps[0]));
+        } else if (!steps.empty()) {
+          node.step = std::make_shared<ir::Stmt>(ir::Stmt{ir::BlockStmt{std::move(steps)}});
         }
       }
       if (fs->getBody())
@@ -1507,15 +1509,21 @@ private:
         }
       }
       ir::ExprPtr rhs = extractExpr(bo->getRHS());
+      ir::TypePtr comp_lhs_ty;
+      if (const auto *cao = dyn_cast<CompoundAssignOperator>(bo)) {
+        comp_lhs_ty = convertType(cao->getComputationLHSType());
+      } else {
+        comp_lhs_ty = convertType(bo->getLHS()->getType());
+      }
       if (const auto *dre = dyn_cast<DeclRefExpr>(lhs)) {
-        out.push_back(
-            ir::Stmt{ir::AssignStmt{dre->getDecl()->getNameAsString(), compound, std::move(rhs)}});
+        out.push_back(ir::Stmt{ir::AssignStmt{dre->getDecl()->getNameAsString(), compound,
+                                              std::move(rhs), std::move(comp_lhs_ty)}});
         return;
       }
       if (const auto *me = dyn_cast<MemberExpr>(lhs)) {
         out.push_back(ir::Stmt{ir::FieldAssignStmt{extractExpr(me->getBase()),
                                                    me->getMemberDecl()->getNameAsString(), compound,
-                                                   std::move(rhs)}});
+                                                   std::move(rhs), std::move(comp_lhs_ty)}});
         return;
       }
     }
@@ -1600,8 +1608,8 @@ private:
               return;
             }
           }
-          out.push_back(ir::Stmt{
-              ir::AssignStmt{dre->getDecl()->getNameAsString(), compound, std::move(rhs)}});
+          out.push_back(ir::Stmt{ir::AssignStmt{dre->getDecl()->getNameAsString(), compound,
+                                                std::move(rhs), std::move(lhs_ty)}});
           return;
         }
       }
@@ -1645,6 +1653,7 @@ private:
             dre->getDecl()->getNameAsString(),
             uo->isIncrementOp() ? ir::BinaryOp::Add : ir::BinaryOp::Sub,
             std::move(one),
+            ty,
         }});
         return;
       }
