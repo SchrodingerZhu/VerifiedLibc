@@ -1,5 +1,7 @@
 import LibcMath.Kernels.Expf.Generated.DoubleEval
+import LibcMath.Kernels.Expf.Generated.DoubleEvalSse42
 import LibcMath.Kernels.Expf.Generated.DoubleEvalFma
+import LibcMath.Kernels.Expf.Generated.DoubleEvalAArch64
 import LibcMath.Kernels.Expf.Generated.IntegerEval
 import LibcMath.Kernels.Expf.Generated.StaticRounding
 import LibcMath.Kernels.Expf.Generated.FloatEval
@@ -31,10 +33,21 @@ open FloatLib.Floats.Formats.BinaryInterchange
 open LibcMath.Libc
 open LibcMath.Kernels.Expf.Generated
 
-/-- All six extracted `expf` evaluation plans. -/
+/-- All six x86-64 evaluation plans extracted by `extract-expf-plans.sh`. -/
 def allPlans : List (UnaryKernel .binary32) :=
   [ DoubleEval.kernel
   , DoubleEvalFma.kernel
+  , IntegerEval.kernel
+  , StaticRounding.kernel
+  , FloatEval.kernel
+  , FloatEvalCrRn.kernel ]
+
+/-- All eight extracted `expf` evaluation and microarch plans. -/
+def allMicroarchPlans : List (UnaryKernel .binary32) :=
+  [ DoubleEval.kernel
+  , DoubleEvalSse42.kernel
+  , DoubleEvalFma.kernel
+  , DoubleEvalAArch64.kernel
   , IntegerEval.kernel
   , StaticRounding.kernel
   , FloatEval.kernel

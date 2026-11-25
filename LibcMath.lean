@@ -18,6 +18,11 @@ import LibcMath.Analysis.Horner
 import LibcMath.Analysis.RoundingTransfer
 import LibcMath.Analysis.ChebTmd
 import LibcMath.Kernels.Expf
+import LibcMath.Kernels.Exp2f
+import LibcMath.Kernels.Exp10f
+import LibcMath.Kernels.Expm1f
+import LibcMath.Kernels.Exp2m1f
+import LibcMath.Kernels.Exp10m1f
 import LibcMath.Testing.Oracle.Exp
 import LibcMath.Testing.Oracle.ExpExamples
 import LibcMath.Testing.Oracle.FloatLib

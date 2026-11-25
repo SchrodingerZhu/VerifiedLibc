@@ -5,6 +5,7 @@ import LibcMath.Kernels.Expf.Proof.DoubleEval
 import LibcMath.Kernels.Expf.Proof.DoubleEvalFma
 import LibcMath.Kernels.Expf.Proof.IntegerEval
 import LibcMath.Kernels.Expf.Proof.StaticRounding
+import LibcMath.Kernels.Expf.Proof.Microarch
 
 /-!
 # `expf`: where everything is

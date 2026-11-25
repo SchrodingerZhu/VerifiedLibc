@@ -1,4 +1,23 @@
 import LibcMath.Kernels.Expf.Plans
+import LibcMath.Kernels.Exp2f.Generated.DoubleEvalSse2
+import LibcMath.Kernels.Exp2f.Generated.DoubleEvalSse42
+import LibcMath.Kernels.Exp2f.Generated.DoubleEvalAvx2Fma
+import LibcMath.Kernels.Exp2f.Generated.FloatEval
+import LibcMath.Kernels.Exp2f.Generated.IntegerEval
+import LibcMath.Kernels.Exp10f.Generated.DoubleEvalSse2
+import LibcMath.Kernels.Exp10f.Generated.DoubleEvalSse42
+import LibcMath.Kernels.Exp10f.Generated.DoubleEvalAvx2Fma
+import LibcMath.Kernels.Exp10f.Generated.FloatEval
+import LibcMath.Kernels.Exp10f.Generated.IntegerEval
+import LibcMath.Kernels.Expm1f.Generated.Sse2
+import LibcMath.Kernels.Expm1f.Generated.Sse42
+import LibcMath.Kernels.Expm1f.Generated.Avx2Fma
+import LibcMath.Kernels.Exp2m1f.Generated.Sse2
+import LibcMath.Kernels.Exp2m1f.Generated.Sse42
+import LibcMath.Kernels.Exp2m1f.Generated.Avx2Fma
+import LibcMath.Kernels.Exp10m1f.Generated.Sse2
+import LibcMath.Kernels.Exp10m1f.Generated.Sse42
+import LibcMath.Kernels.Exp10m1f.Generated.Avx2Fma
 
 /-!
 # Generic Lean model runner for binary32 differential testing
@@ -64,6 +83,8 @@ def lookupKernel (fn plan : String) : Option F32Entry :=
   match fn, plan with
   | "expf", "double_eval" =>
       some (.uF32 LibcMath.Kernels.Expf.Generated.DoubleEval.kernel.eval)
+  | "expf", "double_eval_sse42" =>
+      some (.uF32 LibcMath.Kernels.Expf.Generated.DoubleEvalSse42.kernel.eval)
   | "expf", "double_eval_fma" =>
       some (.uF32 LibcMath.Kernels.Expf.Generated.DoubleEvalFma.kernel.eval)
   | "expf", "integer_eval" =>
@@ -74,6 +95,44 @@ def lookupKernel (fn plan : String) : Option F32Entry :=
       some (.uF32 LibcMath.Kernels.Expf.Generated.FloatEval.kernel.eval)
   | "expf", "float_eval_cr_rn" =>
       some (.uF32 LibcMath.Kernels.Expf.Generated.FloatEvalCrRn.kernel.eval)
+  | "exp2f", "double_eval_sse2" =>
+      some (.uF32 LibcMath.Kernels.Exp2f.Generated.DoubleEvalSse2.kernel.eval)
+  | "exp2f", "double_eval_sse42" =>
+      some (.uF32 LibcMath.Kernels.Exp2f.Generated.DoubleEvalSse42.kernel.eval)
+  | "exp2f", "double_eval_avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Exp2f.Generated.DoubleEvalAvx2Fma.kernel.eval)
+  | "exp2f", "float_eval" =>
+      some (.uF32 LibcMath.Kernels.Exp2f.Generated.FloatEval.kernel.eval)
+  | "exp2f", "integer_eval" =>
+      some (.uF32 LibcMath.Kernels.Exp2f.Generated.IntegerEval.kernel.eval)
+  | "exp10f", "double_eval_sse2" =>
+      some (.uF32 LibcMath.Kernels.Exp10f.Generated.DoubleEvalSse2.kernel.eval)
+  | "exp10f", "double_eval_sse42" =>
+      some (.uF32 LibcMath.Kernels.Exp10f.Generated.DoubleEvalSse42.kernel.eval)
+  | "exp10f", "double_eval_avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Exp10f.Generated.DoubleEvalAvx2Fma.kernel.eval)
+  | "exp10f", "float_eval" =>
+      some (.uF32 LibcMath.Kernels.Exp10f.Generated.FloatEval.kernel.eval)
+  | "exp10f", "integer_eval" =>
+      some (.uF32 LibcMath.Kernels.Exp10f.Generated.IntegerEval.kernel.eval)
+  | "expm1f", "sse2" =>
+      some (.uF32 LibcMath.Kernels.Expm1f.Generated.Sse2.kernel.eval)
+  | "expm1f", "sse42" =>
+      some (.uF32 LibcMath.Kernels.Expm1f.Generated.Sse42.kernel.eval)
+  | "expm1f", "avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Expm1f.Generated.Avx2Fma.kernel.eval)
+  | "exp2m1f", "sse2" =>
+      some (.uF32 LibcMath.Kernels.Exp2m1f.Generated.Sse2.kernel.eval)
+  | "exp2m1f", "sse42" =>
+      some (.uF32 LibcMath.Kernels.Exp2m1f.Generated.Sse42.kernel.eval)
+  | "exp2m1f", "avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Exp2m1f.Generated.Avx2Fma.kernel.eval)
+  | "exp10m1f", "sse2" =>
+      some (.uF32 LibcMath.Kernels.Exp10m1f.Generated.Sse2.kernel.eval)
+  | "exp10m1f", "sse42" =>
+      some (.uF32 LibcMath.Kernels.Exp10m1f.Generated.Sse42.kernel.eval)
+  | "exp10m1f", "avx2_fma" =>
+      some (.uF32 LibcMath.Kernels.Exp10m1f.Generated.Avx2Fma.kernel.eval)
   | _, _ => none
 
 def evalUnaryLine (entry : F32Entry) (mode : IEEERoundingMode) (bx : BitVec 32) : String :=

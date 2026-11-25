@@ -39,4 +39,14 @@ round-to-nearest-even mode. -/
 def ExpfFloatEvalCrRnCorrectlyRounded : Prop :=
   CorrectlyRounded (Spec.exp .binary32) {.nearest} Generated.FloatEvalCrRn.expf
 
+/-- `math::double_eval::expf` compiled with `-msse4.2 -mno-fma` is correctly rounded in all four
+rounding modes of C. -/
+def ExpfDoubleEvalSse42CorrectlyRounded : Prop :=
+  CorrectlyRounded (Spec.exp .binary32) cModes Generated.DoubleEvalSse42.expf
+
+/-- `math::double_eval::expf` compiled for AArch64 is correctly rounded in all four rounding modes
+of C. -/
+def ExpfDoubleEvalAArch64CorrectlyRounded : Prop :=
+  CorrectlyRounded (Spec.exp .binary32) cModes Generated.DoubleEvalAArch64.expf
+
 end LibcMath.Kernels.Expf
