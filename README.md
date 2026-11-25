@@ -30,7 +30,8 @@ kernels `con-leche` and `gruszka`, with `lean4export` and `susz` to feed them.
 nix develop          # or `direnv allow`
 lake exe cache get   # prebuilt Mathlib
 lake build
-kernel-check LibcMath.Kernels.Expf.Proof.DoubleEval   # external kernels
+kernel-check LibcMath.Kernels.Expf.Proof.DoubleEval \
+  LibcMath.Kernels.Expf.Proof.DoubleEval.expfDoubleEval_correctlyRounded   # external kernels
 ```
 
 Lean dependencies are pinned in `lake-manifest.json`:

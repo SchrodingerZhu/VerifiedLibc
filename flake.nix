@@ -81,8 +81,8 @@
         description = "Lean 4 kernel in Rust, normalization by evaluation";
         homepage = "https://github.com/jasisz/gruszka";
       };
-      # kernel-check MODULE...: check the modules and all they import with both external
-      # kernels. Run it after `lake build`, from the checkout.
+      # kernel-check MODULE [CONSTANT...]: check the constants (by default, everything MODULE
+      # imports) and all they depend on with both external kernels. Run it after `lake build`.
       kernel-check = pkgs.writeShellApplication {
         name = "kernel-check";
         runtimeInputs = [(leanFor pkgs) pkgs.git];
@@ -90,21 +90,30 @@
         # lean4export files; each tool is named by its store path.
         text = ''
           if [ $# -eq 0 ]; then
-            echo "usage: kernel-check MODULE..." >&2
+            echo "usage: kernel-check MODULE [CONSTANT...]" >&2
             exit 2
           fi
+          module=$1
+          shift
           cd "$(git rev-parse --show-toplevel)"
           search_path=$(lake env printenv LEAN_PATH)
 
-          echo "== con-leche: $*"
+          echo "== con-leche: $module $*"
+          constant_flags=()
+          for c in "$@"; do constant_flags+=("--constant=$c"); done
           # The default stack of 1 GB overflows on the proof of `expf`.
           export LEAN_STACK_SIZE_KB="''${LEAN_STACK_SIZE_KB:-16777216}"
-          ${nixpkgs.lib.getExe con-leche-bin} --olean --search-path="$search_path" -- "$@"
+          ${nixpkgs.lib.getExe con-leche-bin} --olean "''${constant_flags[@]}" \
+            --search-path="$search_path" -- "$module"
 
           work=$(mktemp -d)
           trap 'rm -rf "$work"' EXIT
-          echo "== gruszka: $*"
-          lake env ${nixpkgs.lib.getExe lean4export-bin} "$@" > "$work/export.ndjson"
+          echo "== gruszka: $module $*"
+          if [ $# -gt 0 ]; then
+            lake env ${nixpkgs.lib.getExe lean4export-bin} "$module" -- "$@" > "$work/export.ndjson"
+          else
+            lake env ${nixpkgs.lib.getExe lean4export-bin} "$module" > "$work/export.ndjson"
+          fi
           ${nixpkgs.lib.getExe susz-bin} pack --no-index "$work/export.ndjson" "$work/export.susz"
           ${nixpkgs.lib.getExe gruszka-bin} "$work/export.susz"
         '';

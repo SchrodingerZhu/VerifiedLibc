@@ -17,9 +17,10 @@ lake build             # must end with "Build completed successfully"
 - Check that `OPEN.md` matches every `sorry` under `LibcMath/`: `python3 scripts/check-open.py`
   (pass `--update` after changing open lemmas).
 - Build and smoke-test the C++23 Clang-AST extractor: `bash extract/test/run_tests.sh`.
-- Check a module and its imports with the external kernels `con-leche` and `gruszka`:
-  `kernel-check LibcMath.Kernels.Expf.Proof.DoubleEval` (after `lake build`; the flake provides
-  both kernels, `lean4export` and `susz`).
+- Check a theorem and everything it depends on with the external kernels `con-leche` and
+  `gruszka`: `kernel-check <Module> <Theorem>...` (after `lake build`; the flake provides both
+  kernels, `lean4export` and `susz`). Without a theorem it checks the whole import closure,
+  which needs more than 90 GB for `expf`.
 - Warnings about files "designed for use with the module system" come from Mathlib imports and
   are expected.
 - To work on a pull request beside the main checkout, use `git worktree add` and link
