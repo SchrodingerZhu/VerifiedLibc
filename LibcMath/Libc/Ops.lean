@@ -60,6 +60,14 @@ namespace Sign
 
 end Sign
 
+/-- Returns the storage bit width of an IEEE format as a reducible numeral. -/
+@[reducible] def storageWidth : FloatFormat → Nat
+  | .binary16 => 16
+  | .binary32 => 32
+  | .binary64 => 64
+  | .binary128 => 128
+  | fmt => fmt.bitWidth
+
 /-- Resolves standard IEEE `FloatFormat` bit widths to concrete numerals (`16`, `32`, `64`, `128`)
 at reducible transparency so `BitVec` operators (`&&&`, `+`, `Libc.bitCast`) synthesize directly
 without explicit width casts. -/
@@ -157,9 +165,21 @@ variable {fmt : FloatFormat}
 @[inline, simp, grind] def maxSubnormal (fmt : FloatFormat) (sign : Sign := .pos) : FPBits fmt :=
   Model.ofFields fmt sign.isNeg 0 fmt.fracMaskNat
 
-@[inline, simp, grind] def quietNaN (fmt : FloatFormat) (sign : Sign := .pos) : FPBits fmt :=
-  let q := Model.canonicalNaN fmt
+@[inline, simp, grind] def quietNaN (fmt : FloatFormat) (sign : Sign := .pos)
+    (payload : BitVec (storageWidth fmt) := 0) : FPBits fmt :=
+  let q :=
+    if payload.toNat == 0 then Model.canonicalNaN fmt
+    else Model.ofFields fmt false (2 * fmt.exponentBias + 1)
+      ((1 <<< (fmt.fracWidth - 1)) ||| (payload.toNat &&& fmt.fracMaskNat))
   if sign.isNeg then Model.neg q else q
+
+/-- Builds a signaling NaN with the given sign and optional payload (`FPBits::signaling_nan`). -/
+@[inline, simp, grind] def signalingNaN (fmt : FloatFormat) (sign : Sign := .pos)
+    (payload : BitVec (storageWidth fmt) := 0) : FPBits fmt :=
+  let frac :=
+    if payload.toNat == 0 then 1 <<< (fmt.fracWidth - 2)
+    else payload.toNat &&& fmt.fracMaskNat
+  Model.ofFields fmt sign.isNeg (2 * fmt.exponentBias + 1) frac
 
 @[inline] def setSign (x : FPBits fmt) (s : Sign) : FPBits fmt :=
   Model.ofFields fmt s.isNeg x.expField x.fracField

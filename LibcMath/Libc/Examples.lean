@@ -215,4 +215,20 @@ info: 'LibcMath.Libc.Microarch.bigInt_quickMulHi_128_error_bound' depends on axi
 #guard_msgs in
 #print axioms LibcMath.Libc.Microarch.bigInt_quickMulHi_128_error_bound
 
+/-! ### `NormalFloat`, NaN payload, and `BigInt.ofLimbs64` checks -/
+
+#guard (FPBits.quietNaN .binary32 .pos (0x123#32)).toBits == 0x7FC00123#32
+#guard (FPBits.signalingNaN .binary32 .pos (0x123#32)).toBits == 0x7F800123#32
+#guard (FPBits.signalingNaN .binary32).toBits == 0x7FA00000#32
+#guard BigInt.ofLimbs64 128 #[0x2#64, 0x1#64] == ((1#128 <<< 64) ||| 2#128)
+#guard (NormalFloat.ofVal f32(0x3FC00000#32)).exponent == 0#32
+#guard (NormalFloat.ofVal f32(0x3FC00000#32)).mantissa == 0x00C00000#32
+#guard (NormalFloat.ofVal f32(0x00000001#32)).exponent == (-149#32)
+#guard NormalFloat.toVal (NormalFloat.ofVal f32(0x3FC00000#32)) == f32(0x3FC00000#32)
+#guard NormalFloat.toVal (NormalFloat.ofVal f32(0x00000001#32)) == f32(0x00000001#32)
+#guard NormalFloat.toVal (NormalFloat.mul2 (NormalFloat.ofVal f32(0x3F800000#32)) 200#32) ==
+    FPBits.inf .binary32
+#guard NormalFloat.cmp (NormalFloat.ofVal f32(0x40000000#32))
+    (NormalFloat.ofVal f32(0x3F800000#32)) == 1#32
+
 end LibcMath.Libc.Examples

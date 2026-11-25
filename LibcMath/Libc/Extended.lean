@@ -297,10 +297,9 @@ def quickMulHi (cfg : MathConfig := {}) {bits : Nat} (a b : BitVec bits) : BitVe
 @[inline] def addOverflow {bits : Nat} (a b : BitVec bits) : BitVec bits × Bool :=
   (a + b, BitVec.uaddOverflow a b)
 
-/-- Constructs a `BitVec bits` from an array of 64-bit little-endian limbs (`UInt<N>{w0, w1, ...}`).
--/
-def ofLimbs64 (bits : Nat) (limbs : List (BitVec 64)) : BitVec bits :=
-  let n := (limbs.zipIdx).foldl (init := 0) fun acc (w, idx) =>
+/-- Builds a `BitVec bits` from 64-bit little-endian limbs (`UInt<N>{w0, w1, ...}`). -/
+def ofLimbs64 (bits : Nat) (limbs : Array (BitVec 64)) : BitVec bits :=
+  let n := (limbs.toList.zipIdx).foldl (init := 0) fun acc (w, idx) =>
     acc ||| (w.toNat <<< (64 * idx))
   BitVec.ofNat bits n
 
@@ -613,5 +612,102 @@ def lookupOdd {fmt : FloatFormat} (cfg : MathConfig) (mode : IEEERoundingMode)
     if isNeg then Model.neg res else res
 
 end ExceptValues
+
+/-! ## `NormalFloat` (`src/__support/FPUtil/NormalFloat.h`) -/
+
+/-- Stores a normalized floating-point value `(-1)^sign * 2^exponent * mantissa` matching
+`fputil::NormalFloat<T>`. -/
+structure NormalFloat (fmt : FloatFormat) where
+  exponent : BitVec 32 := 0
+  mantissa : BitVec (storageWidth fmt) := 0
+  sign : Sign := .pos
+  deriving DecidableEq, Repr, Inhabited
+
+namespace NormalFloat
+
+/-- Computes the left shift that moves the leading bit of `m` to position `fracWidth`. -/
+def normShift (fmt : FloatFormat) (m : BitVec (storageWidth fmt)) : Nat :=
+  let fracLen := fmt.fracWidth
+  let one := 1 <<< fracLen
+  let rec go (fuel : Nat) (cur : Nat) (shift : Nat) : Nat :=
+    match fuel with
+    | 0 => shift
+    | fuel' + 1 =>
+      if (one &&& cur) != 0 then shift
+      else go fuel' (cur <<< 1) (shift + 1)
+  go fracLen m.toNat 0
+
+/-- Builds a normalized `NormalFloat` from sign, unbiased exponent, and mantissa. -/
+def mkNorm (fmt : FloatFormat) (s : Sign) (e : BitVec 32)
+    (m : BitVec (storageWidth fmt)) : NormalFloat fmt :=
+  let one := 1 <<< fmt.fracWidth
+  if m.toNat >= one then
+    { exponent := e, mantissa := m, sign := s }
+  else
+    let shift := normShift fmt m
+    { exponent := e - BitVec.ofNat 32 shift, mantissa := m <<< shift, sign := s }
+
+/-- Builds a `NormalFloat` from `FPBits` (`NormalFloat::init_from_bits`). -/
+def ofBits {fmt : FloatFormat} (bits : FPBits fmt) : NormalFloat fmt :=
+  let s := FPBits.sign bits
+  if FPBits.isInfOrNaN bits || FPBits.isZero bits then
+    { exponent := 0, mantissa := 0, sign := s }
+  else if FPBits.isSubnormal bits then
+    let m : BitVec (storageWidth fmt) := BitVec.ofNat (storageWidth fmt) bits.fracField
+    let shift := normShift fmt m
+    let exp := BitVec.ofInt 32 (1 - (fmt.exponentBias : Int) - (shift : Int))
+    { exponent := exp, mantissa := m <<< shift, sign := s }
+  else
+    let exp := BitVec.ofInt 32 ((bits.expField : Int) - (fmt.exponentBias : Int))
+    let one := 1 <<< fmt.fracWidth
+    let mant := BitVec.ofNat (storageWidth fmt) (one ||| bits.fracField)
+    { exponent := exp, mantissa := mant, sign := s }
+
+/-- Builds a `NormalFloat` from a floating-point value (`NormalFloat(T x)`). -/
+@[inline] def ofVal {fmt : FloatFormat} (x : Model fmt) : NormalFloat fmt :=
+  ofBits (FPBits.ofVal x)
+
+/-- Converts a `NormalFloat` to a floating-point value (`NormalFloat::operator T()`). -/
+def toVal {fmt : FloatFormat} (n : NormalFloat fmt) : Model fmt :=
+  let biasedExp : Int := n.exponent.toInt + (fmt.exponentBias : Int)
+  let maxExpVal : Int := (2 * fmt.exponentBias : Nat)
+  if biasedExp > maxExpVal then
+    FPBits.inf fmt n.sign
+  else
+    let subnormalExp : Int := -(fmt.exponentBias : Int) + 1
+    if n.exponent.toInt < subnormalExp then
+      let shift : Nat := (subnormalExp - n.exponent.toInt).toNat
+      if shift <= fmt.fracWidth + 1 then
+        let shiftOutMask := (1 <<< shift) - 1
+        let shiftOutVal := n.mantissa.toNat &&& shiftOutMask
+        let halfwayVal := 1 <<< (shift - 1)
+        let baseMant := (n.mantissa.toNat >>> shift) &&& fmt.fracMaskNat
+        let newMant :=
+          if shiftOutVal > halfwayVal then baseMant + 1
+          else if shiftOutVal == halfwayVal && (baseMant &&& 1) == 1 then baseMant + 1
+          else baseMant
+        let expField := if newMant == (1 <<< fmt.fracWidth) then 1 else 0
+        Model.ofFields fmt n.sign.isNeg expField (newMant &&& fmt.fracMaskNat)
+      else
+        FPBits.zero fmt n.sign
+    else
+      Model.ofFields fmt n.sign.isNeg biasedExp.toNat (n.mantissa.toNat &&& fmt.fracMaskNat)
+
+/-- Multiplies a `NormalFloat` by `2^e` (`NormalFloat::mul2`). -/
+@[inline] def mul2 {fmt : FloatFormat} (n : NormalFloat fmt) (e : BitVec 32) : NormalFloat fmt :=
+  { n with exponent := n.exponent + e }
+
+/-- Compares two `NormalFloat` values (`NormalFloat::cmp`). -/
+def cmp {fmt : FloatFormat} (a b : NormalFloat fmt) : BitVec 32 :=
+  let res : BitVec 32 := if a.sign.isNeg then (-1#32) else 1#32
+  if a.sign != b.sign then res
+  else if BitVec.slt b.exponent a.exponent then res
+  else if a.exponent == b.exponent then
+    if BitVec.ult b.mantissa a.mantissa then res
+    else if a.mantissa == b.mantissa then 0#32
+    else -res
+  else -res
+
+end NormalFloat
 
 end LibcMath.Libc
