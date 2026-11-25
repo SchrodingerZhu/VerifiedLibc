@@ -28,13 +28,19 @@ Each verified math function lives under `LibcMath/Kernels/` as an entry file
 ```text
 LibcMath/
   Kernels/
-    Expf.lean            # entry point: `expfDoubleEval_correctlyRounded`, axioms, reductions
+    Expf.lean            # start here: each plan, its state, and the name of its theorem
     Expf/
       Generated/         # plans emitted by `ast2lean`; never edited by hand
       Plans.lean         # catalogue of extracted plans
       Statement.lean     # `CorrectlyRounded` statements
-      ShortPaths/        # `SymbolicExecution.lean` and whole-range proofs in `Ranges.lean`
-      MainPath/          # one file per numerical-analysis step + `Tmd/` certificates
+      Proof/
+        Common.lean      # facts about bit patterns that the plans share
+        DoubleEval.lean  # `expfDoubleEval_correctlyRounded` (complete)
+        DoubleEval/
+          ShortPaths/    # `SymbolicExecution.lean`, and whole ranges in `Ranges.lean`
+          MainPath/      # one file per numerical-analysis step, and `Tmd/` certificates
+        DoubleEvalFma.lean, StaticRounding.lean, IntegerEval.lean
+        DoubleEvalFma/, StaticRounding/, IntegerEval/   # `ShortPaths/` only
       Examples.lean      # worked evaluations and `Libc.Diag` checks
   Libc/                  # shared LLVM libc operations (`FPBits`, `nearestInt`, `horner`, `Diag`, …)
   Analysis/              # reusable numerical analysis (`RangeReduction`, `Horner`, `RoundingTransfer`, `ChebTmd`, …)
@@ -102,7 +108,8 @@ The six extracted `expf` evaluation plans under `LibcMath/Kernels/Expf/Generated
 
 ## What is proved
 
-**`expfDoubleEval_correctlyRounded` (`LibcMath/Kernels/Expf.lean`) is complete.** It proves
+**`expfDoubleEval_correctlyRounded` (`LibcMath/Kernels/Expf/Proof/DoubleEval.lean`) is
+complete.** It proves
 `ExpfDoubleEvalCorrectlyRounded` — that `math::double_eval::expf` (x86-64 non-FMA, `LIBC_MATH=0`),
 extracted from LLVM libc at `e1a5f92db023`, is correctly rounded across all `2³²` binary32 inputs
 in all four rounding directions of C (`cModes`) and reaches no operation that C++ leaves undefined,
@@ -111,9 +118,9 @@ using zero `sorry`s, zero `native_decide`, and only the three standard Lean axio
 
 | Inputs | Bit patterns | Share | Proof |
 |---|---|---|---|
-| Zeros, infinities, NaNs, `\|x\| ≤ 2⁻²⁶`, overflow, underflow | 3 749 616 693 | 87.30 % | `Expf/ShortPaths/Ranges.lean` |
-| Tiny & near-underflow main-path intervals | 25 256 675 | 0.59 % | analytic (`Expf/MainPath/ProductError.lean`) |
-| Main polynomial ranges (`2⁻²⁴ ≤ x < 88.72…`, `-103.97… < x < -2⁻²⁵`) | 520 093 927 | 12.11 % | value error (`≤ 2 · 10⁻¹⁵ · exp x`) + 278 619 Chebyshev SLZ TMD certificates (`Expf/MainPath/Tmd/`) + 103 pointwise exceptions (`Expf/MainPath/PointwiseExceptions.lean`) |
+| Zeros, infinities, NaNs, `\|x\| ≤ 2⁻²⁶`, overflow, underflow | 3 749 616 693 | 87.30 % | `Expf/Proof/DoubleEval/ShortPaths/Ranges.lean` |
+| Tiny & near-underflow main-path intervals | 25 256 675 | 0.59 % | analytic (`Expf/Proof/DoubleEval/MainPath/ProductError.lean`) |
+| Main polynomial ranges (`2⁻²⁴ ≤ x < 88.72…`, `-103.97… < x < -2⁻²⁵`) | 520 093 927 | 12.11 % | value error (`≤ 2 · 10⁻¹⁵ · exp x`) + 278 619 Chebyshev SLZ TMD certificates (`Expf/Proof/DoubleEval/MainPath/Tmd/`) + 103 pointwise exceptions (`Expf/Proof/DoubleEval/MainPath/PointwiseExceptions.lean`) |
 
 Every statement and theorem explicitly names its extracted plan (there is no "default" plan alias).
 For `expf`, `expfDoubleEval_correctlyRounded` is complete, while statements and proved short-path

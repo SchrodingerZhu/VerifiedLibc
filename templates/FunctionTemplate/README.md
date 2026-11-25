@@ -12,8 +12,11 @@ Checklist:
 2. Extract the LLVM libc evaluation plans into `LibcMath/Kernels/<Function>/Generated/` with `ast2lean`
    (keeping generated files isolated from hand-written ones) and list them in `Plans.lean`.
 3. Define the `CorrectlyRounded` statement(s) in `Statement.lean`.
-4. Prove the short-path ranges in `ShortPaths/SymbolicExecution.lean` and `ShortPaths/Ranges.lean`.
-5. Split the main path into one file per numerical-analysis step under `MainPath/`, reusing
+4. For each plan, rename `Proof/Plan.lean` and `Proof/Plan/` to the name of the plan, and prove the
+   short-path ranges in `Proof/<Plan>/ShortPaths/SymbolicExecution.lean` and `Ranges.lean`. Facts
+   that several plans share go to `Proof/Common.lean`.
+5. Split the main path into one file per numerical-analysis step under `Proof/<Plan>/MainPath/`,
+   reusing
    `LibcMath/Analysis/RangeReduction.lean`, `LibcMath/Analysis/Horner.lean`,
    `LibcMath/Analysis/RoundingTransfer.lean`, and `LibcMath/Analysis/ChebTmd.lean`. Any step not
    yet proved must stay a named `sorry` lemma with a `/-- **Open.** ... -/` docstring.

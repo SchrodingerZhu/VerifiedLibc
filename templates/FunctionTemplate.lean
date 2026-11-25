@@ -1,31 +1,17 @@
 import LibcMath.Kernels.Fn.Plans
 import LibcMath.Kernels.Fn.Statement
-import LibcMath.Kernels.Fn.ShortPaths.Ranges
-import LibcMath.Kernels.Fn.MainPath.Step
+import LibcMath.Kernels.Fn.Proof.Plan
 import LibcMath.Kernels.Fn.Examples
 
 /-!
-# Extracted `<fn>` implementations: correctness theorems
+# `<fn>`: where everything is
 
-Entry point for the proof of `math::<plan>::<fn>`. Every statement and theorem explicitly names
-its extracted evaluation plan (never a "default" alias). Short paths are proved in
-`Fn/ShortPaths/`, numerical analysis of the main path lives in `Fn/MainPath/` (one file per step),
-and `fnPlan_correctlyRounded` assembles them here.
+List each extracted plan here with its state (complete, short paths only, extracted only) and the
+name of its theorem. Every statement and theorem names its evaluation plan; there is no default.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan, with `Proof/<Plan>/ShortPaths/` and
+  `Proof/<Plan>/MainPath/`.
+* `Proof/Common.lean`: facts that the plans share, if there are any.
 -/
-
-namespace LibcMath.Kernels.Fn
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open Model (IEEERoundingMode)
-
-/-- `math::<plan>::<fn>` is correctly rounded across the four rounding directions of C. -/
-theorem fnPlan_correctlyRounded : FnPlanCorrectlyRounded := by
-  refine correctlyRounded_of_holdsOnBits fun mode hmode => ?_
-  -- Combine `ShortPaths.holdsOnBits_short_paths_plan hmode` and
-  -- `MainPath.correctAt_plan_main hmode` with `HoldsOnBits.append`.
-  sorry
-
-#guard_msgs in
-#print axioms fnPlan_correctlyRounded
-
-end LibcMath.Kernels.Fn

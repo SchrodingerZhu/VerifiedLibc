@@ -1,0 +1,19 @@
+\title{The proofs of \code{\verb~|expf~} are kept by plan, under \code{\verb~|Kernels/Expf/Proof/<Plan>~}}
+\taxon{Change}
+\date{2026-11-25}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{architecture}
+\tag{expf}
+\import{base-macros}
+
+\p{Asked for by the maintainer on 2026-11-25. No statement or proof changes; declarations moved and their namespaces changed.}
+\ul{
+\li{\strong{One directory and one theorem file for each plan.} \code{\verb~|Proof/DoubleEval.lean~} has \code{\verb~|expfDoubleEval_correctlyRounded~}, and \code{\verb~|Proof/DoubleEval/~} has \code{\verb~|ShortPaths/~} and \code{\verb~|MainPath/~}, the certificates included. \code{\verb~|Proof/DoubleEvalFma~}, \code{\verb~|Proof/StaticRounding~} and \code{\verb~|Proof/IntegerEval~} have a theorem file and \code{\verb~|ShortPaths/~} each. The namespace is \code{\verb~|LibcMath.Kernels.Expf.Proof.<Plan>~}.}
+\li{\strong{The files that held four plans are split.} \code{\verb~|ShortPaths/SymbolicExecution.lean~} and \code{\verb~|ShortPaths/Ranges.lean~} became one pair for each plan. Ten lemmas about bit patterns that the plans share, which were private, are public in \code{\verb~|Proof/Common.lean~}. \code{\verb~|IntegerEval~} imports \code{\verb~|StaticRounding~}, whose short paths it takes over.}
+\li{\strong{\code{\verb~|Kernels/Expf.lean~} has no declarations.} It imports the plans and lists each with its state and the name of its theorem.}
+\li{\strong{What is still a hypothesis.} The theorems of the three other plans take their main ranges as a hypothesis (\code{\verb~|…_of_mainRanges~}); this change moved them and did not alter them. Each theorem file now says in its first line that the proof is not complete.}
+\li{The template, [note-adding-a-function](note-adding-a-function), \code{\verb~|AGENTS.md~} and \code{\verb~|README.md~} describe the layout.}
+\li{\strong{Verified.} \code{\verb~|lake build LibcMath checkrange difftest-expf-model~} completes with no \code{\verb~|sorry~}; \code{\verb~|scripts/check-open.py~} and the tests of the extractor pass.}
+}
