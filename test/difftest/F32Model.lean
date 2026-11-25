@@ -123,6 +123,37 @@ import LibcMath.Kernels.FmaximumMagf.Generated.GenericSse2
 import LibcMath.Kernels.FminimumMagf.Generated.GenericSse2
 import LibcMath.Kernels.FmaximumMagNumf.Generated.GenericSse2
 import LibcMath.Kernels.FminimumMagNumf.Generated.GenericSse2
+import LibcMath.Kernels.Nextupf.Generated.GenericSse2
+import LibcMath.Kernels.Nextdownf.Generated.GenericSse2
+import LibcMath.Kernels.Nextafterf.Generated.GenericSse2
+import LibcMath.Kernels.Ldexpf.Generated.GenericSse2
+import LibcMath.Kernels.Scalbnf.Generated.GenericSse2
+import LibcMath.Kernels.Scalblnf.Generated.GenericSse2
+import LibcMath.Kernels.Logbf.Generated.GenericSse2
+import LibcMath.Kernels.Ilogbf.Generated.GenericSse2
+import LibcMath.Kernels.Llogbf.Generated.GenericSse2
+import LibcMath.Kernels.Frexpf.Generated.GenericSse2
+import LibcMath.Kernels.Modff.Generated.GenericSse2
+import LibcMath.Kernels.Fmodf.Generated.GenericSse2
+import LibcMath.Kernels.Remainderf.Generated.GenericSse2
+import LibcMath.Kernels.Remquof.Generated.GenericSse2
+import LibcMath.Kernels.Getpayloadf.Generated.GenericSse2
+import LibcMath.Kernels.Setpayloadf.Generated.GenericSse2
+import LibcMath.Kernels.Setpayloadsigf.Generated.GenericSse2
+import LibcMath.Kernels.Totalorderf.Generated.GenericSse2
+import LibcMath.Kernels.Totalordermagf.Generated.GenericSse2
+import LibcMath.Kernels.Canonicalizef.Generated.GenericSse2
+import LibcMath.Kernels.Iscanonicalf.Generated.GenericSse2
+import LibcMath.Kernels.Isnanf.Generated.GenericSse2
+import LibcMath.Kernels.Issignalingf.Generated.GenericSse2
+import LibcMath.Kernels.Lrintf.Generated.GenericSse2
+import LibcMath.Kernels.Llrintf.Generated.GenericSse2
+import LibcMath.Kernels.Lroundf.Generated.GenericSse2
+import LibcMath.Kernels.Llroundf.Generated.GenericSse2
+import LibcMath.Kernels.Fromfpf.Generated.GenericSse2
+import LibcMath.Kernels.Fromfpxf.Generated.GenericSse2
+import LibcMath.Kernels.Ufromfpf.Generated.GenericSse2
+import LibcMath.Kernels.Ufromfpxf.Generated.GenericSse2
 
 /-!
 # Generic Lean model runner for binary32 differential testing
@@ -449,6 +480,69 @@ def lookupKernel (fn plan : String) : Option F32Entry :=
       some (.bF32 LibcMath.Kernels.FmaximumMagNumf.Generated.GenericSse2.kernel.eval)
   | "fminimum_mag_numf", "generic_sse2" =>
       some (.bF32 LibcMath.Kernels.FminimumMagNumf.Generated.GenericSse2.kernel.eval)
+  | "nextupf", "generic_sse2" =>
+      some (.uF32 LibcMath.Kernels.Nextupf.Generated.GenericSse2.kernel.eval)
+  | "nextdownf", "generic_sse2" =>
+      some (.uF32 LibcMath.Kernels.Nextdownf.Generated.GenericSse2.kernel.eval)
+  | "nextafterf", "generic_sse2" =>
+      some (.bF32 LibcMath.Kernels.Nextafterf.Generated.GenericSse2.kernel.eval)
+  | "ldexpf", "generic_sse2" =>
+      some (.uF32InI32 LibcMath.Kernels.Ldexpf.Generated.GenericSse2.ldexpf)
+  | "scalbnf", "generic_sse2" =>
+      some (.uF32InI32 LibcMath.Kernels.Scalbnf.Generated.GenericSse2.scalbnf)
+  | "scalblnf", "generic_sse2" =>
+      some (.uF32InI64 LibcMath.Kernels.Scalblnf.Generated.GenericSse2.scalblnf)
+  | "logbf", "generic_sse2" =>
+      some (.uF32 LibcMath.Kernels.Logbf.Generated.GenericSse2.kernel.eval)
+  | "ilogbf", "generic_sse2" =>
+      some (.uF32I32 fun _ x => LibcMath.Kernels.Ilogbf.Generated.GenericSse2.ilogbf x)
+  | "llogbf", "generic_sse2" =>
+      some (.uF32I64 fun _ x => LibcMath.Kernels.Llogbf.Generated.GenericSse2.llogbf x)
+  | "frexpf", "generic_sse2" =>
+      some (.uF32OutI32 fun _ x => LibcMath.Kernels.Frexpf.Generated.GenericSse2.frexpf x)
+  | "modff", "generic_sse2" =>
+      some (.uF32OutF32 LibcMath.Kernels.Modff.Generated.GenericSse2.modff)
+  | "fmodf", "generic_sse2" =>
+      some (.bF32 LibcMath.Kernels.Fmodf.Generated.GenericSse2.kernel.eval)
+  | "remainderf", "generic_sse2" =>
+      some (.bF32 LibcMath.Kernels.Remainderf.Generated.GenericSse2.kernel.eval)
+  | "remquof", "generic_sse2" =>
+      some (.bF32OutI32 LibcMath.Kernels.Remquof.Generated.GenericSse2.remquof)
+  | "getpayloadf", "generic_sse2" =>
+      some (.uF32 LibcMath.Kernels.Getpayloadf.Generated.GenericSse2.kernel.eval)
+  | "setpayloadf", "generic_sse2" =>
+      some (.uOutF32I32 LibcMath.Kernels.Setpayloadf.Generated.GenericSse2.setpayloadf)
+  | "setpayloadsigf", "generic_sse2" =>
+      some (.uOutF32I32 LibcMath.Kernels.Setpayloadsigf.Generated.GenericSse2.setpayloadsigf)
+  | "totalorderf", "generic_sse2" =>
+      some (.bPtrI32 fun _ x y => LibcMath.Kernels.Totalorderf.Generated.GenericSse2.totalorderf x y)
+  | "totalordermagf", "generic_sse2" =>
+      some (.bPtrI32 fun _ x y =>
+        LibcMath.Kernels.Totalordermagf.Generated.GenericSse2.totalordermagf x y)
+  | "canonicalizef", "generic_sse2" =>
+      some (.uOutF32I32 fun _ x => LibcMath.Kernels.Canonicalizef.Generated.GenericSse2.canonicalizef x)
+  | "iscanonicalf", "generic_sse2" =>
+      some (.uF32I32 fun _ x => LibcMath.Kernels.Iscanonicalf.Generated.GenericSse2.iscanonicalf x)
+  | "isnanf", "generic_sse2" =>
+      some (.uF32I32 fun _ x => LibcMath.Kernels.Isnanf.Generated.GenericSse2.isnanf x)
+  | "issignalingf", "generic_sse2" =>
+      some (.uF32I32 fun _ x => LibcMath.Kernels.Issignalingf.Generated.GenericSse2.issignalingf x)
+  | "lrintf", "generic_sse2" =>
+      some (.uF32I64 LibcMath.Kernels.Lrintf.Generated.GenericSse2.lrintf)
+  | "llrintf", "generic_sse2" =>
+      some (.uF32I64 LibcMath.Kernels.Llrintf.Generated.GenericSse2.llrintf)
+  | "lroundf", "generic_sse2" =>
+      some (.uF32I64 fun _ x => LibcMath.Kernels.Lroundf.Generated.GenericSse2.lroundf x)
+  | "llroundf", "generic_sse2" =>
+      some (.uF32I64 fun _ x => LibcMath.Kernels.Llroundf.Generated.GenericSse2.llroundf x)
+  | "fromfpf", "generic_sse2" =>
+      some (.uF32FromFp fun _ x r w => LibcMath.Kernels.Fromfpf.Generated.GenericSse2.fromfpf x r w)
+  | "fromfpxf", "generic_sse2" =>
+      some (.uF32FromFp fun _ x r w => LibcMath.Kernels.Fromfpxf.Generated.GenericSse2.fromfpxf x r w)
+  | "ufromfpf", "generic_sse2" =>
+      some (.uF32FromFp LibcMath.Kernels.Ufromfpf.Generated.GenericSse2.ufromfpf)
+  | "ufromfpxf", "generic_sse2" =>
+      some (.uF32FromFp LibcMath.Kernels.Ufromfpxf.Generated.GenericSse2.ufromfpxf)
   | _, _ => none
 
 def evalUnaryLine (entry : F32Entry) (mode : IEEERoundingMode) (bx : BitVec 32) : String :=

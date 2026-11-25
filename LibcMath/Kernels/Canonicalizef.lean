@@ -1,0 +1,35 @@
+import LibcMath.Framework.Spec
+import LibcMath.Kernels.Canonicalizef.Generated.GenericSse2
+
+/-!
+# Extracted `canonicalizef` generic SSE2 plan
+
+Collects the extracted LLVM libc `canonicalizef` (`generic_sse2`) plan and states its obligation.
+Every statement names its microarch plan explicitly.
+-/
+
+namespace LibcMath.Kernels.Canonicalizef
+
+open FloatLib.Floats.Formats.BinaryInterchange
+open Model (IEEERoundingMode)
+open LibcMath.Libc
+open LibcMath.Kernels.Canonicalizef.Generated
+
+/-- Definedness (no C++ undefined behavior) of `canonicalizef` (`generic_sse2`). -/
+def CanonicalizefGenericSse2Defined : Prop :=
+  ∀ x : Model .binary32, (GenericSse2.canonicalizef x).isSome
+
+/-- **Open.** Prove `canonicalizef` (`generic_sse2`) executes without C++ undefined behavior. -/
+theorem canonicalizefGenericSse2_defined : CanonicalizefGenericSse2Defined := by
+  sorry
+
+/--
+info: 'LibcMath.Kernels.Canonicalizef.canonicalizefGenericSse2_defined' depends on axioms: [propext,
+ sorryAx,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms canonicalizefGenericSse2_defined
+
+end LibcMath.Kernels.Canonicalizef

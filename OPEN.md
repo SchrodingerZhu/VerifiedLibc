@@ -4,7 +4,7 @@ Generated from every `sorry` under `LibcMath/` by `scripts/check-open.py`.
 Do not edit by hand; run `python3 scripts/check-open.py --update` after changing
 the open lemmas.
 
-Total open obligations: **129**.
+Total open obligations: **160**.
 
 | File | Lemma | Summary |
 |---|---|---|
@@ -28,6 +28,7 @@ Total open obligations: **129**.
 | `LibcMath/Kernels/Atanf.lean` | `atanfFloatEval_defined` | **Open.** Prove `atanf` (`float_eval`) executes without C++ undefined behavior. |
 | `LibcMath/Kernels/Atanhf.lean` | `atanhfSse2_correctlyRounded` | **Open.** Prove `atanhf` (`sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Atanhf.lean` | `atanhfAvx2Fma_correctlyRounded` | **Open.** Prove `atanhf` (`avx2_fma`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Canonicalizef.lean` | `canonicalizefGenericSse2_defined` | **Open.** Prove `canonicalizef` (`generic_sse2`) executes without C++ undefined behavior. |
 | `LibcMath/Kernels/Cbrtf.lean` | `cbrtfSse2_correctlyRounded` | **Open.** Prove `cbrtf` (`sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Cbrtf.lean` | `cbrtfAvx2Fma_correctlyRounded` | **Open.** Prove `cbrtf` (`avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Ceilf.lean` | `ceilfGenericSse2_correctlyRounded` | **Open.** Prove `ceilf` (`generic_sse2`) is correctly rounded in all four C modes. |
@@ -84,24 +85,46 @@ Total open obligations: **129**.
 | `LibcMath/Kernels/FminimumMagf.lean` | `fminimum_magfGenericSse2_correctlyRounded` | **Open.** Prove `fminimum_magf` (`generic_sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/FminimumNumf.lean` | `fminimum_numfGenericSse2_correctlyRounded` | **Open.** Prove `fminimum_numf` (`generic_sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Fminimumf.lean` | `fminimumfGenericSse2_correctlyRounded` | **Open.** Prove `fminimumf` (`generic_sse2`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Fmodf.lean` | `fmodfGenericSse2_defined` | **Open.** Prove `fmodf` (`generic_sse2`) executes without C++ undefined behavior. |
+| `LibcMath/Kernels/Frexpf.lean` | `frexpfGenericSse2_defined` | **Open.** Prove `frexpf` (`generic_sse2`) executes without C++ undefined behavior. |
+| `LibcMath/Kernels/Fromfpf.lean` | `fromfpfGenericSse2_defined` | **Open.** Prove `fromfpf` (`generic_sse2`) executes without C++ undefined behavior. |
+| `LibcMath/Kernels/Fromfpxf.lean` | `fromfpxfGenericSse2_defined` | **Open.** Prove `fromfpxf` (`generic_sse2`) executes without C++ undefined behavior. |
+| `LibcMath/Kernels/Getpayloadf.lean` | `getpayloadfGenericSse2_correctlyRounded` | **Open.** Prove `getpayloadf` (`generic_sse2`) matches `FloatLibSpec.getpayload` in C modes. |
 | `LibcMath/Kernels/Hypotf.lean` | `hypotfGenericSse2_correctlyRounded` | **Open.** Prove `hypotf` (`generic_sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Hypotf.lean` | `hypotfAvx2Fma_correctlyRounded` | **Open.** Prove `hypotf` (`avx2_fma`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Ilogbf.lean` | `ilogbfGenericSse2_defined` | **Open.** Prove `ilogbf` (`generic_sse2`) executes without C++ undefined behavior. |
+| `LibcMath/Kernels/Iscanonicalf.lean` | `iscanonicalfGenericSse2_correct` | **Open.** Prove `iscanonicalf` (`generic_sse2`) matches IEEE canonical encoding predicate. |
+| `LibcMath/Kernels/Isnanf.lean` | `isnanfGenericSse2_correct` | **Open.** Prove `isnanf` (`generic_sse2`) matches IEEE NaN classification. |
+| `LibcMath/Kernels/Issignalingf.lean` | `issignalingfGenericSse2_correct` | **Open.** Prove `issignalingf` (`generic_sse2`) matches IEEE sNaN test. |
+| `LibcMath/Kernels/Ldexpf.lean` | `ldexpfGenericSse2_defined` | **Open.** Prove `ldexpf` (`generic_sse2`) executes without C++ undefined behavior. |
 | `LibcMath/Kernels/Lgammaf.lean` | `lgammafSse2_correctlyRounded` | **Open.** Prove `lgammaf` (`sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Lgammaf.lean` | `lgammafAvx2Fma_correctlyRounded` | **Open.** Prove `lgammaf` (`avx2_fma`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Llogbf.lean` | `llogbfGenericSse2_defined` | **Open.** Prove `llogbf` (`generic_sse2`) executes without C++ undefined behavior. |
+| `LibcMath/Kernels/Llrintf.lean` | `llrintfGenericSse2_defined` | **Open.** Prove `llrintf` (`generic_sse2`) executes without C++ undefined behavior. |
+| `LibcMath/Kernels/Llroundf.lean` | `llroundfGenericSse2_defined` | **Open.** Prove `llroundf` (`generic_sse2`) executes without C++ undefined behavior. |
 | `LibcMath/Kernels/Log10f.lean` | `log10fDoubleEvalSse2_correctlyRounded` | **Open.** Prove `log10f` (`double_eval_sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Log10f.lean` | `log10fDoubleEvalAvx2Fma_correctlyRounded` | **Open.** Prove `log10f` (`double_eval_avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Log1pf.lean` | `log1pfDoubleEvalSse2_correctlyRounded` | **Open.** Prove `log1pf` (`double_eval_sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Log1pf.lean` | `log1pfDoubleEvalAvx2Fma_correctlyRounded` | **Open.** Prove `log1pf` (`double_eval_avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Log2f.lean` | `log2fDoubleEvalSse2_correctlyRounded` | **Open.** Prove `log2f` (`double_eval_sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Log2f.lean` | `log2fDoubleEvalAvx2Fma_correctlyRounded` | **Open.** Prove `log2f` (`double_eval_avx2_fma`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Logbf.lean` | `logbfGenericSse2_defined` | **Open.** Prove `logbf` (`generic_sse2`) executes without C++ undefined behavior. |
 | `LibcMath/Kernels/Logf.lean` | `logfDoubleEvalSse2_correctlyRounded` | **Open.** Prove `logf` (`double_eval_sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Logf.lean` | `logfDoubleEvalAvx2Fma_correctlyRounded` | **Open.** Prove `logf` (`double_eval_avx2_fma`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Lrintf.lean` | `lrintfGenericSse2_defined` | **Open.** Prove `lrintf` (`generic_sse2`) executes without C++ undefined behavior. |
+| `LibcMath/Kernels/Lroundf.lean` | `lroundfGenericSse2_defined` | **Open.** Prove `lroundf` (`generic_sse2`) executes without C++ undefined behavior. |
+| `LibcMath/Kernels/Modff.lean` | `modffGenericSse2_defined` | **Open.** Prove `modff` (`generic_sse2`) executes without C++ undefined behavior. |
 | `LibcMath/Kernels/Nearbyintf.lean` | `nearbyintfGenericSse2_correctlyRounded` | **Open.** Prove `nearbyintf` (`generic_sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Nearbyintf.lean` | `nearbyintfBuiltinSse42_correctlyRounded` | **Open.** Prove `nearbyintf` (`builtin_sse42`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Nextafterf.lean` | `nextafterfGenericSse2_defined` | **Open.** Prove `nextafterf` (`generic_sse2`) executes without C++ undefined behavior. |
+| `LibcMath/Kernels/Nextdownf.lean` | `nextdownfGenericSse2_correctlyRounded` | **Open.** Prove `nextdownf` (`generic_sse2`) matches `FloatLibSpec.nextdown` in all C modes. |
+| `LibcMath/Kernels/Nextupf.lean` | `nextupfGenericSse2_correctlyRounded` | **Open.** Prove `nextupf` (`generic_sse2`) matches `FloatLibSpec.nextup` in all four C modes. |
 | `LibcMath/Kernels/Powf.lean` | `powfDoubleEvalSse2_correctlyRounded` | **Open.** Prove `powf` (`double_eval_sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Powf.lean` | `powfDoubleEvalSse42_correctlyRounded` | **Open.** Prove `powf` (`double_eval_sse42`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Powf.lean` | `powfDoubleEvalAvx2Fma_correctlyRounded` | **Open.** Prove `powf` (`double_eval_avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Powf.lean` | `powfFloatEval_defined` | **Open.** Prove `powf` (`float_eval`) executes without C++ undefined behavior. |
+| `LibcMath/Kernels/Remainderf.lean` | `remainderfGenericSse2_correctlyRounded` | **Open.** Prove `remainderf` (`generic_sse2`) matches IEEE remainder in all C modes. |
+| `LibcMath/Kernels/Remquof.lean` | `remquofGenericSse2_defined` | **Open.** Prove `remquof` (`generic_sse2`) executes without C++ undefined behavior. |
 | `LibcMath/Kernels/Rintf.lean` | `rintfGenericSse2_correctlyRounded` | **Open.** Prove `rintf` (`generic_sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Rintf.lean` | `rintfBuiltinSse42_correctlyRounded` | **Open.** Prove `rintf` (`builtin_sse42`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Roundevenf.lean` | `roundevenfGenericSse2_correctlyRounded` | **Open.** Prove `roundevenf` (`generic_sse2`) is correctly rounded in all four C modes. |
@@ -110,6 +133,10 @@ Total open obligations: **129**.
 | `LibcMath/Kernels/Roundf.lean` | `roundfAArch64_correctlyRounded` | **Open.** Prove `roundf` (`aarch64`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Rsqrtf.lean` | `rsqrtfSse2_correctlyRounded` | **Open.** Prove `rsqrtf` (`sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Rsqrtf.lean` | `rsqrtfAvx2Fma_correctlyRounded` | **Open.** Prove `rsqrtf` (`avx2_fma`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Scalblnf.lean` | `scalblnfGenericSse2_defined` | **Open.** Prove `scalblnf` (`generic_sse2`) executes without C++ undefined behavior. |
+| `LibcMath/Kernels/Scalbnf.lean` | `scalbnfGenericSse2_defined` | **Open.** Prove `scalbnf` (`generic_sse2`) executes without C++ undefined behavior. |
+| `LibcMath/Kernels/Setpayloadf.lean` | `setpayloadfGenericSse2_defined` | **Open.** Prove `setpayloadf` (`generic_sse2`) executes without C++ undefined behavior. |
+| `LibcMath/Kernels/Setpayloadsigf.lean` | `setpayloadsigfGenericSse2_defined` | **Open.** Prove `setpayloadsigf` (`generic_sse2`) executes without C++ undefined behavior. |
 | `LibcMath/Kernels/Sincosf.lean` | `sincosfSse2_correctlyRounded` | **Open.** Prove `sincosf` (`sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Sincosf.lean` | `sincosfSse42_correctlyRounded` | **Open.** Prove `sincosf` (`sse42`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Sincosf.lean` | `sincosfAvx2Fma_correctlyRounded` | **Open.** Prove `sincosf` (`avx2_fma`) is correctly rounded in all four C modes. |
@@ -135,5 +162,9 @@ Total open obligations: **129**.
 | `LibcMath/Kernels/Tanpif.lean` | `tanpifSse2_correctlyRounded` | **Open.** Prove `tanpif` (`sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Tanpif.lean` | `tanpifSse42_correctlyRounded` | **Open.** Prove `tanpif` (`sse42`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Tanpif.lean` | `tanpifAvx2Fma_correctlyRounded` | **Open.** Prove `tanpif` (`avx2_fma`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Totalorderf.lean` | `totalorderfGenericSse2_correct` | **Open.** Prove `totalorderf` (`generic_sse2`) matches `FloatLibSpec.totalorder`. |
+| `LibcMath/Kernels/Totalordermagf.lean` | `totalordermagfGenericSse2_correct` | **Open.** Prove `totalordermagf` (`generic_sse2`) matches `FloatLibSpec.totalordermag`. |
 | `LibcMath/Kernels/Truncf.lean` | `truncfGenericSse2_correctlyRounded` | **Open.** Prove `truncf` (`generic_sse2`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Truncf.lean` | `truncfBuiltinSse42_correctlyRounded` | **Open.** Prove `truncf` (`builtin_sse42`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Ufromfpf.lean` | `ufromfpfGenericSse2_defined` | **Open.** Prove `ufromfpf` (`generic_sse2`) executes without C++ undefined behavior. |
+| `LibcMath/Kernels/Ufromfpxf.lean` | `ufromfpxfGenericSse2_defined` | **Open.** Prove `ufromfpxf` (`generic_sse2`) executes without C++ undefined behavior. |
