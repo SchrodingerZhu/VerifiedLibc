@@ -63,6 +63,7 @@ constexpr auto floatFmtShort(FloatFmt fmt) -> std::string_view {
 
 enum class CoreTypeKind : std::uint8_t {
   FPBits,
+  NormalFloat,
   DyadicFloat,
   NumberPair,
   TripleDouble,
@@ -227,6 +228,7 @@ enum class CoreOpKind : std::uint8_t {
   FPBitsSetMantissa,
   FPBitsSetUintval,
   FPBitsQuietNan,
+  FPBitsSignalingNan,
   FPBitsInf,
   FPBitsZero,
   FPBitsMaxNormal,
@@ -235,6 +237,14 @@ enum class CoreOpKind : std::uint8_t {
   FPBitsMinNormal,
   FPBitsOne,
   FPBitsCreateValue,
+
+  // NormalFloat<T> operations.
+  NormalFloatOfVal,
+  NormalFloatOfBits,
+  NormalFloatMkNorm,
+  NormalFloatToVal,
+  NormalFloatMul2,
+  NormalFloatCmp,
 
   // Integer bit-manipulation intrinsics.
   Clz,
@@ -253,6 +263,7 @@ enum class CoreOpKind : std::uint8_t {
   OptionalSome,
   SignIsPos,
   SignIsNeg,
+  SignNegate,
   TransparentHint,
 };
 
@@ -425,9 +436,6 @@ inline constexpr std::array kFreeCoreOps = std::to_array<CoreOpSpec>({
     {CoreOpKind::FminimumMagNum, "fputil::fminimum_mag_num", "Libc.fminimumMagNum", false, false,
      false, false},
     {CoreOpKind::GetPayload, "fputil::getpayload", "Libc.getPayload", false, false, false, false},
-    {CoreOpKind::SetPayload, "fputil::setpayload", "Libc.setPayload", false, false, false, false},
-    {CoreOpKind::SetPayloadSig, "fputil::setpayloadsig", "Libc.setPayloadSignaling", false, false,
-     false, false},
     {CoreOpKind::TotalOrder, "fputil::totalorder", "Libc.totalOrder", false, false, false, false},
     {CoreOpKind::TotalOrderMag, "fputil::totalordermag", "Libc.totalOrderMag", false, false, false,
      false},
@@ -590,9 +598,13 @@ inline constexpr std::array kFPBitsMethods = std::to_array<CoreOpSpec>({
      false, false, false},
     {CoreOpKind::FPBitsSetMantissa, "set_mantissa", "Libc.FPBits.setMantissa", false, false, false,
      false},
+    {CoreOpKind::FPBitsSetMantissa, "set_significand", "Libc.FPBits.setMantissa", false, false,
+     false, false},
     {CoreOpKind::FPBitsSetUintval, "set_uintval", "Libc.FPBits.setUintval", false, false, false,
      false},
     {CoreOpKind::FPBitsQuietNan, "quiet_nan", "Libc.FPBits.quietNaN", false, false, false, false},
+    {CoreOpKind::FPBitsSignalingNan, "signaling_nan", "Libc.FPBits.signalingNaN", false, false,
+     false, false},
     {CoreOpKind::FPBitsInf, "inf", "Libc.FPBits.inf", false, false, false, false},
     {CoreOpKind::FPBitsZero, "zero", "Libc.FPBits.zero", false, false, false, false},
     {CoreOpKind::FPBitsMaxNormal, "max_normal", "Libc.FPBits.maxNormal", false, false, false,
@@ -611,6 +623,7 @@ inline constexpr std::array kFPBitsMethods = std::to_array<CoreOpSpec>({
 inline constexpr std::array kSignMethods = std::to_array<CoreOpSpec>({
     {CoreOpKind::SignIsPos, "is_pos", "Libc.Sign.isPos", false, false, false, false},
     {CoreOpKind::SignIsNeg, "is_neg", "Libc.Sign.isNeg", false, false, false, false},
+    {CoreOpKind::SignNegate, "negate", "Libc.Sign.negate", false, false, false, false},
 });
 
 inline constexpr std::array kDyadicMethods = std::to_array<CoreOpSpec>({
@@ -656,9 +669,14 @@ inline constexpr std::array kOptionalMethods = std::to_array<CoreOpSpec>({
     {CoreOpKind::OptionalValue, "value", "Option.get!", false, false, false, false},
 });
 
+inline constexpr std::array kNormalFloatMethods = std::to_array<CoreOpSpec>({
+    {CoreOpKind::NormalFloatMul2, "mul2", "Libc.NormalFloat.mul2", false, false, false, false},
+    {CoreOpKind::NormalFloatCmp, "cmp", "Libc.NormalFloat.cmp", false, false, false, false},
+});
+
 auto matchCoreType(std::string_view raw_qualified) -> std::optional<CoreTypeKind> {
   auto norm = normalizeQualifiedName(raw_qualified);
-  constexpr std::array<std::pair<std::string_view, CoreTypeKind>, 19> kTypes = {{
+  constexpr std::array<std::pair<std::string_view, CoreTypeKind>, 21> kTypes = {{
       {"fputil::FPBits", CoreTypeKind::FPBits},
       {"FPBits", CoreTypeKind::FPBits},
       {"fputil::internal::FPRepImpl", CoreTypeKind::FPBits},
@@ -666,6 +684,8 @@ auto matchCoreType(std::string_view raw_qualified) -> std::optional<CoreTypeKind
       {"fputil::internal::FPRepBase", CoreTypeKind::FPBits},
       {"fputil::internal::FPStorage", CoreTypeKind::FPBits},
       {"fputil::internal::FPBase", CoreTypeKind::FPBits},
+      {"fputil::NormalFloat", CoreTypeKind::NormalFloat},
+      {"NormalFloat", CoreTypeKind::NormalFloat},
       {"fputil::DyadicFloat", CoreTypeKind::DyadicFloat},
       {"DyadicFloat", CoreTypeKind::DyadicFloat},
       {"fputil::DoubleDouble", CoreTypeKind::NumberPair},
@@ -712,6 +732,8 @@ auto matchMethodCoreOp(CoreTypeKind owner, std::string_view method_name)
   switch (owner) {
   case CoreTypeKind::FPBits:
     return lookup(kFPBitsMethods);
+  case CoreTypeKind::NormalFloat:
+    return lookup(kNormalFloatMethods);
   case CoreTypeKind::DyadicFloat:
     return lookup(kDyadicMethods);
   case CoreTypeKind::BigInt:

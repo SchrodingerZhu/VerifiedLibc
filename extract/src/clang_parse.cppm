@@ -328,7 +328,8 @@ auto unwrapExprSugar(const Expr *e) -> const Expr * {
     } else if (const auto *ic = dyn_cast<ImplicitCastExpr>(e)) {
       auto ck = ic->getCastKind();
       if (ck == CK_LValueToRValue || ck == CK_NoOp || ck == CK_FunctionToPointerDecay ||
-          ck == CK_ArrayToPointerDecay) {
+          ck == CK_ArrayToPointerDecay || ck == CK_DerivedToBase ||
+          ck == CK_UncheckedDerivedToBase) {
         e = ic->getSubExpr();
       } else {
         break;
@@ -372,6 +373,8 @@ public:
         switch (*core) {
         case CoreTypeKind::FPBits:
           return ir::Type::makeFPBits(getTemplateFirstFloatArg(spec, ctx_));
+        case CoreTypeKind::NormalFloat:
+          return ir::Type::makeNormalFloat(getTemplateFirstFloatArg(spec, ctx_));
         case CoreTypeKind::DyadicFloat:
           return ir::Type::makeDyadic(
               static_cast<std::uint32_t>(getTemplateFirstIntegralArg(spec, 128)));
@@ -410,9 +413,79 @@ public:
       }
 
       auto norm = normalizeQualifiedName(qname);
-      return ir::Type::makeStruct(shortLeanName(norm));
+      std::string sname = registerStruct(rd);
+      return ir::Type::makeStruct(std::move(sname));
     }
     return ir::Type::makeOpaque(qt.getAsString());
+  }
+
+  static auto isOutParam(const ParmVarDecl *p) -> bool {
+    QualType qt = p->getType().getCanonicalType();
+    if (const auto *lv = qt->getAs<LValueReferenceType>()) {
+      return !lv->getPointeeType().isConstQualified();
+    }
+    if (const auto *pt = qt->getAs<PointerType>()) {
+      return !pt->getPointeeType().isConstQualified() && !pt->getPointeeType()->isVoidType();
+    }
+    return false;
+  }
+
+  static auto isExceptValuesType(QualType qt) -> bool {
+    qt = qt.getNonReferenceType().getCanonicalType().getUnqualifiedType();
+    if (const auto *rt = qt->getAs<RecordType>()) {
+      return matchCoreType(rt->getDecl()->getQualifiedNameAsString()) == CoreTypeKind::ExceptValues;
+    }
+    return false;
+  }
+
+  auto registerStruct(const RecordDecl *rd) -> std::string {
+    rd = cast<RecordDecl>(rd->getCanonicalDecl());
+    if (auto it = structs_seen_.find(rd); it != structs_seen_.end()) {
+      return it->second;
+    }
+    auto cpp_name = normalizeQualifiedName(rd->getQualifiedNameAsString());
+    auto base = shortLeanName(cpp_name);
+    if (used_struct_names_.contains(base)) {
+      base = sanitizeLeanIdent(cpp_name);
+    }
+    std::string lean_name = base;
+    int suffix = 2;
+    while (used_struct_names_.contains(lean_name)) {
+      lean_name = std::format("{}_{}", base, suffix++);
+    }
+    used_struct_names_.insert(lean_name);
+    structs_seen_[rd] = lean_name;
+
+    if (const auto *cxx = dyn_cast<CXXRecordDecl>(rd); cxx && cxx->isLambda()) {
+      return lean_name;
+    }
+
+    const RecordDecl *def = rd->getDefinition();
+    if (!def) {
+      return lean_name;
+    }
+    ir::StructDef sdef;
+    sdef.lean_name = lean_name;
+    sdef.cpp_name = cpp_name;
+    if (const auto *cxx = dyn_cast<CXXRecordDecl>(def)) {
+      for (const auto &bs : cxx->bases()) {
+        if (const auto *brt = bs.getType()->getAs<RecordType>()) {
+          if (const RecordDecl *bdef = brt->getDecl()->getDefinition()) {
+            for (const FieldDecl *fd : bdef->fields()) {
+              sdef.fields.push_back(ir::StructField{fd->getNameAsString(),
+                                                    convertType(fd->getType())});
+            }
+          }
+        }
+      }
+    }
+    for (const FieldDecl *fd : def->fields()) {
+      sdef.fields.push_back(ir::StructField{fd->getNameAsString(), convertType(fd->getType())});
+    }
+    if (!sdef.fields.empty()) {
+      module_.structs.push_back(std::move(sdef));
+    }
+    return lean_name;
   }
 
   auto convertAPValue(const APValue &val, QualType qt) -> std::optional<ir::ConstVal> {
@@ -627,6 +700,31 @@ public:
     if (auto it = tables_seen_.find(vd); it != tables_seen_.end()) {
       return it->second;
     }
+    auto cpp_name = normalizeQualifiedName(vd->getQualifiedNameAsString());
+    if (matchesQualifiedSuffix(cpp_name, "nullopt")) {
+      return std::nullopt;
+    }
+    if (const auto *rd = vd->getType().getCanonicalType()->getAsRecordDecl()) {
+      if (const RecordDecl *def = rd->getDefinition()) {
+        bool has_fields = !def->field_empty();
+        if (!has_fields) {
+          if (const auto *cxx = dyn_cast<CXXRecordDecl>(def)) {
+            for (const auto &bs : cxx->bases()) {
+              if (const auto *brt = bs.getType()->getAs<RecordType>()) {
+                if (const RecordDecl *bdef = brt->getDecl()->getDefinition();
+                    bdef && !bdef->field_empty()) {
+                  has_fields = true;
+                  break;
+                }
+              }
+            }
+          }
+        }
+        if (!has_fields && !matchCoreType(rd->getQualifiedNameAsString())) {
+          return std::nullopt;
+        }
+      }
+    }
     const APValue *apv = vd->evaluateValue();
     if (!apv)
       return std::nullopt;
@@ -634,7 +732,6 @@ public:
     if (!cval)
       return std::nullopt;
 
-    auto cpp_name = normalizeQualifiedName(vd->getQualifiedNameAsString());
     auto base_name = sanitizeLeanIdent(vd->getNameAsString());
     if (used_table_names_.contains(base_name)) {
       base_name = sanitizeLeanIdent(cpp_name);
@@ -677,6 +774,27 @@ public:
     return unique;
   }
 
+  auto computeEffectiveReturnType(const FunctionDecl *fd) -> ir::TypePtr {
+    auto orig = convertType(fd->getReturnType());
+    std::vector<ir::TypePtr> elems;
+    if (!orig->isVoid()) {
+      elems.push_back(orig);
+    }
+    for (const ParmVarDecl *p : fd->parameters()) {
+      if (isOutParam(p)) {
+        QualType pqt = p->getType().getCanonicalType();
+        if (const auto *pt = pqt->getAs<PointerType>())
+          pqt = pt->getPointeeType();
+        elems.push_back(convertType(pqt));
+      }
+    }
+    if (elems.empty())
+      return orig;
+    if (elems.size() == 1)
+      return elems[0];
+    return ir::Type::makeTuple(std::move(elems));
+  }
+
   auto extractFunction(const FunctionDecl *fd, std::string lean_name_override = "")
       -> std::expected<void, std::string> {
     if (extracted_funcs_.contains(fd))
@@ -692,15 +810,25 @@ public:
     fn.cpp_name = normalizeQualifiedName(fd->getQualifiedNameAsString());
     fn.mangled_name = mangleDecl(ctx_, fd);
     fn.lean_name = assignFuncLeanName(fd, lean_name_override);
-    fn.return_type = convertType(fd->getReturnType());
+    fn.orig_return_type = convertType(fd->getReturnType());
+    fn.return_type = computeEffectiveReturnType(fd);
 
     for (const ParmVarDecl *p : fd->parameters()) {
       std::string pname = p->getNameAsString();
       if (pname.empty())
         pname = std::format("arg{}", fn.params.size());
-      fn.params.push_back(ir::Param{pname, convertType(p->getType())});
+      bool is_out = isOutParam(p);
+      QualType pqt = p->getType().getCanonicalType();
+      if (const auto *pt = pqt->getAs<PointerType>(); pt && !pt->getPointeeType()->isVoidType()) {
+        pqt = pt->getPointeeType();
+      }
+      fn.params.push_back(ir::Param{pname, convertType(pqt), is_out, false});
     }
 
+    auto saved_lambdas = std::move(local_lambdas_);
+    auto saved_lambda_specs = std::move(lambda_spec_names_);
+    local_lambdas_.clear();
+    lambda_spec_names_.clear();
     current_diags_.clear();
     if (const auto *cs = dyn_cast<CompoundStmt>(fd->getBody())) {
       fn.body_stmts = extractStmtList(cs);
@@ -708,6 +836,8 @@ public:
       extractStmtInto(fd->getBody(), fn.body_stmts);
     }
     fn.diagnostics = current_diags_;
+    local_lambdas_ = std::move(saved_lambdas);
+    lambda_spec_names_ = std::move(saved_lambda_specs);
 
     if (opts_.strict && !fn.diagnostics.empty()) {
       return std::unexpected(std::format("strict mode: {} unsupported construct(s) in '{}': {}",
@@ -769,6 +899,105 @@ private:
     return out;
   }
 
+  static auto unwrapTransparentAndCasts(const Expr *e) -> const Expr * {
+    while (e) {
+      e = unwrapExprSugar(e);
+      if (const auto *ce = dyn_cast_or_null<CastExpr>(e)) {
+        e = ce->getSubExpr();
+        continue;
+      }
+      if (const auto *call = dyn_cast_or_null<CallExpr>(e);
+          call && !isa<CXXMemberCallExpr>(call) && !isa<CXXOperatorCallExpr>(call)) {
+        if (const FunctionDecl *fd = call->getDirectCallee()) {
+          if (auto spec = matchFreeCoreOp(fd->getQualifiedNameAsString());
+              spec && spec->is_transparent && call->getNumArgs() >= 1) {
+            e = call->getArg(0);
+            continue;
+          }
+        }
+      }
+      break;
+    }
+    return e;
+  }
+
+  static auto unwrapLambdaExpr(const Expr *e) -> const LambdaExpr * {
+    e = unwrapExprSugar(e);
+    if (const auto *le = dyn_cast_or_null<LambdaExpr>(e))
+      return le;
+    if (const auto *cce = dyn_cast_or_null<CXXConstructExpr>(e); cce && cce->getNumArgs() == 1) {
+      return dyn_cast_or_null<LambdaExpr>(unwrapExprSugar(cce->getArg(0)));
+    }
+    return nullptr;
+  }
+
+  static auto extractOutTargetName(const Expr *raw) -> std::optional<std::string> {
+    const Expr *e = unwrapExprSugar(raw);
+    while (e) {
+      if (const auto *uo = dyn_cast<UnaryOperator>(e);
+          uo && (uo->getOpcode() == UO_AddrOf || uo->getOpcode() == UO_Deref)) {
+        e = unwrapExprSugar(uo->getSubExpr());
+      } else {
+        break;
+      }
+    }
+    if (const auto *dre = dyn_cast_or_null<DeclRefExpr>(e)) {
+      return dre->getDecl()->getNameAsString();
+    }
+    return std::nullopt;
+  }
+
+  auto tryExtractOutParamCall(const CallExpr *call,
+                              std::vector<std::pair<std::string, ir::TypePtr>> &out_targets)
+      -> std::optional<ir::ExprPtr> {
+    if (!call || isa<CXXMemberCallExpr>(call) || isa<CXXOperatorCallExpr>(call))
+      return std::nullopt;
+    const FunctionDecl *callee = call->getDirectCallee();
+    if (!callee)
+      return std::nullopt;
+    if (const auto *md = dyn_cast<CXXMethodDecl>(callee); md && md->isStatic()) {
+      if (matchCoreType(md->getParent()->getQualifiedNameAsString()))
+        return std::nullopt;
+    }
+    if (matchFreeCoreOp(callee->getQualifiedNameAsString()))
+      return std::nullopt;
+
+    bool any_out = false;
+    for (const ParmVarDecl *p : callee->parameters()) {
+      if (isOutParam(p)) {
+        any_out = true;
+        break;
+      }
+    }
+    if (!any_out)
+      return std::nullopt;
+
+    if (opts_.follow_helpers && callee->hasBody()) {
+      pending_helpers_.push_back(callee);
+    }
+    std::vector<ir::ExprPtr> in_args;
+    out_targets.clear();
+    for (unsigned i = 0; i < call->getNumArgs() && i < callee->getNumParams(); ++i) {
+      const ParmVarDecl *p = callee->getParamDecl(i);
+      if (isOutParam(p)) {
+        auto tname = extractOutTargetName(call->getArg(i));
+        if (!tname)
+          return std::nullopt;
+        QualType pqt = p->getType().getCanonicalType();
+        if (const auto *pt = pqt->getAs<PointerType>())
+          pqt = pt->getPointeeType();
+        out_targets.emplace_back(std::move(*tname), convertType(pqt));
+      } else {
+        in_args.push_back(extractExpr(call->getArg(i)));
+      }
+    }
+    auto lean_callee = assignFuncLeanName(callee);
+    auto eff_ret = computeEffectiveReturnType(callee);
+    return ir::Expr::make(
+        ir::FuncCallExpr{std::move(lean_callee), std::move(in_args), false, false},
+        std::move(eff_ret));
+  }
+
   void extractStmtInto(const Stmt *s, std::vector<ir::Stmt> &out) {
     if (!s || isa<NullStmt>(s))
       return;
@@ -799,12 +1028,72 @@ private:
           continue;
         }
         if (const auto *vd = dyn_cast<VarDecl>(d)) {
+          if (vd->hasInit()) {
+            if (const LambdaExpr *le = unwrapLambdaExpr(vd->getInit())) {
+              auto emitLambdaOp = [&](const CXXMethodDecl *call_op, std::string lname) {
+                ir::LocalFuncStmt lfs;
+                lfs.name = std::move(lname);
+                lfs.return_type = convertType(call_op->getReturnType());
+                for (const ParmVarDecl *p : call_op->parameters()) {
+                  std::string pname = p->getNameAsString();
+                  if (pname.empty())
+                    pname = std::format("arg{}", lfs.params.size());
+                  lfs.params.emplace_back(std::move(pname), convertType(p->getType()));
+                }
+                local_lambdas_.insert(lfs.name);
+                if (const auto *body_cs = dyn_cast<CompoundStmt>(call_op->getBody())) {
+                  lfs.body_stmts = extractStmtList(body_cs);
+                } else {
+                  extractStmtInto(call_op->getBody(), lfs.body_stmts);
+                }
+                out.push_back(ir::Stmt{std::move(lfs)});
+              };
+              if (le->isGenericLambda()) {
+                std::vector<const CXXMethodDecl *> specs;
+                if (const auto *ftd = le->getLambdaClass()->getDependentLambdaCallOperator()) {
+                  for (const FunctionDecl *sp : ftd->specializations()) {
+                    if (const auto *md = dyn_cast<CXXMethodDecl>(sp); md && md->hasBody()) {
+                      specs.push_back(md);
+                    }
+                  }
+                }
+                if (specs.size() == 1) {
+                  std::string lname = vd->getNameAsString();
+                  lambda_spec_names_[specs[0]->getCanonicalDecl()] = lname;
+                  emitLambdaOp(specs[0], std::move(lname));
+                } else {
+                  for (std::size_t idx = 0; idx < specs.size(); ++idx) {
+                    std::string lname = std::format("{}_s{}", vd->getNameAsString(), idx);
+                    lambda_spec_names_[specs[idx]->getCanonicalDecl()] = lname;
+                    emitLambdaOp(specs[idx], std::move(lname));
+                  }
+                }
+              } else {
+                emitLambdaOp(le->getCallOperator(), vd->getNameAsString());
+              }
+              continue;
+            }
+          }
           bool is_const_table =
               (vd->isConstexpr() || vd->getType().isConstQualified()) &&
-              (vd->getType()->isArrayType() ||
+              (vd->getType()->isArrayType() || isExceptValuesType(vd->getType()) ||
                (vd->isStaticLocal() && vd->getType()->isRecordType()));
           if (is_const_table && registerTable(vd).has_value()) {
             continue;
+          }
+          if (vd->hasInit()) {
+            if (const auto *call = dyn_cast_or_null<CallExpr>(unwrapExprSugar(vd->getInit()))) {
+              std::vector<std::pair<std::string, ir::TypePtr>> out_targets;
+              if (auto ocall = tryExtractOutParamCall(call, out_targets)) {
+                ir::TupleDeclStmt tds;
+                tds.bindings.emplace_back(vd->getNameAsString(), convertType(vd->getType()));
+                for (auto &ot : out_targets)
+                  tds.bindings.push_back(std::move(ot));
+                tds.init = std::move(*ocall);
+                out.push_back(ir::Stmt{std::move(tds)});
+                continue;
+              }
+            }
           }
           ir::VarDeclStmt vds;
           vds.name = vd->getNameAsString();
@@ -832,6 +1121,36 @@ private:
     if (const auto *rs = dyn_cast<ReturnStmt>(s)) {
       std::optional<ir::ExprPtr> val;
       if (const Expr *re = rs->getRetValue()) {
+        const Expr *call_cand = unwrapTransparentAndCasts(re);
+        if (const auto *call = dyn_cast_or_null<CallExpr>(call_cand)) {
+          std::vector<std::pair<std::string, ir::TypePtr>> out_targets;
+          if (auto ocall = tryExtractOutParamCall(call, out_targets)) {
+            std::string tmp_ret = std::format("__ret_{}", tmp_counter_++);
+            auto call_ret_ty = convertType(call->getType());
+            ir::TupleDeclStmt tds;
+            tds.bindings.emplace_back(tmp_ret, call_ret_ty);
+            for (auto &ot : out_targets)
+              tds.bindings.push_back(std::move(ot));
+            tds.init = std::move(*ocall);
+            out.push_back(ir::Stmt{std::move(tds)});
+            ir::ExprPtr ret_expr = ir::Expr::make(ir::VarExpr{std::move(tmp_ret)}, call_ret_ty);
+            auto dst_ty = convertType(re->getType());
+            if (call_ret_ty->isBool() && dst_ty->isInt()) {
+              ret_expr = ir::Expr::make(ir::CastExpr{ir::CastKind::BoolToInt, ret_expr}, dst_ty);
+            } else if (call_ret_ty->isInt() && dst_ty->isInt()) {
+              const auto &src_i = std::get<ir::IntType>(call_ret_ty->v);
+              const auto &dst_i = std::get<ir::IntType>(dst_ty->v);
+              if (src_i.width != dst_i.width) {
+                ret_expr =
+                    ir::Expr::make(ir::CastExpr{ir::CastKind::IntToInt, ret_expr}, dst_ty);
+              }
+            } else if (call_ret_ty->isInt() && dst_ty->isBool()) {
+              ret_expr = ir::Expr::make(ir::CastExpr{ir::CastKind::ToBool, ret_expr}, dst_ty);
+            }
+            out.push_back(ir::Stmt{ir::ReturnStmt{std::move(ret_expr)}});
+            return;
+          }
+        }
         val = extractExpr(re);
       }
       out.push_back(ir::Stmt{ir::ReturnStmt{std::move(val)}});
@@ -854,7 +1173,35 @@ private:
       }
 
       ir::IfStmt node;
-      node.cond = extractExpr(ifs->getCond());
+      const Expr *cond_raw = unwrapTransparentAndCasts(ifs->getCond());
+      bool cond_negated = false;
+      if (const auto *uo = dyn_cast_or_null<UnaryOperator>(cond_raw);
+          uo && uo->getOpcode() == UO_LNot) {
+        cond_negated = true;
+        cond_raw = unwrapTransparentAndCasts(uo->getSubExpr());
+      }
+      if (const auto *call = dyn_cast_or_null<CallExpr>(cond_raw)) {
+        std::vector<std::pair<std::string, ir::TypePtr>> out_targets;
+        if (auto ocall = tryExtractOutParamCall(call, out_targets)) {
+          std::string tmp_cond = std::format("__cond_{}", tmp_counter_++);
+          auto cond_ty = convertType(call->getType());
+          ir::TupleDeclStmt tds;
+          tds.bindings.emplace_back(tmp_cond, cond_ty);
+          for (auto &ot : out_targets)
+            tds.bindings.push_back(std::move(ot));
+          tds.init = std::move(*ocall);
+          out.push_back(ir::Stmt{std::move(tds)});
+          ir::ExprPtr cexpr = ir::Expr::make(ir::VarExpr{std::move(tmp_cond)}, cond_ty);
+          if (cond_negated) {
+            cexpr = ir::Expr::make(ir::UnaryExpr{ir::UnaryOp::LogNot, std::move(cexpr)},
+                                   ir::Type::makeBool());
+          }
+          node.cond = std::move(cexpr);
+        }
+      }
+      if (!node.cond) {
+        node.cond = extractExpr(ifs->getCond());
+      }
       if (ifs->getThen())
         extractStmtInto(ifs->getThen(), node.then_body);
       if (ifs->getElse())
@@ -879,6 +1226,15 @@ private:
       node.cond = extractExpr(ws->getCond());
       if (ws->getBody())
         extractStmtInto(ws->getBody(), node.body);
+      out.push_back(ir::Stmt{std::move(node)});
+      return;
+    }
+
+    if (const auto *dw = dyn_cast<clang::DoStmt>(s)) {
+      ir::DoWhileStmt node;
+      if (dw->getBody())
+        extractStmtInto(dw->getBody(), node.body);
+      node.cond = extractExpr(dw->getCond());
       out.push_back(ir::Stmt{std::move(node)});
       return;
     }
@@ -987,9 +1343,43 @@ private:
     if (!e)
       return;
 
+    if (const auto *bo = dyn_cast<BinaryOperator>(e); bo && bo->getOpcode() == BO_Comma) {
+      extractExprAsStmt(bo->getLHS(), out);
+      extractExprAsStmt(bo->getRHS(), out);
+      return;
+    }
+
     if (const auto *bo = dyn_cast<BinaryOperator>(e); bo && bo->isAssignmentOp()) {
       auto compound = mapCompoundAssignOp(bo->getOpcode());
       const Expr *lhs = unwrapExprSugar(bo->getLHS());
+      if (const auto *uo = dyn_cast<UnaryOperator>(lhs); uo && uo->getOpcode() == UO_Deref) {
+        lhs = unwrapExprSugar(uo->getSubExpr());
+      }
+      if (!compound) {
+        const Expr *rhs_raw = unwrapExprSugar(bo->getRHS());
+        if (const auto *rhs_bo = dyn_cast<BinaryOperator>(rhs_raw);
+            rhs_bo && rhs_bo->isAssignmentOp()) {
+          extractExprAsStmt(rhs_bo, out);
+          if (const auto *dre = dyn_cast<DeclRefExpr>(lhs)) {
+            out.push_back(ir::Stmt{ir::AssignStmt{dre->getDecl()->getNameAsString(), std::nullopt,
+                                                  extractExpr(rhs_bo->getLHS())}});
+            return;
+          }
+        }
+        if (const auto *call = dyn_cast<CallExpr>(rhs_raw)) {
+          std::vector<std::pair<std::string, ir::TypePtr>> out_targets;
+          if (auto ocall = tryExtractOutParamCall(call, out_targets)) {
+            if (const auto *dre = dyn_cast<DeclRefExpr>(lhs)) {
+              std::vector<std::string> targets;
+              targets.push_back(dre->getDecl()->getNameAsString());
+              for (auto &[tn, _] : out_targets)
+                targets.push_back(std::move(tn));
+              out.push_back(ir::Stmt{ir::AssignTupleStmt{std::move(targets), std::move(*ocall)}});
+              return;
+            }
+          }
+        }
+      }
       ir::ExprPtr rhs = extractExpr(bo->getRHS());
       if (const auto *dre = dyn_cast<DeclRefExpr>(lhs)) {
         out.push_back(
@@ -1007,6 +1397,9 @@ private:
     if (const auto *op = dyn_cast<CXXOperatorCallExpr>(e); op && op->getNumArgs() == 2) {
       auto kind = op->getOperator();
       const Expr *lhs = unwrapExprSugar(op->getArg(0));
+      if (const auto *uo = dyn_cast<UnaryOperator>(lhs); uo && uo->getOpcode() == UO_Deref) {
+        lhs = unwrapExprSugar(uo->getSubExpr());
+      }
       ir::ExprPtr rhs = extractExpr(op->getArg(1));
       std::optional<ir::BinaryOp> compound;
       bool is_assign = false;
@@ -1021,6 +1414,21 @@ private:
       } else if (kind == OO_StarEqual) {
         is_assign = true;
         compound = ir::BinaryOp::Mul;
+      } else if (kind == OO_PipeEqual) {
+        is_assign = true;
+        compound = ir::BinaryOp::BitOr;
+      } else if (kind == OO_AmpEqual) {
+        is_assign = true;
+        compound = ir::BinaryOp::BitAnd;
+      } else if (kind == OO_CaretEqual) {
+        is_assign = true;
+        compound = ir::BinaryOp::BitXor;
+      } else if (kind == OO_LessLessEqual) {
+        is_assign = true;
+        compound = ir::BinaryOp::Shl;
+      } else if (kind == OO_GreaterGreaterEqual) {
+        is_assign = true;
+        compound = ir::BinaryOp::Shr;
       }
       if (is_assign) {
         if (const auto *dre = dyn_cast<DeclRefExpr>(lhs)) {
@@ -1116,6 +1524,25 @@ private:
       }
     }
 
+    if (const auto *call = dyn_cast<CallExpr>(e)) {
+      std::vector<std::pair<std::string, ir::TypePtr>> out_targets;
+      if (auto ocall = tryExtractOutParamCall(call, out_targets)) {
+        bool has_ret = !convertType(call->getType())->isVoid();
+        if (!has_ret && out_targets.size() == 1) {
+          out.push_back(
+              ir::Stmt{ir::AssignStmt{out_targets[0].first, std::nullopt, std::move(*ocall)}});
+          return;
+        }
+        std::vector<std::string> targets;
+        if (has_ret)
+          targets.emplace_back("_");
+        for (auto &[tn, _] : out_targets)
+          targets.push_back(std::move(tn));
+        out.push_back(ir::Stmt{ir::AssignTupleStmt{std::move(targets), std::move(*ocall)}});
+        return;
+      }
+    }
+
     out.push_back(ir::Stmt{ir::ExprStmt{extractExpr(e)}});
   }
 
@@ -1181,7 +1608,7 @@ private:
             }
           }
         } else if ((var->isConstexpr() || var->getType().isConstQualified()) &&
-                   (var->getType()->isArrayType() ||
+                   (var->getType()->isArrayType() || isExceptValuesType(var->getType()) ||
                     (var->isStaticLocal() && var->getType()->isRecordType()))) {
           if (auto tname = registerTable(var)) {
             return ir::Expr::make(ir::TableRefExpr{*tname}, var_ty);
@@ -1223,6 +1650,7 @@ private:
         return ir::Expr::make(ir::UnaryExpr{ir::UnaryOp::LogNot, extractExpr(uo->getSubExpr())},
                               ir::Type::makeBool());
       case UO_AddrOf:
+      case UO_Deref:
         return extractExpr(uo->getSubExpr());
       default:
         return recordUnsupportedExpr(
@@ -1232,6 +1660,13 @@ private:
     }
 
     if (const auto *bo = dyn_cast<BinaryOperator>(e)) {
+      if (bo->getOpcode() == BO_Comma) {
+        auto lhs = extractExpr(bo->getLHS());
+        auto rhs = extractExpr(bo->getRHS());
+        auto rty = rhs->type;
+        return ir::Expr::make(ir::LetExpr{"_", lhs->type, std::move(lhs), std::move(rhs)},
+                              std::move(rty));
+      }
       if (auto op = mapBinaryOp(bo->getOpcode())) {
         return ir::Expr::make(
             ir::BinaryExpr{*op, extractExpr(bo->getLHS()), extractExpr(bo->getRHS())},
@@ -1357,6 +1792,33 @@ private:
   auto extractOperatorCall(const CXXOperatorCallExpr *oce) -> ir::ExprPtr {
     auto op = oce->getOperator();
     auto ret_ty = convertType(oce->getType());
+
+    if (op == OO_Call && oce->getNumArgs() >= 1) {
+      std::string resolved_name;
+      if (const FunctionDecl *callee = oce->getDirectCallee()) {
+        if (auto it = lambda_spec_names_.find(callee->getCanonicalDecl());
+            it != lambda_spec_names_.end()) {
+          resolved_name = it->second;
+        }
+      }
+      if (resolved_name.empty()) {
+        if (const auto *dre = dyn_cast_or_null<DeclRefExpr>(unwrapExprSugar(oce->getArg(0)))) {
+          auto lname = dre->getDecl()->getNameAsString();
+          if (local_lambdas_.contains(lname)) {
+            resolved_name = std::move(lname);
+          }
+        }
+      }
+      if (!resolved_name.empty()) {
+        std::vector<ir::ExprPtr> cargs;
+        for (unsigned i = 1; i < oce->getNumArgs(); ++i) {
+          cargs.push_back(extractExpr(oce->getArg(i)));
+        }
+        return ir::Expr::make(
+            ir::FuncCallExpr{std::move(resolved_name), std::move(cargs), false, true},
+            std::move(ret_ty));
+      }
+    }
 
     if (op == OO_Subscript && oce->getNumArgs() == 2) {
       auto base = extractExpr(oce->getArg(0));
@@ -1493,6 +1955,17 @@ private:
                                                false,
                                                false},
                               ir::Type::makeBool());
+      }
+      if (core_owner == CoreTypeKind::NormalFloat && ret_ty->isFloat()) {
+        return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::NormalFloatToVal,
+                                               "Libc.NormalFloat.toVal",
+                                               {std::move(recv)},
+                                               {},
+                                               false,
+                                               false,
+                                               false,
+                                               {}},
+                              std::move(ret_ty));
       }
       if (core_owner == CoreTypeKind::DyadicFloat && ret_ty->isFloat()) {
         auto fmt = std::get<ir::FloatType>(ret_ty->v).fmt;
@@ -1633,6 +2106,44 @@ private:
                                                false},
                               std::move(ret_ty));
       }
+      case CoreTypeKind::NormalFloat: {
+        auto fmt = std::get<ir::NormalFloatType>(ret_ty->v).fmt;
+        if (args.size() == 3) {
+          return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::NormalFloatMkNorm,
+                                                 "Libc.NormalFloat.mkNorm",
+                                                 std::move(args),
+                                                 {std::string(floatFmtLean(fmt))},
+                                                 false,
+                                                 false,
+                                                 false,
+                                                 {}},
+                                std::move(ret_ty));
+        }
+        if (args.size() == 1 && args[0]->type &&
+            std::holds_alternative<ir::FPBitsType>(args[0]->type->v)) {
+          return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::NormalFloatOfBits,
+                                                 "Libc.NormalFloat.ofBits",
+                                                 std::move(args),
+                                                 {},
+                                                 false,
+                                                 false,
+                                                 false,
+                                                 {}},
+                                std::move(ret_ty));
+        }
+        if (args.size() == 1) {
+          return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::NormalFloatOfVal,
+                                                 "Libc.NormalFloat.ofVal",
+                                                 std::move(args),
+                                                 {},
+                                                 false,
+                                                 false,
+                                                 false,
+                                                 {}},
+                                std::move(ret_ty));
+        }
+        break;
+      }
       case CoreTypeKind::DyadicFloat: {
         auto bits = std::get<ir::DyadicFloatType>(ret_ty->v).bits;
         if (args.empty()) {
@@ -1692,6 +2203,19 @@ private:
         }
         if (args.size() == 1 && args[0]->type && args[0]->type->isInt()) {
           return ir::Expr::make(ir::CastExpr{ir::CastKind::IntToInt, std::move(args[0])},
+                                std::move(ret_ty));
+        }
+        if (args.size() == 1 &&
+            (std::holds_alternative<ir::ArrayLitExpr>(args[0]->v) ||
+             (args[0]->type && std::holds_alternative<ir::ArrayType>(args[0]->type->v)))) {
+          return ir::Expr::make(ir::CoreCallExpr{CoreOpKind::BigIntOfLimbs64,
+                                                 "Libc.BigInt.ofLimbs64",
+                                                 {std::move(args[0])},
+                                                 {std::to_string(it.width)},
+                                                 false,
+                                                 false,
+                                                 false,
+                                                 {}},
                                 std::move(ret_ty));
         }
         break;
@@ -2144,13 +2668,18 @@ private:
   ASTContext &ctx_;
   const ParseOptions &opts_;
   ir::Module module_;
+  std::unordered_map<const RecordDecl *, std::string> structs_seen_;
+  std::unordered_set<std::string> used_struct_names_;
   std::unordered_map<const VarDecl *, std::string> tables_seen_;
   std::unordered_set<std::string> used_table_names_;
   std::unordered_map<const FunctionDecl *, std::string> func_lean_names_;
   std::unordered_set<std::string> used_func_names_;
   std::unordered_set<const FunctionDecl *> extracted_funcs_;
   std::vector<const FunctionDecl *> pending_helpers_;
+  std::unordered_set<std::string> local_lambdas_;
+  std::unordered_map<const FunctionDecl *, std::string> lambda_spec_names_;
   std::vector<std::string> current_diags_;
+  int tmp_counter_ = 0;
 };
 
 class FunctionFinder : public RecursiveASTVisitor<FunctionFinder> {

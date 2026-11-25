@@ -259,6 +259,12 @@ auto exprMentionsVar(const ExprPtr &e, std::string_view name) -> bool {
             return exprMentionsVar(le.value, name) ||
                    (le.name != name && exprMentionsVar(le.body, name));
           },
+          [name](const LetFuncExpr &lf) {
+            bool param_shadow = std::ranges::any_of(
+                lf.params, [name](const auto &kv) { return kv.first == name; });
+            return (!param_shadow && exprMentionsVar(lf.func_body, name)) ||
+                   (lf.name != name && exprMentionsVar(lf.body, name));
+          },
           [name](const LetJoinExpr &lj) {
             return exprMentionsVar(lj.join_body, name) || exprMentionsVar(lj.body, name);
           },
@@ -351,6 +357,14 @@ auto substVarInExpr(const ExprPtr &e, std::string_view var, const ExprPtr &repla
                    if (le.name != var)
                      le.body = rec(le.body);
                  },
+                 [&](LetFuncExpr &lf) {
+                   bool param_shadow = std::ranges::any_of(
+                       lf.params, [var](const auto &kv) { return kv.first == var; });
+                   if (!param_shadow)
+                     lf.func_body = rec(lf.func_body);
+                   if (lf.name != var)
+                     lf.body = rec(lf.body);
+                 },
                  [&](LetJoinExpr &lj) {
                    lj.join_body = rec(lj.join_body);
                    lj.body = rec(lj.body);
@@ -396,6 +410,16 @@ auto substVarInStmts(std::span<const Stmt> stmts, std::string_view var, const Ex
                    },
                    [&](TupleDeclStmt &td) { td.init = recE(td.init); },
                    [&](AssignStmt &a) { a.value = recE(a.value); },
+                   [&](AssignTupleStmt &at) { at.value = recE(at.value); },
+                   [&](LocalFuncStmt &lf) {
+                     bool param_shadow = std::ranges::any_of(
+                         lf.params, [var](const auto &kv) { return kv.first == var; });
+                     if (!param_shadow) {
+                       lf.body_stmts = substVarInStmts(lf.body_stmts, var, replacement);
+                       if (lf.lifted_body)
+                         lf.lifted_body = recE(*lf.lifted_body);
+                     }
+                   },
                    [&](FieldAssignStmt &fa) {
                      fa.base = recE(fa.base);
                      fa.value = recE(fa.value);
@@ -415,6 +439,10 @@ auto substVarInStmts(std::span<const Stmt> stmts, std::string_view var, const Ex
                    [&](WhileStmt &w) {
                      w.cond = recE(w.cond);
                      w.body = substVarInStmts(w.body, var, replacement);
+                   },
+                   [&](DoWhileStmt &dw) {
+                     dw.body = substVarInStmts(dw.body, var, replacement);
+                     dw.cond = recE(dw.cond);
                    },
                    [&](ForStmt &f) {
                      if (f.cond)
@@ -601,6 +629,10 @@ auto simplifyExpr(ExprPtr e, const LiftOptions &opts) -> ExprPtr {
                    le.value = recurse(std::move(le.value));
                    le.body = recurse(std::move(le.body));
                  },
+                 [&](LetFuncExpr &lf) {
+                   lf.func_body = recurse(std::move(lf.func_body));
+                   lf.body = recurse(std::move(lf.body));
+                 },
                  [&](LetJoinExpr &lj) {
                    lj.join_body = recurse(std::move(lj.join_body));
                    lj.body = recurse(std::move(lj.body));
@@ -720,6 +752,8 @@ void simplifyStmts(std::vector<Stmt> &stmts, const LiftOptions &opts) {
                    },
                    [&](TupleDeclStmt &td) { td.init = simplifyExpr(std::move(td.init), opts); },
                    [&](AssignStmt &a) { a.value = simplifyExpr(std::move(a.value), opts); },
+                   [&](AssignTupleStmt &at) { at.value = simplifyExpr(std::move(at.value), opts); },
+                   [&](LocalFuncStmt &lf) { simplifyStmts(lf.body_stmts, opts); },
                    [&](FieldAssignStmt &fa) {
                      fa.base = simplifyExpr(std::move(fa.base), opts);
                      fa.value = simplifyExpr(std::move(fa.value), opts);
@@ -753,6 +787,10 @@ void simplifyStmts(std::vector<Stmt> &stmts, const LiftOptions &opts) {
                    [&](WhileStmt &w) {
                      w.cond = simplifyExpr(std::move(w.cond), opts);
                      simplifyStmts(w.body, opts);
+                   },
+                   [&](DoWhileStmt &dw) {
+                     simplifyStmts(dw.body, opts);
+                     dw.cond = simplifyExpr(std::move(dw.cond), opts);
                    },
                    [&](ForStmt &f) {
                      if (f.init && *f.init) {
@@ -815,7 +853,11 @@ auto containsUnliftableConstruct(std::span<const Stmt> stmts) -> bool {
   return std::ranges::any_of(stmts, [](const Stmt &s) {
     return std::visit(Overloaded{
                           [](const WhileStmt &) { return true; },
+                          [](const DoWhileStmt &) { return true; },
                           [](const ForStmt &) { return true; },
+                          [](const LocalFuncStmt &lf) {
+                            return containsUnliftableConstruct(lf.body_stmts);
+                          },
                           [](const FieldAssignStmt &fa) {
                             return !fa.base || !std::holds_alternative<VarExpr>(fa.base->v);
                           },
@@ -891,8 +933,16 @@ void collectMutatedOuterVars(std::span<const Stmt> stmts,
         Overloaded{
             [&](const VarDeclStmt &v) { local_shadow.insert(v.name); },
             [&](const TupleDeclStmt &td) {
-              for (const auto &[n, _] : td.bindings)
-                local_shadow.insert(n);
+              for (const auto &[n, _] : td.bindings) {
+                if (!local_shadow.contains(n) && outer_scope.contains(n)) {
+                  if (!seen.contains(n)) {
+                    seen.insert(n);
+                    order.push_back(n);
+                  }
+                } else {
+                  local_shadow.insert(n);
+                }
+              }
             },
             [&](const AssignStmt &a) {
               if (!local_shadow.contains(a.target) && outer_scope.contains(a.target) &&
@@ -901,6 +951,16 @@ void collectMutatedOuterVars(std::span<const Stmt> stmts,
                 order.push_back(a.target);
               }
             },
+            [&](const AssignTupleStmt &at) {
+              for (const auto &t : at.targets) {
+                if (t != "_" && !local_shadow.contains(t) && outer_scope.contains(t) &&
+                    !seen.contains(t)) {
+                  seen.insert(t);
+                  order.push_back(t);
+                }
+              }
+            },
+            [&](const LocalFuncStmt &lf) { local_shadow.insert(lf.name); },
             [&](const FieldAssignStmt &fa) {
               if (fa.base) {
                 if (const auto *v = std::get_if<VarExpr>(&fa.base->v)) {
@@ -993,6 +1053,43 @@ public:
                 return std::nullopt;
               auto body_ty = (*body)->type;
               return Expr::make(LetExpr{a.target, vty, std::move(rhs), std::move(*body)},
+                                std::move(body_ty));
+            },
+            [&](const AssignTupleStmt &at) -> std::optional<ExprPtr> {
+              std::vector<std::pair<std::string, TypePtr>> binds;
+              binds.reserve(at.targets.size());
+              for (const auto &t : at.targets) {
+                binds.emplace_back(t, lookupType(t, nullptr));
+                if (t != "_")
+                  scope.insert(t);
+              }
+              auto body = lift(tail, scope, fallthrough);
+              if (!body)
+                return std::nullopt;
+              auto body_ty = (*body)->type;
+              return Expr::make(LetTupleExpr{std::move(binds), at.value, std::move(*body)},
+                                std::move(body_ty));
+            },
+            [&](const LocalFuncStmt &lf) -> std::optional<ExprPtr> {
+              auto child_scope = scope;
+              for (const auto &[pn, pt] : lf.params) {
+                var_types_[pn] = pt;
+                child_scope.insert(pn);
+              }
+              ExprPtr fn_fall = nullptr;
+              if (lf.return_type && lf.return_type->isVoid()) {
+                fn_fall = Expr::make(ConstExpr{ConstVal{BoolConst{false}}}, Type::makeVoid());
+              }
+              auto fn_body = lift(lf.body_stmts, std::move(child_scope), std::move(fn_fall));
+              if (!fn_body)
+                return std::nullopt;
+              scope.insert(lf.name);
+              auto body = lift(tail, scope, fallthrough);
+              if (!body)
+                return std::nullopt;
+              auto body_ty = (*body)->type;
+              return Expr::make(LetFuncExpr{lf.name, lf.params, lf.return_type, std::move(*fn_body),
+                                            std::move(*body)},
                                 std::move(body_ty));
             },
             [&](const FieldAssignStmt &fa) -> std::optional<ExprPtr> {
@@ -1326,6 +1423,10 @@ auto exprUsesRoundingMode(const ExprPtr &e, const std::unordered_set<std::string
             return exprUsesRoundingMode(le.value, mode_funcs) ||
                    exprUsesRoundingMode(le.body, mode_funcs);
           },
+          [&](const LetFuncExpr &lf) {
+            return exprUsesRoundingMode(lf.func_body, mode_funcs) ||
+                   exprUsesRoundingMode(lf.body, mode_funcs);
+          },
           [&](const LetJoinExpr &lj) {
             return exprUsesRoundingMode(lj.join_body, mode_funcs) ||
                    exprUsesRoundingMode(lj.body, mode_funcs);
@@ -1364,6 +1465,11 @@ auto stmtsUseRoundingMode(std::span<const Stmt> stmts,
             },
             [&](const TupleDeclStmt &td) { return exprUsesRoundingMode(td.init, mode_funcs); },
             [&](const AssignStmt &a) { return exprUsesRoundingMode(a.value, mode_funcs); },
+            [&](const AssignTupleStmt &at) { return exprUsesRoundingMode(at.value, mode_funcs); },
+            [&](const LocalFuncStmt &lf) {
+              return lf.lifted_body ? exprUsesRoundingMode(*lf.lifted_body, mode_funcs)
+                                    : stmtsUseRoundingMode(lf.body_stmts, mode_funcs);
+            },
             [&](const FieldAssignStmt &fa) {
               return exprUsesRoundingMode(fa.base, mode_funcs) ||
                      exprUsesRoundingMode(fa.value, mode_funcs);
@@ -1384,6 +1490,10 @@ auto stmtsUseRoundingMode(std::span<const Stmt> stmts,
             [&](const WhileStmt &w) {
               return exprUsesRoundingMode(w.cond, mode_funcs) ||
                      stmtsUseRoundingMode(w.body, mode_funcs);
+            },
+            [&](const DoWhileStmt &dw) {
+              return exprUsesRoundingMode(dw.cond, mode_funcs) ||
+                     stmtsUseRoundingMode(dw.body, mode_funcs);
             },
             [&](const ForStmt &f) {
               return (f.cond && exprUsesRoundingMode(*f.cond, mode_funcs)) ||
@@ -1446,13 +1556,18 @@ void propagateCallModeExpr(ExprPtr &e, const std::unordered_set<std::string> &mo
                      propagateCallModeExpr(c, mode_funcs);
                  },
                  [&](FuncCallExpr &fc) {
-                   fc.needs_mode = mode_funcs.contains(fc.callee);
+                   if (!fc.is_local_lambda)
+                     fc.needs_mode = mode_funcs.contains(fc.callee);
                    for (auto &a : fc.args)
                      propagateCallModeExpr(a, mode_funcs);
                  },
                  [&](LetExpr &le) {
                    propagateCallModeExpr(le.value, mode_funcs);
                    propagateCallModeExpr(le.body, mode_funcs);
+                 },
+                 [&](LetFuncExpr &lf) {
+                   propagateCallModeExpr(lf.func_body, mode_funcs);
+                   propagateCallModeExpr(lf.body, mode_funcs);
                  },
                  [&](LetJoinExpr &lj) {
                    propagateCallModeExpr(lj.join_body, mode_funcs);
@@ -1491,6 +1606,12 @@ void propagateCallModeStmts(std::vector<Stmt> &stmts,
                    },
                    [&](TupleDeclStmt &td) { propagateCallModeExpr(td.init, mode_funcs); },
                    [&](AssignStmt &a) { propagateCallModeExpr(a.value, mode_funcs); },
+                   [&](AssignTupleStmt &at) { propagateCallModeExpr(at.value, mode_funcs); },
+                   [&](LocalFuncStmt &lf) {
+                     propagateCallModeStmts(lf.body_stmts, mode_funcs);
+                     if (lf.lifted_body)
+                       propagateCallModeExpr(*lf.lifted_body, mode_funcs);
+                   },
                    [&](FieldAssignStmt &fa) {
                      propagateCallModeExpr(fa.base, mode_funcs);
                      propagateCallModeExpr(fa.value, mode_funcs);
@@ -1511,6 +1632,10 @@ void propagateCallModeStmts(std::vector<Stmt> &stmts,
                      propagateCallModeExpr(w.cond, mode_funcs);
                      propagateCallModeStmts(w.body, mode_funcs);
                    },
+                   [&](DoWhileStmt &dw) {
+                     propagateCallModeExpr(dw.cond, mode_funcs);
+                     propagateCallModeStmts(dw.body, mode_funcs);
+                   },
                    [&](ForStmt &f) {
                      if (f.cond)
                        propagateCallModeExpr(*f.cond, mode_funcs);
@@ -1527,12 +1652,88 @@ void propagateCallModeStmts(std::vector<Stmt> &stmts,
   }
 }
 
+void rewriteReturnsForOutParams(std::vector<Stmt> &stmts, bool orig_void,
+                                const std::vector<Param> &outs, const TypePtr &eff_ret) {
+  auto packReturn = [&](std::optional<ExprPtr> val) -> ExprPtr {
+    std::vector<ExprPtr> elems;
+    if (!orig_void && val)
+      elems.push_back(std::move(*val));
+    for (const auto &op : outs) {
+      elems.push_back(Expr::make(VarExpr{op.name}, op.type));
+    }
+    if (elems.size() == 1)
+      return elems[0];
+    return Expr::make(TupleExpr{std::move(elems)}, eff_ret);
+  };
+  for (auto &s : stmts) {
+    std::visit(
+        Overloaded{
+            [&](ReturnStmt &r) { r.value = packReturn(std::move(r.value)); },
+            [&](IfStmt &i) {
+              rewriteReturnsForOutParams(i.then_body, orig_void, outs, eff_ret);
+              rewriteReturnsForOutParams(i.else_body, orig_void, outs, eff_ret);
+            },
+            [&](SwitchStmt &sw) {
+              for (auto &c : sw.cases)
+                rewriteReturnsForOutParams(c.body, orig_void, outs, eff_ret);
+              rewriteReturnsForOutParams(sw.default_body, orig_void, outs, eff_ret);
+            },
+            [&](WhileStmt &w) { rewriteReturnsForOutParams(w.body, orig_void, outs, eff_ret); },
+            [&](DoWhileStmt &dw) {
+              rewriteReturnsForOutParams(dw.body, orig_void, outs, eff_ret);
+            },
+            [&](ForStmt &f) { rewriteReturnsForOutParams(f.body, orig_void, outs, eff_ret); },
+            [&](BlockStmt &b) { rewriteReturnsForOutParams(b.stmts, orig_void, outs, eff_ret); },
+            [](auto &) {},
+        },
+        s.v);
+  }
+}
+
+void rewriteOutParams(Function &fn) {
+  std::vector<Param> in_params;
+  std::vector<Param> out_params;
+  for (const auto &p : fn.params) {
+    if (p.is_out)
+      out_params.push_back(p);
+    else
+      in_params.push_back(p);
+  }
+  if (out_params.empty())
+    return;
+
+  bool orig_void = fn.orig_return_type && fn.orig_return_type->isVoid();
+  fn.params = std::move(in_params);
+  rewriteReturnsForOutParams(fn.body_stmts, orig_void, out_params, fn.return_type);
+
+  if (orig_void && !alwaysReturns(fn.body_stmts)) {
+    std::vector<ExprPtr> elems;
+    for (const auto &op : out_params) {
+      elems.push_back(Expr::make(VarExpr{op.name}, op.type));
+    }
+    ExprPtr packed = elems.size() == 1 ? elems[0]
+                                       : Expr::make(TupleExpr{std::move(elems)}, fn.return_type);
+    fn.body_stmts.push_back(Stmt{ReturnStmt{std::move(packed)}});
+  }
+
+  std::vector<Stmt> prefixed;
+  prefixed.reserve(out_params.size() + fn.body_stmts.size());
+  for (const auto &op : out_params) {
+    prefixed.push_back(Stmt{VarDeclStmt{
+        op.name, op.type, Expr::make(VarExpr{"default"}, op.type), false, false}});
+  }
+  for (auto &st : fn.body_stmts)
+    prefixed.push_back(std::move(st));
+  fn.body_stmts = std::move(prefixed);
+}
+
 } // namespace
 
 void liftModule(ir::Module &mod, const LiftOptions &opts) {
   std::unordered_set<std::string> mode_funcs;
 
   for (auto &fn : mod.functions) {
+    rewriteOutParams(fn);
     simplifyStmts(fn.body_stmts, opts);
 
     if (opts.lift_functional && !containsUnliftableConstruct(fn.body_stmts)) {

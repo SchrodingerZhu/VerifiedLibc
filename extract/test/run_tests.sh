@@ -63,8 +63,14 @@ if awk 'length > 100' <<<"$out_expf" | grep -q "f64("; then
 fi
 
 out_loop=$("$bin" "$root/test/dyadic_sample.cpp" --function=loop_reduce)
-check_contains "loop-do"       "Id.run do"           "$out_loop"
-check_contains "loop-while"    "while BitVec.slt i n do" "$out_loop"
+check_contains "loop-bounded"  "for _ in [:65536] do" "$out_loop"
+check_contains "loop-cond"     "if !(BitVec.slt i n) then break" "$out_loop"
+
+out_sol=$("$bin" "$root/test/dyadic_sample.cpp" --function=struct_outparam_lambda \
+  --follow-helpers --strict)
+check_contains "sol-struct"    "structure ReducedPair where" "$out_sol"
+check_contains "sol-outparam"  "let (__cond_0, r) ← try_reduce mode x" "$out_sol"
+check_contains "sol-lambda"    "let apply_sign (v : Model .binary64) : Option (Model .binary64)" "$out_sol"
 
 out_cfg=$("$bin" "$root/test/expf_sample.cpp" --dump-config -Wno-undefined-inline -DLIBC_NAMESPACE=__llvm_libc)
 check_contains "dump-config"   "MathConfig:" "$out_cfg"

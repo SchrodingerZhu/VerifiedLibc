@@ -157,5 +157,26 @@ float mutating_and_templates(float from, float to) {
   return static_cast<float>(res);
 }
 
+struct ReducedPair {
+  double val;
+  int k;
+};
+
+static bool try_reduce(double x, double &out_r) {
+  out_r = x * 0.5;
+  return x > 0.0;
+}
+
+// Tests user structs, out-parameters in if-conditions, and generic lambdas.
+double struct_outparam_lambda(double x, bool neg) {
+  auto apply_sign = [neg](auto v) -> auto { return neg ? -v : v; };
+  double r = 0.0;
+  if (try_reduce(x, r)) {
+    ReducedPair rp{apply_sign(r), 1};
+    return rp.val;
+  }
+  return apply_sign(x);
+}
+
 } // namespace math
 } // namespace __llvm_libc

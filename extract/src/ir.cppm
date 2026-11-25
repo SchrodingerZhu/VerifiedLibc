@@ -77,6 +77,9 @@ struct FloatType {
 struct FPBitsType {
   FloatFmt fmt = FloatFmt::Binary32;
 };
+struct NormalFloatType {
+  FloatFmt fmt = FloatFmt::Binary32;
+};
 struct DyadicFloatType {
   std::uint32_t bits = 128;
 };
@@ -103,14 +106,17 @@ struct StructType {
 struct PtrType {
   TypePtr pointee;
 };
+struct TupleType {
+  std::vector<TypePtr> elems;
+};
 struct OpaqueType {
   std::string cpp_name;
 };
 
 struct Type {
-  std::variant<VoidType, BoolType, IntType, FloatType, FPBitsType, DyadicFloatType, NumberPairType,
-               TripleDoubleType, Frac64Type, ExceptValuesType, SignType, OptionalType, ArrayType,
-               StructType, PtrType, OpaqueType>
+  std::variant<VoidType, BoolType, IntType, FloatType, FPBitsType, NormalFloatType, DyadicFloatType,
+               NumberPairType, TripleDoubleType, Frac64Type, ExceptValuesType, SignType,
+               OptionalType, ArrayType, StructType, PtrType, TupleType, OpaqueType>
       v = VoidType{};
 
   static auto makeVoid() -> TypePtr { return std::make_shared<Type>(Type{VoidType{}}); }
@@ -123,6 +129,9 @@ struct Type {
   }
   static auto makeFPBits(FloatFmt f) -> TypePtr {
     return std::make_shared<Type>(Type{FPBitsType{f}});
+  }
+  static auto makeNormalFloat(FloatFmt f) -> TypePtr {
+    return std::make_shared<Type>(Type{NormalFloatType{f}});
   }
   static auto makeDyadic(std::uint32_t bits) -> TypePtr {
     return std::make_shared<Type>(Type{DyadicFloatType{bits}});
@@ -149,6 +158,9 @@ struct Type {
   }
   static auto makePtr(TypePtr p) -> TypePtr {
     return std::make_shared<Type>(Type{PtrType{std::move(p)}});
+  }
+  static auto makeTuple(std::vector<TypePtr> elems) -> TypePtr {
+    return std::make_shared<Type>(Type{TupleType{std::move(elems)}});
   }
   static auto makeOpaque(std::string name) -> TypePtr {
     return std::make_shared<Type>(Type{OpaqueType{std::move(name)}});
@@ -337,11 +349,19 @@ struct FuncCallExpr {
   std::string callee;
   std::vector<ExprPtr> args;
   bool needs_mode = false;
+  bool is_local_lambda = false;
 };
 struct LetExpr {
   std::string name;
   TypePtr bind_type;
   ExprPtr value;
+  ExprPtr body;
+};
+struct LetFuncExpr {
+  std::string name;
+  std::vector<std::pair<std::string, TypePtr>> params;
+  TypePtr result_type;
+  ExprPtr func_body;
   ExprPtr body;
 };
 struct LetJoinExpr {
@@ -382,8 +402,8 @@ struct UnsupportedExpr {
 struct Expr {
   std::variant<ConstExpr, VarExpr, TableRefExpr, UnaryExpr, BinaryExpr, CastExpr, SelectExpr,
                IndexExpr, FieldExpr, StructLitExpr, StructUpdateExpr, ArrayLitExpr, CoreCallExpr,
-               PolyevalExpr, FuncCallExpr, LetExpr, LetJoinExpr, CallJoinExpr, LetTupleExpr,
-               TupleExpr, IfExpr, MatchExpr, UnsupportedExpr>
+               PolyevalExpr, FuncCallExpr, LetExpr, LetFuncExpr, LetJoinExpr, CallJoinExpr,
+               LetTupleExpr, TupleExpr, IfExpr, MatchExpr, UnsupportedExpr>
       v;
   TypePtr type;
 
@@ -415,6 +435,17 @@ struct AssignStmt {
   std::optional<BinaryOp> compound_op;
   ExprPtr value;
 };
+struct AssignTupleStmt {
+  std::vector<std::string> targets;
+  ExprPtr value;
+};
+struct LocalFuncStmt {
+  std::string name;
+  std::vector<std::pair<std::string, TypePtr>> params;
+  TypePtr return_type;
+  std::vector<Stmt> body_stmts;
+  std::optional<ExprPtr> lifted_body;
+};
 struct FieldAssignStmt {
   ExprPtr base;
   std::string field;
@@ -442,6 +473,10 @@ struct WhileStmt {
   ExprPtr cond;
   std::vector<Stmt> body;
 };
+struct DoWhileStmt {
+  std::vector<Stmt> body;
+  ExprPtr cond;
+};
 struct ForStmt {
   std::optional<StmtPtr> init;
   std::optional<ExprPtr> cond;
@@ -461,15 +496,26 @@ struct UnsupportedStmt {
 };
 
 struct Stmt {
-  std::variant<VarDeclStmt, TupleDeclStmt, AssignStmt, FieldAssignStmt, ExprStmt, IfStmt,
-               SwitchStmt, WhileStmt, ForStmt, ReturnStmt, BlockStmt, BreakStmt, ContinueStmt,
-               UnsupportedStmt>
+  std::variant<VarDeclStmt, TupleDeclStmt, AssignStmt, AssignTupleStmt, LocalFuncStmt,
+               FieldAssignStmt, ExprStmt, IfStmt, SwitchStmt, WhileStmt, DoWhileStmt, ForStmt,
+               ReturnStmt, BlockStmt, BreakStmt, ContinueStmt, UnsupportedStmt>
       v;
 };
 
 // ============================================================================
 // Module-level definitions
 // ============================================================================
+
+struct StructField {
+  std::string name;
+  TypePtr type;
+};
+
+struct StructDef {
+  std::string lean_name;
+  std::string cpp_name;
+  std::vector<StructField> fields;
+};
 
 struct Table {
   std::string lean_name;
@@ -481,6 +527,8 @@ struct Table {
 struct Param {
   std::string name;
   TypePtr type;
+  bool is_out = false;
+  bool is_in_out = false;
 };
 
 struct Function {
@@ -489,6 +537,7 @@ struct Function {
   std::string mangled_name;
   std::vector<Param> params;
   TypePtr return_type;
+  TypePtr orig_return_type; // Pre-out-param return type (for void/non-void return packing).
   std::vector<Stmt> body_stmts;
   std::optional<ExprPtr> lifted_expr; // Populated by lift pass when loop-free.
   bool uses_rounding_mode = false;
@@ -501,6 +550,7 @@ struct Module {
   std::string source_commit;
   std::string clang_version;
   MathConfig config;
+  std::vector<StructDef> structs;
   std::vector<Table> tables;
   std::vector<Function> functions;
 };

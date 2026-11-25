@@ -8,6 +8,7 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -99,6 +100,9 @@ auto emitType(const TypePtr &ty) -> std::string {
           [](const IntType &i) { return std::format("BitVec {}", i.width); },
           [](const FloatType &f) { return std::format("Model {}", floatFmtLean(f.fmt)); },
           [](const FPBitsType &f) { return std::format("Libc.FPBits {}", floatFmtLean(f.fmt)); },
+          [](const NormalFloatType &n) {
+            return std::format("Libc.NormalFloat {}", floatFmtLean(n.fmt));
+          },
           [](const DyadicFloatType &d) { return std::format("Libc.DyadicFloat {}", d.bits); },
           [](const NumberPairType &np) {
             if (np.fmt == FloatFmt::Binary32)
@@ -117,6 +121,13 @@ auto emitType(const TypePtr &ty) -> std::string {
           [](const ArrayType &a) { return std::format("Array {}", emitTypeArg(a.elem)); },
           [](const StructType &s) { return s.name; },
           [](const PtrType &p) { return emitType(p.pointee); },
+          [](const TupleType &t) {
+            std::vector<std::string> parts;
+            parts.reserve(t.elems.size());
+            for (const auto &el : t.elems)
+              parts.push_back(emitTypeArg(el));
+            return joinWith(parts, " × ");
+          },
           [](const OpaqueType &o) { return std::format("Libc.Opaque /- {} -/", o.cpp_name); },
       },
       ty->v);
@@ -245,6 +256,16 @@ public:
 
     // Emit active LLVM libc MathConfig snapshot captured from Clang's preprocessor.
     out += emitMathConfigDef(mod.config);
+
+    // Extracted C++ structs.
+    for (const auto &sd : mod.structs) {
+      out += std::format("/-- Extracted struct `{}`. -/\n", sd.cpp_name);
+      out += std::format("structure {} where\n", sd.lean_name);
+      for (const auto &f : sd.fields) {
+        out += std::format("  {} : {}\n", leanIdent(f.name), emitType(f.type));
+      }
+      out += "  deriving DecidableEq, Inhabited\n\n";
+    }
 
     // Constant tables.
     for (const auto &tbl : mod.tables) {
@@ -460,14 +481,66 @@ def kernel : Libc.TernaryKernel {} :=
       out += emitExprBlock(*fn.lifted_expr, 1);
       out += "\n";
     } else {
-      // A body that was not lifted keeps its loops and mutable variables. Operations in it are
-      // the total ones, so undefined behaviour is not tracked there.
-      out += "  pure <| Id.run do\n";
+      // Unlifted loop body runs directly in Option with bounded iteration so UB is tracked.
+      declared_muts_.clear();
+      do_tmp_counter_ = 0;
+      std::unordered_set<std::string> assigned;
+      collectAssignedVars(fn.body_stmts, assigned);
+      for (const auto &p : fn.params) {
+        if (assigned.contains(p.name)) {
+          auto id = leanIdent(p.name);
+          out += std::format("  let mut {} := {}\n", id, id);
+          declared_muts_.insert(p.name);
+        }
+      }
       for (const auto &st : fn.body_stmts) {
-        out += emitDoStmt(st, 2);
+        out += emitDoStmt(st, 1);
+      }
+      if (fn.body_stmts.empty() || !std::holds_alternative<ReturnStmt>(fn.body_stmts.back().v)) {
+        out += "  none\n";
       }
     }
     return out;
+  }
+
+  static void collectAssignedVars(const std::vector<Stmt> &stmts,
+                                  std::unordered_set<std::string> &assigned) {
+    for (const auto &st : stmts) {
+      std::visit(Overloaded{
+                     [&](const AssignStmt &a) { assigned.insert(a.target); },
+                     [&](const AssignTupleStmt &at) {
+                       for (const auto &t : at.targets) {
+                         if (t != "_")
+                           assigned.insert(t);
+                       }
+                     },
+                     [&](const FieldAssignStmt &fa) {
+                       if (fa.base) {
+                         if (const auto *v = std::get_if<VarExpr>(&fa.base->v))
+                           assigned.insert(v->name);
+                       }
+                     },
+                     [&](const IfStmt &i) {
+                       collectAssignedVars(i.then_body, assigned);
+                       collectAssignedVars(i.else_body, assigned);
+                     },
+                     [&](const SwitchStmt &sw) {
+                       for (const auto &c : sw.cases)
+                         collectAssignedVars(c.body, assigned);
+                       collectAssignedVars(sw.default_body, assigned);
+                     },
+                     [&](const WhileStmt &w) { collectAssignedVars(w.body, assigned); },
+                     [&](const DoWhileStmt &dw) { collectAssignedVars(dw.body, assigned); },
+                     [&](const ForStmt &f) {
+                       if (f.step && *f.step)
+                         collectAssignedVars({**f.step}, assigned);
+                       collectAssignedVars(f.body, assigned);
+                     },
+                     [&](const BlockStmt &b) { collectAssignedVars(b.stmts, assigned); },
+                     [](const auto &) {},
+                 },
+                 st.v);
+    }
   }
 
   /// The type of a function or join point that returns `t`: `none` stands for an execution that
@@ -592,14 +665,25 @@ def kernel : Libc.TernaryKernel {} :=
 
   auto emitShiftAmountNat(const ExprPtr &rhs) -> std::string {
     if (rhs) {
-      if (const auto *ce = std::get_if<ConstExpr>(&rhs->v)) {
+      const Expr *inner = rhs.get();
+      while (const auto *ce = std::get_if<CastExpr>(&inner->v)) {
+        if ((ce->kind == CastKind::NoOp || ce->kind == CastKind::IntToInt) && ce->operand) {
+          inner = ce->operand.get();
+        } else {
+          break;
+        }
+      }
+      if (const auto *ce = std::get_if<ConstExpr>(&inner->v)) {
         if (const auto *ic = std::get_if<IntConst>(&ce->value.v);
             ic && ic->fits_i64 && ic->signed_val >= 0) {
           return std::to_string(ic->signed_val);
         }
       }
+      if (const auto *ve = std::get_if<VarExpr>(&rhs->v)) {
+        return std::format("{}.toNat", leanIdent(ve->name));
+      }
     }
-    return std::format("{}.toNat", emitArg(rhs));
+    return std::format("({}).toNat", emitInlineExpr(rhs));
   }
 
   auto emitInlineExpr(const ExprPtr &e) -> std::string {
@@ -607,7 +691,11 @@ def kernel : Libc.TernaryKernel {} :=
       return "()";
     return std::visit(
         Overloaded{
-            [&](const ConstExpr &c) { return emitConst(c.value, opts_.emit_float_comments); },
+            [&](const ConstExpr &c) {
+              if (e->type && e->type->isVoid())
+                return std::string("()");
+              return emitConst(c.value, opts_.emit_float_comments);
+            },
             [](const VarExpr &v) { return leanIdent(v.name); },
             [](const TableRefExpr &t) { return t.table_name; },
             [&](const UnaryExpr &u) {
@@ -716,6 +804,12 @@ def kernel : Libc.TernaryKernel {} :=
                 return std::format("{} {} {}", cc.lean_name, emitArg(cc.args[0]),
                                    emitShiftAmountNat(cc.args[1]));
               }
+              if (cc.op == CoreOpKind::FPBitsCreateValue && cc.args.size() == 3 &&
+                  cc.type_args.size() == 1) {
+                return std::format("Libc.FPBits.createValue {} {} {} {}", cc.type_args[0],
+                                   emitArg(cc.args[0]), emitShiftAmountNat(cc.args[1]),
+                                   emitShiftAmountNat(cc.args[2]));
+              }
               if (cc.op == CoreOpKind::DyadicRound && cc.args.size() == 4 &&
                   cc.type_args.size() == 1) {
                 return std::format("Libc.DyadicFloat.round {} config {} {} {} {} {}",
@@ -771,11 +865,15 @@ def kernel : Libc.TernaryKernel {} :=
             },
             [&](const FuncCallExpr &fc) {
               std::vector<std::string> parts;
-              parts.push_back(fc.callee);
-              if (fc.needs_mode)
+              parts.push_back(leanIdent(fc.callee));
+              if (fc.needs_mode && !fc.is_local_lambda)
                 parts.emplace_back(currentModeArg());
-              for (const auto &a : fc.args)
-                parts.push_back(emitArg(a));
+              if (fc.is_local_lambda && fc.args.empty()) {
+                parts.emplace_back("()");
+              } else {
+                for (const auto &a : fc.args)
+                  parts.push_back(emitArg(a));
+              }
               return std::format("(← {})", joinWith(parts, " "));
             },
             [&](const TupleExpr &te) {
@@ -1071,10 +1169,25 @@ def kernel : Libc.TernaryKernel {} :=
       return out;
     }
 
+    if (const auto *lf = std::get_if<LetFuncExpr>(&e->v)) {
+      std::vector<std::string> sig;
+      if (lf->params.empty()) {
+        sig.emplace_back("(_ : Unit)");
+      } else {
+        for (const auto &[pn, pt] : lf->params)
+          sig.push_back(std::format("({} : {})", leanIdent(pn), emitType(pt)));
+      }
+      std::string out =
+          std::format("{}let {} {} : {} := do\n{}\n", pad, leanIdent(lf->name), joinWith(sig, " "),
+                      optionType(lf->result_type), emitExprBlock(lf->func_body, ind + 1));
+      out += emitExprBlock(lf->body, ind);
+      return out;
+    }
+
     if (const auto *lt = std::get_if<LetTupleExpr>(&e->v)) {
       std::vector<std::string> names;
       for (const auto &[n, _] : lt->bindings)
-        names.push_back(leanIdent(n));
+        names.push_back(n == "_" ? std::string("_") : leanIdent(n));
       std::string out;
       if (std::holds_alternative<IfExpr>(lt->value->v) ||
           std::holds_alternative<MatchExpr>(lt->value->v) ||
@@ -1082,8 +1195,12 @@ def kernel : Libc.TernaryKernel {} :=
         out += std::format("{}let ({}) ← do\n{}\n", pad, joinWith(names, ", "),
                            emitExprBlock(lt->value, ind + 1));
       } else {
-        out += std::format("{}let ({}) := {}\n", pad, joinWith(names, ", "),
-                           emitInlineExpr(lt->value));
+        auto val = emitInlineExpr(lt->value);
+        if (auto action = soleAction(val)) {
+          out += std::format("{}let ({}) ← {}\n", pad, joinWith(names, ", "), *action);
+        } else {
+          out += std::format("{}let ({}) := {}\n", pad, joinWith(names, ", "), val);
+        }
       }
       out += emitExprBlock(lt->body, ind);
       return out;
@@ -1122,25 +1239,75 @@ def kernel : Libc.TernaryKernel {} :=
     return std::format("{}pure ({})", pad, emitInlineExpr(e));
   }
 
+  static auto hasContinueStmt(const std::vector<Stmt> &stmts) -> bool {
+    return std::ranges::any_of(stmts, [](const Stmt &s) {
+      return std::visit(Overloaded{
+                            [](const ContinueStmt &) { return true; },
+                            [](const IfStmt &i) {
+                              return hasContinueStmt(i.then_body) || hasContinueStmt(i.else_body);
+                            },
+                            [](const BlockStmt &b) { return hasContinueStmt(b.stmts); },
+                            [](const auto &) { return false; },
+                        },
+                        s.v);
+    });
+  }
+
   auto emitDoStmt(const Stmt &st, int ind) -> std::string {
     auto pad = indentStr(ind);
     return std::visit(
         Overloaded{
             [&](const VarDeclStmt &v) {
+              if (!v.is_const && declared_muts_.contains(v.name)) {
+                if (v.init) {
+                  auto val = emitInlineExpr(*v.init);
+                  if (auto action = soleAction(val)) {
+                    return std::format("{}{} ← {}\n", pad, leanIdent(v.name), *action);
+                  }
+                  return std::format("{}{} := {}\n", pad, leanIdent(v.name), val);
+                }
+                return std::format("{}{} := default\n", pad, leanIdent(v.name));
+              }
               std::string kw = v.is_const ? "let" : "let mut";
+              if (!v.is_const)
+                declared_muts_.insert(v.name);
               if (v.init) {
+                auto val = emitInlineExpr(*v.init);
+                if (auto action = soleAction(val)) {
+                  return std::format("{}{} {} : {} ← {}\n", pad, kw, leanIdent(v.name),
+                                     emitType(v.type), *action);
+                }
                 return std::format("{}{} {} : {} := {}\n", pad, kw, leanIdent(v.name),
-                                   emitType(v.type), emitInlineExpr(*v.init));
+                                   emitType(v.type), val);
               }
               return std::format("{}{} {} : {} := default\n", pad, kw, leanIdent(v.name),
                                  emitType(v.type));
             },
             [&](const TupleDeclStmt &td) {
-              std::vector<std::string> names;
-              for (const auto &[n, _] : td.bindings)
-                names.push_back(leanIdent(n));
-              return std::format("{}let ({}) := {}\n", pad, joinWith(names, ", "),
-                                 emitInlineExpr(td.init));
+              std::vector<std::string> tmps;
+              tmps.reserve(td.bindings.size());
+              for (std::size_t k = 0; k < td.bindings.size(); ++k)
+                tmps.push_back(std::format("__t{}", do_tmp_counter_++));
+              auto val = emitInlineExpr(td.init);
+              std::string out;
+              if (auto action = soleAction(val)) {
+                out += std::format("{}let ({}) ← {}\n", pad, joinWith(tmps, ", "), *action);
+              } else {
+                out += std::format("{}let ({}) := {}\n", pad, joinWith(tmps, ", "), val);
+              }
+              for (std::size_t k = 0; k < td.bindings.size(); ++k) {
+                const auto &[n, ty] = td.bindings[k];
+                if (n == "_")
+                  continue;
+                if (declared_muts_.contains(n)) {
+                  out += std::format("{}{} := {}\n", pad, leanIdent(n), tmps[k]);
+                } else {
+                  declared_muts_.insert(n);
+                  out += std::format("{}let mut {} : {} := {}\n", pad, leanIdent(n), emitType(ty),
+                                     tmps[k]);
+                }
+              }
+              return out;
             },
             [&](const AssignStmt &a) {
               if (a.compound_op) {
@@ -1149,7 +1316,54 @@ def kernel : Libc.TernaryKernel {} :=
                 return std::format("{}{} := {}\n", pad, leanIdent(a.target),
                                    emitInlineExpr(combined));
               }
-              return std::format("{}{} := {}\n", pad, leanIdent(a.target), emitInlineExpr(a.value));
+              auto val = emitInlineExpr(a.value);
+              if (auto action = soleAction(val)) {
+                return std::format("{}{} ← {}\n", pad, leanIdent(a.target), *action);
+              }
+              return std::format("{}{} := {}\n", pad, leanIdent(a.target), val);
+            },
+            [&](const AssignTupleStmt &at) {
+              std::vector<std::string> tmps;
+              tmps.reserve(at.targets.size());
+              for (std::size_t k = 0; k < at.targets.size(); ++k)
+                tmps.push_back(std::format("__t{}", do_tmp_counter_++));
+              auto val = emitInlineExpr(at.value);
+              std::string out;
+              if (auto action = soleAction(val)) {
+                out += std::format("{}let ({}) ← {}\n", pad, joinWith(tmps, ", "), *action);
+              } else {
+                out += std::format("{}let ({}) := {}\n", pad, joinWith(tmps, ", "), val);
+              }
+              for (std::size_t k = 0; k < at.targets.size(); ++k) {
+                if (at.targets[k] == "_")
+                  continue;
+                out += std::format("{}{} := {}\n", pad, leanIdent(at.targets[k]), tmps[k]);
+              }
+              return out;
+            },
+            [&](const LocalFuncStmt &lf) {
+              std::vector<std::string> sig;
+              if (lf.params.empty()) {
+                sig.emplace_back("(_ : Unit)");
+              } else {
+                for (const auto &[pn, pt] : lf.params)
+                  sig.push_back(std::format("({} : {})", leanIdent(pn), emitType(pt)));
+              }
+              std::string out = std::format("{}let {} {} : {} := do\n", pad, leanIdent(lf.name),
+                                            joinWith(sig, " "), optionType(lf.return_type));
+              if (lf.lifted_body) {
+                out += emitExprBlock(*lf.lifted_body, ind + 1) + "\n";
+              } else {
+                for (const auto &s : lf.body_stmts)
+                  out += emitDoStmt(s, ind + 1);
+                if (lf.return_type && lf.return_type->isVoid()) {
+                  out += std::format("{}pure ()\n", indentStr(ind + 1));
+                } else if (lf.body_stmts.empty() ||
+                           !std::holds_alternative<ReturnStmt>(lf.body_stmts.back().v)) {
+                  out += std::format("{}none\n", indentStr(ind + 1));
+                }
+              }
+              return out;
             },
             [&](const FieldAssignStmt &fa) {
               ExprPtr rhs = fa.value;
@@ -1157,20 +1371,32 @@ def kernel : Libc.TernaryKernel {} :=
                 auto cur = Expr::make(FieldExpr{fa.base, fa.field}, fa.value->type);
                 rhs = Expr::make(BinaryExpr{*fa.compound_op, std::move(cur), rhs}, fa.value->type);
               }
-              return std::format("{}{}.{} := {}\n", pad, emitInlineExpr(fa.base),
+              auto base_s = emitInlineExpr(fa.base);
+              return std::format("{}{} := {{ {} with {} := {} }}\n", pad, base_s, base_s,
                                  leanIdent(fa.field), emitInlineExpr(rhs));
             },
             [&](const ExprStmt &es) {
-              return std::format("{}let _ := {}\n", pad, emitInlineExpr(es.expr));
+              auto val = emitInlineExpr(es.expr);
+              if (auto action = soleAction(val)) {
+                return std::format("{}let _ ← {}\n", pad, *action);
+              }
+              return std::format("{}let _ := {}\n", pad, val);
             },
             [&](const IfStmt &ifs) {
               std::string out = std::format("{}if {} then\n", pad, emitInlineExpr(ifs.cond));
-              for (const auto &s : ifs.then_body)
-                out += emitDoStmt(s, ind + 1);
+              auto saved_muts = declared_muts_;
+              if (ifs.then_body.empty()) {
+                out += std::format("{}pure ()\n", indentStr(ind + 1));
+              } else {
+                for (const auto &s : ifs.then_body)
+                  out += emitDoStmt(s, ind + 1);
+              }
+              declared_muts_ = saved_muts;
               if (!ifs.else_body.empty()) {
                 out += std::format("{}else\n", pad);
                 for (const auto &s : ifs.else_body)
                   out += emitDoStmt(s, ind + 1);
+                declared_muts_ = saved_muts;
               }
               return out;
             },
@@ -1181,31 +1407,61 @@ def kernel : Libc.TernaryKernel {} :=
                 for (const auto &v : c.values)
                   pats.push_back(emitConst(v, opts_.emit_float_comments));
                 out += std::format("{}| {} =>\n", pad, joinWith(pats, " | "));
-                for (const auto &s : c.body)
-                  out += emitDoStmt(s, ind + 1);
+                if (c.body.empty()) {
+                  out += std::format("{}pure ()\n", indentStr(ind + 1));
+                } else {
+                  for (const auto &s : c.body)
+                    out += emitDoStmt(s, ind + 1);
+                }
               }
-              if (!sw.default_body.empty()) {
-                out += std::format("{}| _ =>\n", pad);
+              out += std::format("{}| _ =>\n", pad);
+              if (sw.default_body.empty()) {
+                out += std::format("{}pure ()\n", indentStr(ind + 1));
+              } else {
                 for (const auto &s : sw.default_body)
                   out += emitDoStmt(s, ind + 1);
               }
               return out;
             },
             [&](const WhileStmt &w) {
-              std::string out = std::format("{}while {} do\n", pad, emitInlineExpr(w.cond));
+              std::string out = std::format("{}for _ in [:65536] do\n", pad);
+              out += std::format("{}if !({}) then break\n", indentStr(ind + 1),
+                                 emitInlineExpr(w.cond));
               for (const auto &s : w.body)
                 out += emitDoStmt(s, ind + 1);
+              return out;
+            },
+            [&](const DoWhileStmt &dw) {
+              std::string out = std::format("{}for _ in [:65536] do\n", pad);
+              for (const auto &s : dw.body)
+                out += emitDoStmt(s, ind + 1);
+              out += std::format("{}if !({}) then break\n", indentStr(ind + 1),
+                                 emitInlineExpr(dw.cond));
               return out;
             },
             [&](const ForStmt &f) {
               std::string out;
               if (f.init && *f.init)
                 out += emitDoStmt(**f.init, ind);
-              std::string cond = f.cond ? emitInlineExpr(*f.cond) : "true";
-              out += std::format("{}while {} do\n", pad, cond);
+              bool has_cont = (f.step && *f.step) && hasContinueStmt(f.body);
+              std::string first_var;
+              if (has_cont) {
+                first_var = std::format("__first{}", do_tmp_counter_++);
+                out += std::format("{}let mut {} := true\n", pad, first_var);
+              }
+              out += std::format("{}for _ in [:65536] do\n", pad);
+              if (has_cont) {
+                out += std::format("{}if !{} then\n", indentStr(ind + 1), first_var);
+                out += emitDoStmt(**f.step, ind + 2);
+                out += std::format("{}{} := false\n", indentStr(ind + 1), first_var);
+              }
+              if (f.cond) {
+                out += std::format("{}if !({}) then break\n", indentStr(ind + 1),
+                                   emitInlineExpr(*f.cond));
+              }
               for (const auto &s : f.body)
                 out += emitDoStmt(s, ind + 1);
-              if (f.step && *f.step)
+              if (!has_cont && f.step && *f.step)
                 out += emitDoStmt(**f.step, ind + 1);
               return out;
             },
@@ -1231,6 +1487,8 @@ def kernel : Libc.TernaryKernel {} :=
 
   EmitOptions opts_;
   bool current_fn_uses_mode_ = false;
+  std::unordered_set<std::string> declared_muts_;
+  int do_tmp_counter_ = 0;
 };
 
 // ============================================================================
@@ -1325,6 +1583,10 @@ auto dumpExprIR(const ExprPtr &e, int ind) -> std::string {
           [&](const LetExpr &le) {
             return std::format("{}Let({} : {})\n{}{}", pad, le.name, emitType(le.bind_type),
                                dumpExprIR(le.value, ind + 1), dumpExprIR(le.body, ind));
+          },
+          [&](const LetFuncExpr &lf) {
+            return std::format("{}LetFunc({} -> {})\n{}{}", pad, lf.name, emitType(lf.result_type),
+                               dumpExprIR(lf.func_body, ind + 1), dumpExprIR(lf.body, ind));
           },
           [&](const LetJoinExpr &lj) {
             return std::format("{}LetJoin({} : {})\n{}{}", pad, lj.name, emitType(lj.result_type),
