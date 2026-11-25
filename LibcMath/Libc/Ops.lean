@@ -136,6 +136,11 @@ variable {fmt : FloatFormat}
   else
     BitVec.ofNat w ((1 <<< fmt.fracWidth) ||| x.fracField)
 
+/-- Unbiased exponent (`int`), matching `FPBits<T>::get_exponent()`.
+Returns `-exponentBias` for both zero and subnormal inputs. -/
+@[inline] def exponent (x : FPBits fmt) : BitVec 32 :=
+  BitVec.ofInt 32 (Int.ofNat x.expField - Int.ofNat fmt.exponentBias)
+
 /-- Explicit unbiased exponent (`int`), matching `FPBits<T>::get_explicit_exponent()`. -/
 @[inline] def explicitExponent (x : FPBits fmt) : BitVec 32 :=
   let e : Int :=

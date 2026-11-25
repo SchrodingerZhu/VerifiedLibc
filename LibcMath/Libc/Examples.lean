@@ -218,6 +218,8 @@ info: 'LibcMath.Libc.Microarch.bigInt_quickMulHi_128_error_bound' depends on axi
 /-! ### `NormalFloat`, NaN payload, and `BigInt.ofLimbs64` checks -/
 
 #guard (FPBits.quietNaN .binary32 .pos (0x123#32)).toBits == 0x7FC00123#32
+#guard FPBits.exponent (FPBits.ofVal f32(0x00000001#32)) == (-127#32)
+#guard FPBits.explicitExponent (FPBits.ofVal f32(0x00000001#32)) == (-126#32)
 #guard (FPBits.signalingNaN .binary32 .pos (0x123#32)).toBits == 0x7F800123#32
 #guard (FPBits.signalingNaN .binary32).toBits == 0x7FA00000#32
 #guard BigInt.ofLimbs64 128 #[0x2#64, 0x1#64] == ((1#128 <<< 64) ||| 2#128)
