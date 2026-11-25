@@ -1,0 +1,19 @@
+\title{Microarch semantics, core/libc fixes, and extraction of all 88 \code{\verb~|binary32~} kernels}
+\taxon{Change}
+\date{2026-11-25}
+\author{antigravity}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{extraction}
+\tag{microarch}
+\tag{difftest}
+\import{base-macros}
+
+\p{Landed in 18 linear semantic commits (\code{\verb~|30fe1cd~} through \code{\verb~|c4c263c~}) during session [ses-BUYJ](ses-BUYJ). The complete proof \code{\verb~|expfDoubleEval_correctlyRounded~} remains intact with zero \code{\verb~|sorry~}.}
+\ul{
+\li{\strong{Project rules in \code{\verb~|AGENTS.md~} (\code{\verb~|30fe1cd~}).} Recorded Conventional Commits, ASD-STE100 prose rules, \code{\verb~|difftest~} verification for every extracted kernel, and external kernel verification with \code{\verb~|gruszka/con-leche~}.}
+\li{\strong{Performance and \code{\verb~|LibcMath/Libc/~} completion (\code{\verb~|c099d38~}, \code{\verb~|2d6ba57~}, \code{\verb~|b677244~}, \code{\verb~|7ad1820~}, \code{\verb~|1f769b6~}).} Marked FloatLib arithmetic wrappers \code{\verb~|@[noinline]~} for a 32x C codegen reduction ([ins-L00D](ins-L00D)). Added microarchitecture \code{\verb~|MathConfig~} ISA presets and proved microarch theorems in \code{\verb~|LibcMath/Libc/Microarch.lean~}. Added accuracy-pass operations, \code{\verb~|NormalFloat~}, NaN payloads, array \code{\verb~|BigInt~} limbs, and exact \code{\verb~|FPBits.exponent~} and \code{\verb~|intlogb~} semantics.}
+\li{\strong{Extractor upgrades (\code{\verb~|232b93f~}, \code{\verb~|b4346f4~}, \code{\verb~|50e20e8~}, \code{\verb~|00ccc26~}, \code{\verb~|3a16048~}).} Extended \code{\verb~|ast2lean~} with microarch macro capture, structs, out and in-out reference parameters, generic lambdas, \code{\verb~|Option~}-monad loops, \code{\verb~|__builtin_unreachable~}, compound-assignment LHS widths, and multi-step \code{\verb~|for~} increments ([ins-Y83Z](ins-Y83Z)).}
+\li{\strong{FloatLib specs and generic \code{\verb~|difftest~} (\code{\verb~|7fe872d~}).} Wrapped FloatLib transcendental and algebraic specifications in \code{\verb~|LibcMath/Testing/Oracle/FloatLib.lean~}. Added \code{\verb~|test/difftest/F32Model.lean~}, \code{\verb~|f32_native.cpp~}, and \code{\verb~|scripts/difftest-f32.sh~}.}
+\li{\strong{All 88 \code{\verb~|binary32~} kernels extracted and difftested (\code{\verb~|a2d2388~}, \code{\verb~|501063d~}, \code{\verb~|bbaa98d~}, \code{\verb~|f8f8dec~}, \code{\verb~|da82699~}, \code{\verb~|c4c263c~}).} Extracted 166 evaluation and microarch plans across exponential, log/root/power, trigonometric, hyperbolic/special, basic/rounding/extrema, and IEEE families. Each unproved theorem uses explicit \code{\verb~|sorry~} and \code{\verb~|#guard_msgs in #print axioms~}, tracked in \code{\verb~|OPEN.md~} (160 open obligations). Every native plan passes \code{\verb~|difftest~} with zero mismatches; upstream \code{\verb~|exp2m1f~} negative-NaN UB is proved in Lean ([prob-X3VQ](prob-X3VQ)).}
+}

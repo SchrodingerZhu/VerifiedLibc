@@ -1,0 +1,21 @@
+\title{Microarch semantics, FloatLib reuse, and extracting all 88 \code{\verb~|binary32~} kernels}
+\taxon{Session}
+\date{2026-11-25}
+\author{antigravity}
+\contributor{schrodingerzy}
+\tag{extraction}
+\tag{microarch}
+\tag{difftest}
+\tag{performance}
+\meta{harness}{Antigravity CLI}
+\meta{model-id}{antigravity}
+\import{base-macros}
+
+\p{This session completed all seven items of the \code{\verb~|binary32~} extraction and microarchitecture goal in 18 strictly linear semantic commits (\code{\verb~|30fe1cd~} through \code{\verb~|c4c263c~}). See [log-PSSL](log-PSSL) for the full change summary.}
+\ul{
+\li{\strong{Core library and performance.} Eliminated LCNF heartbeat timeouts with \code{\verb~|@[noinline]~} wrappers around FloatLib arithmetic ([ins-L00D](ins-L00D)). Reused FloatLib specifications and rounding models across \code{\verb~|LibcMath/Libc/~} and \code{\verb~|LibcMath/Testing/Oracle/FloatLib.lean~}.}
+\li{\strong{Microarchitectural semantics.} Modeled x86-64 SSE2, SSSE3, SSE4.2, AVX2+FMA, AArch64, 32-bit ARMv8 hard-float, RISC-V 64GC, RV32I soft-float, and GPU targets in \code{\verb~|MathConfig~}. Proved FMA, \code{\verb~|nearest_integer~}, \code{\verb~|Frac64~} split-multiply, and \code{\verb~|BigInt~} multiplication theorems in \code{\verb~|LibcMath/Libc/Microarch.lean~}.}
+\li{\strong{Complete \code{\verb~|binary32~} extraction and \code{\verb~|difftest~}.} Extracted all 88 feasible IEEE \code{\verb~|binary32~} math functions from LLVM libc \code{\verb~|e1a5f92db023~} across 166 evaluation and microarchitecture plans. Fixed five subtle extractor and library bugs exposed by \code{\verb~|scripts/difftest-f32.sh~} ([ins-Y83Z](ins-Y83Z)). Proved an upstream C++ undefined-behavior bug in \code{\verb~|exp2m1f~} on negative NaNs ([prob-X3VQ](prob-X3VQ)).}
+\li{\strong{External kernel check.} Skipped \code{\verb~|gruszka/con-leche~} because neither \code{\verb~|con-leche~} nor a Lean 4.36.0 proof exporter is packaged in \code{\verb~|flake.nix~} ([prob-YUE1](prob-YUE1)).}
+\li{\strong{Verified.} \code{\verb~|lake build~} (7 804 jobs), \code{\verb~|lake build checkrange difftest-expf-model difftest-f32-model~}, \code{\verb~|bash extract/test/run_tests.sh~}, \code{\verb~|python3 scripts/check-open.py~} (160 open obligations), \code{\verb~|scripts/difftest-expf.sh~} across all 5 native plans, \code{\verb~|scripts/difftest-f32.sh~} across all 156 native x86-64 plans (0 mismatches), \code{\verb~|checkrange --oracle=mpfr~}, \code{\verb~|journal-build~} (0 diagnostics), and \code{\verb~|git log --merges main~} (empty).}
+}

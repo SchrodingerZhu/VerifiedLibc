@@ -1,0 +1,18 @@
+\title{Semantic bugs caught by differential testing across 88 \code{\verb~|binary32~} kernels}
+\taxon{Insight}
+\date{2026-11-25}
+\author{antigravity}
+\contributor{schrodingerzy}
+\tag{extraction}
+\tag{difftest}
+\tag{semantics}
+\import{base-macros}
+
+\p{Source: session [ses-BUYJ](ses-BUYJ). Running \code{\verb~|scripts/difftest-f32.sh~} against compiled LLVM libc C++ at commit \code{\verb~|e1a5f92db023~} caught five subtle translation bugs that type-checking alone missed.}
+\ul{
+\li{\strong{\code{\verb~|FPBits::get_exponent()~} differs from \code{\verb~|get_explicit_exponent()~} on subnormals.} On \code{\verb~|binary32~} zero and subnormal values, \code{\verb~|get_exponent()~} returns \code{\verb~|-127~}, while \code{\verb~|get_explicit_exponent()~} returns \code{\verb~|0~} on zero and \code{\verb~|-126~} on subnormals. Splitting them in commit \code{\verb~|7ad1820~} fixed RV32I bit-by-bit \code{\verb~|sqrtf~}.}
+\li{\strong{In-out reference parameters must pass their initial value.} Functions such as \code{\verb~|powf~}, \code{\verb~|lgammaf~}, and \code{\verb~|fputil::generic::sqrt~} read and conditionally overwrite reference arguments. Commit \code{\verb~|50e20e8~} detects in-out references, passes them as inputs, and scopes loop-local \code{\verb~|let mut~} bindings.}
+\li{\strong{Compound shift assignments use the left operand width.} In \code{\verb~|fmodf~}, \code{\verb~|m_x <<= sides_zeroes_count~} shifts a 64-bit unsigned integer by a 32-bit signed count. Using the right operand type caused false \code{\verb~|shiftAmount? 32~} undefined behavior. Storing Clang's \code{\verb~|CompoundAssignOperator::getComputationLHSType()~} in commit \code{\verb~|3a16048~} fixed this.}
+\li{\strong{Comma-separated \code{\verb~|for~} increments contain multiple statements.} In \code{\verb~|remquof~} and \code{\verb~|remainderf~}, \code{\verb~|n <<= 1, ++shift_count~} produces two statements. Keeping only the first statement dropped \code{\verb~|++shift_count~}. Wrapping multiple increment steps in a \code{\verb~|BlockStmt~} in commit \code{\verb~|3a16048~} fixed both kernels.}
+\li{\strong{\code{\verb~|LIBC_FULL_BUILD~} sets \code{\verb~|FP_ILOGBNAN~} to \code{\verb~|INT_MAX~} and sign-extends 32-bit constants.} In \code{\verb~|ManipulationFunctions.h~}, \code{\verb~|IntLogbConstants<long>~} uses 32-bit \code{\verb~|FP_ILOGB0~} and \code{\verb~|FP_ILOGBNAN~} instead of 64-bit \code{\verb~|FP_LLOGB0~}. Commits \code{\verb~|1f769b6~} and \code{\verb~|3a16048~} match this behavior in \code{\verb~|Libc.intlogb~} and \code{\verb~|ast2lean~}.}
+}

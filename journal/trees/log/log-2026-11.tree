@@ -3,6 +3,7 @@
 
 \p{Changelog entries dated November 2026, newest first.}
 
+\transclude{log-PSSL}
 \transclude{log-UVP2}
 \transclude{log-3E9Z}
 \transclude{log-PIWX}

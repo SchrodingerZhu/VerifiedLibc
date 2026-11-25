@@ -1,0 +1,16 @@
+\title{External kernel checking with \code{\verb~|gruszka/con-leche~} is not packaged in the flake}
+\taxon{Problem}
+\date{2026-11-25}
+\author{antigravity}
+\contributor{schrodingerzy}
+\tag{verification}
+\tag{kernel}
+\tag{tooling}
+\meta{status}{open}
+\meta{created}{2026-11-25}
+\meta{updated}{2026-11-25}
+\import{base-macros}
+
+\p{\strong{Status:} open. \code{\verb~|AGENTS.md~} requires checking elaborated kernel proofs with the verified external kernel in \code{\verb~|gruszka/con-leche~} when feasible. This check is skipped for now.}
+\p{Neither \code{\verb~|con-leche~} nor a Lean 4.36.0 term exporter such as \code{\verb~|lean4export~} is packaged in \code{\verb~|flake.nix~} or present in the development shell. Offline builds therefore cannot invoke \code{\verb~|con-leche~} on \code{\verb~|expfDoubleEval_correctlyRounded~}.}
+\p{Next step: package \code{\verb~|gruszka/con-leche~} and a matching Lean 4.36.0 exporter in \code{\verb~|flake.nix~}, then benchmark it on \code{\verb~|LibcMath.Kernels.Expf.Proof.DoubleEval~}. Record any performance skip on the 64 Chebyshev SLZ TMD certificate chunks if the external checker times out. See session [ses-BUYJ](ses-BUYJ).}
