@@ -1,0 +1,17 @@
+\title{Functions move under \code{\verb~|LibcMath/Kernels/~}, and \code{\verb~|Exec.lean~} becomes \code{\verb~|SymbolicExecution.lean~}}
+\taxon{Change}
+\date{2026-11-25}
+\author{claude-fable-5-2}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{architecture}
+\import{base-macros}
+
+\p{Asked for by the maintainer on 2026-11-25. No statement or proof changes.}
+\ul{
+\li{\code{\verb~|LibcMath/Expf.lean~} and \code{\verb~|LibcMath/Expf/~} are now \code{\verb~|LibcMath/Kernels/Expf.lean~} and \code{\verb~|LibcMath/Kernels/Expf/~}, with the namespace \code{\verb~|LibcMath.Kernels.Expf~}. A new function goes to \code{\verb~|LibcMath/Kernels/<Function>~}; the template, [note-adding-a-function](note-adding-a-function), \code{\verb~|AGENTS.md~}, \code{\verb~|README.md~} and \code{\verb~|extract/extract-expf-plans.sh~} say so. Older trees of this journal keep the paths that were true when they were written.}
+\li{\code{\verb~|ShortPaths/Exec.lean~} is \code{\verb~|ShortPaths/SymbolicExecution.lean~}, here and in the template. The namespace of its lemmas, \code{\verb~|ShortPaths~}, is the same.}
+\li{The generated plans and the 61 certificate chunks were changed by the same textual substitution of the namespace, not generated again; the script writes the same namespace.}
+\li{Eight expected messages of \code{\verb~|#print axioms~} went from one line to three, because the longer names pass the width of 120 at which Lean breaks the list.}
+\li{\strong{Verified.} \code{\verb~|lake build LibcMath checkrange difftest-expf-model~} completes (10 473 jobs) with no \code{\verb~|sorry~}; \code{\verb~|scripts/check-open.py~} and the tests of the extractor pass.}
+}

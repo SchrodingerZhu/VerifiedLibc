@@ -1,8 +1,8 @@
-import LibcMath.Fn.Plans
-import LibcMath.Fn.Statement
-import LibcMath.Fn.ShortPaths.Ranges
-import LibcMath.Fn.MainPath.Step
-import LibcMath.Fn.Examples
+import LibcMath.Kernels.Fn.Plans
+import LibcMath.Kernels.Fn.Statement
+import LibcMath.Kernels.Fn.ShortPaths.Ranges
+import LibcMath.Kernels.Fn.MainPath.Step
+import LibcMath.Kernels.Fn.Examples
 
 /-!
 # Extracted `<fn>` implementations: correctness theorems
@@ -13,7 +13,7 @@ its extracted evaluation plan (never a "default" alias). Short paths are proved 
 and `fnPlan_correctlyRounded` assembles them here.
 -/
 
-namespace LibcMath.Fn
+namespace LibcMath.Kernels.Fn
 
 open FloatLib.Floats.Formats.BinaryInterchange
 open Model (IEEERoundingMode)
@@ -28,4 +28,4 @@ theorem fnPlan_correctlyRounded : FnPlanCorrectlyRounded := by
 #guard_msgs in
 #print axioms fnPlan_correctlyRounded
 
-end LibcMath.Fn
+end LibcMath.Kernels.Fn

@@ -7,23 +7,23 @@
 \tag{guide}
 \import{base-macros}
 
-\p{Each verified LLVM libc math function lives at the top level of \code{\verb~|LibcMath/~}: an entry module \code{\verb~|LibcMath/<Function>.lean~} and a directory \code{\verb~|LibcMath/<Function>/~} with a fixed structure. \code{\verb~|LibcMath/Expf.lean~} and \code{\verb~|LibcMath/Expf/~} are the worked example, and \code{\verb~|templates/FunctionTemplate/~} is a copyable skeleton.}
+\p{Each verified LLVM libc math function lives under \code{\verb~|LibcMath/Kernels/~}: an entry module \code{\verb~|LibcMath/Kernels/<Function>.lean~} and a directory \code{\verb~|LibcMath/Kernels/<Function>/~} with a fixed structure. \code{\verb~|LibcMath/Kernels/Expf.lean~} and \code{\verb~|LibcMath/Kernels/Expf/~} are the worked example, and \code{\verb~|templates/FunctionTemplate/~} is a copyable skeleton.}
 
 \p{Proofs are directed by numerical analysis, not exhaustive enumeration ([dec-US4Q](dec-US4Q)). Shared building blocks live under \code{\verb~|LibcMath/Analysis/~} so a new function plugs into the same range-reduction, rounding-transfer, and Chebyshev SLZ Table Maker's Dilemma machinery instead of rebuilding it.}
 
 \subtree[note-adding-a-function-layout]{
 \title{Directory shape}
 
-\p{Copy \code{\verb~|templates/FunctionTemplate/~} to \code{\verb~|LibcMath/<Function>/~} and \code{\verb~|templates/FunctionTemplate.lean~} to \code{\verb~|LibcMath/<Function>.lean~}, replacing \code{\verb~|Fn~} / \code{\verb~|fn~} with your function name (for example, \code{\verb~|Exp2f~} / \code{\verb~|exp2f~}) and \code{\verb~|Plan~} / \code{\verb~|plan~} with the explicit evaluation plan name (for example, \code{\verb~|DoubleEval~} / \code{\verb~|doubleEval~}); per [dec-RLMN](dec-RLMN), never define a plan-less "default" alias:}
+\p{Copy \code{\verb~|templates/FunctionTemplate/~} to \code{\verb~|LibcMath/Kernels/<Function>/~} and \code{\verb~|templates/FunctionTemplate.lean~} to \code{\verb~|LibcMath/Kernels/<Function>.lean~}, replacing \code{\verb~|Fn~} / \code{\verb~|fn~} with your function name (for example, \code{\verb~|Exp2f~} / \code{\verb~|exp2f~}) and \code{\verb~|Plan~} / \code{\verb~|plan~} with the explicit evaluation plan name (for example, \code{\verb~|DoubleEval~} / \code{\verb~|doubleEval~}); per [dec-RLMN](dec-RLMN), never define a plan-less "default" alias:}
 
 \ul{
-\li{\code{\verb~|LibcMath/<Function>.lean~} — entry point: imports the short paths and main path, states and proves the top-level theorem, and carries \code{\verb~|#guard_msgs in #print axioms~}.}
-\li{\code{\verb~|LibcMath/<Function>/Generated/~} — plans emitted by \code{\verb~|ast2lean~}; never edited by hand and never mixed with hand-written files.}
-\li{\code{\verb~|LibcMath/<Function>/Plans.lean~} — hand-written catalogue collecting \code{\verb~|allPlans~}.}
-\li{\code{\verb~|LibcMath/<Function>/Statement.lean~} — \code{\verb~|CorrectlyRounded~} statements for the extracted evaluation plans.}
-\li{\code{\verb~|LibcMath/<Function>/ShortPaths/{Exec,Ranges}.lean~} — symbolic evaluation and whole-range correctness for zeros, infinities, NaNs, tiny arguments, overflow, and underflow.}
-\li{\code{\verb~|LibcMath/<Function>/MainPath/~} — one file per numerical-analysis step (range reduction and UB-freedom, real polynomial approximation, floating-point Horner evaluation error, table bounds, combined value error, isolated pointwise exceptions, and TMD rounding clearance; generated certificate chunks stay isolated under \code{\verb~|MainPath/Tmd/Certs/~}).}
-\li{\code{\verb~|LibcMath/<Function>/Examples.lean~} — worked evaluations and \code{\verb~|Libc.Diag~} checks compiled as part of \code{\verb~|lake build~}.}
+\li{\code{\verb~|LibcMath/Kernels/<Function>.lean~} — entry point: imports the short paths and main path, states and proves the top-level theorem, and carries \code{\verb~|#guard_msgs in #print axioms~}.}
+\li{\code{\verb~|LibcMath/Kernels/<Function>/Generated/~} — plans emitted by \code{\verb~|ast2lean~}; never edited by hand and never mixed with hand-written files.}
+\li{\code{\verb~|LibcMath/Kernels/<Function>/Plans.lean~} — hand-written catalogue collecting \code{\verb~|allPlans~}.}
+\li{\code{\verb~|LibcMath/Kernels/<Function>/Statement.lean~} — \code{\verb~|CorrectlyRounded~} statements for the extracted evaluation plans.}
+\li{\code{\verb~|LibcMath/Kernels/<Function>/ShortPaths/{SymbolicExecution,Ranges}.lean~} — symbolic evaluation and whole-range correctness for zeros, infinities, NaNs, tiny arguments, overflow, and underflow.}
+\li{\code{\verb~|LibcMath/Kernels/<Function>/MainPath/~} — one file per numerical-analysis step (range reduction and UB-freedom, real polynomial approximation, floating-point Horner evaluation error, table bounds, combined value error, isolated pointwise exceptions, and TMD rounding clearance; generated certificate chunks stay isolated under \code{\verb~|MainPath/Tmd/Certs/~}).}
+\li{\code{\verb~|LibcMath/Kernels/<Function>/Examples.lean~} — worked evaluations and \code{\verb~|Libc.Diag~} checks compiled as part of \code{\verb~|lake build~}.}
 }
 }
 
@@ -32,9 +32,9 @@
 
 \ol{
 \li{\strong{Add the specification.} If the mathematical specification is not yet in \code{\verb~|LibcMath/Framework/Specs.lean~}, add \code{\verb~|Spec.<fn>~} following ISO C23 Annex F.10.}
-\li{\strong{Extract the plans with \code{\verb~|ast2lean~}.} Write an extraction script modelled on \code{\verb~|extract/extract-expf-plans.sh~} that emits each build plan into \code{\verb~|LibcMath/<Function>/Generated/~} with \code{\verb~|--namespace=LibcMath.<Function>.Generated.<Plan>~}. Add \code{\verb~|Plans.lean~} next to \code{\verb~|Generated/~} collecting \code{\verb~|allPlans~}.}
+\li{\strong{Extract the plans with \code{\verb~|ast2lean~}.} Write an extraction script modelled on \code{\verb~|extract/extract-expf-plans.sh~} that emits each build plan into \code{\verb~|LibcMath/Kernels/<Function>/Generated/~} with \code{\verb~|--namespace=LibcMath.Kernels.<Function>.Generated.<Plan>~}. Add \code{\verb~|Plans.lean~} next to \code{\verb~|Generated/~} collecting \code{\verb~|allPlans~}.}
 \li{\strong{Write the statement.} In \code{\verb~|Statement.lean~}, define \code{\verb~|<Function><Plan>CorrectlyRounded~} against \code{\verb~|Spec.<fn>~} and \code{\verb~|cModes~} (or \code{\verb~|{.nearest}~} for RN-only plans), always naming the implementation plan explicitly ([dec-RLMN](dec-RLMN)).}
-\li{\strong{Prove the short paths for whole ranges.} Add closed-form range theorems for the real function under \code{\verb~|LibcMath/Analysis/~} (modelled on \code{\verb~|Analysis/ExpRanges.lean~}). Evaluate the extracted kernel symbolically in \code{\verb~|ShortPaths/Exec.lean~} and join the ranges with \code{\verb~|HoldsOnBits.append~} in \code{\verb~|ShortPaths/Ranges.lean~}.}
+\li{\strong{Prove the short paths for whole ranges.} Add closed-form range theorems for the real function under \code{\verb~|LibcMath/Analysis/~} (modelled on \code{\verb~|Analysis/ExpRanges.lean~}). Evaluate the extracted kernel symbolically in \code{\verb~|ShortPaths/SymbolicExecution.lean~} and join the ranges with \code{\verb~|HoldsOnBits.append~} in \code{\verb~|ShortPaths/Ranges.lean~}.}
 \li{\strong{Decompose the main path into analytical steps.} Create one file per step under \code{\verb~|MainPath/~}:
   \ul{
   \li{\strong{Range reduction & UB-freedom} (\code{\verb~|MainPath/RangeReduction.lean~}): reuse \code{\verb~|Analysis/RangeReduction.lean~} for exact power-of-two scaling, \code{\verb~|genericNearestInt~}, Sterbenz subtraction, widening casts, and checked \code{\verb~|fptosi?~} / \code{\verb~|sadd?~} / table bounds. Note any isolated rounding edge cases (like \code{\verb~|0x3B7FFFFF~} and \code{\verb~|0xBB7FFFFF~} in \code{\verb~|expf~}) early.}
@@ -43,6 +43,6 @@
   \li{\strong{Rounding transfer & TMD} (\code{\verb~|MainPath/PointwiseExceptions.lean~}, \code{\verb~|MainPath/Tmd/~}): plug the value error bound \code{\verb~|ε~} into the shared \code{\verb~|Analysis/RoundingTransfer.lean~} (\code{\verb~|roundReal_eq_of_awayFromGrid~}) and \code{\verb~|Analysis/ChebTmd.lean~} (pure-\code{\verb~|Nat~} always-odd Chebyshev SLZ verifier), discharging the finite list of hard-to-round inputs individually via a proved-sound oracle + \code{\verb~|decide +kernel~}.}
   }
   Any step not yet proved stays a named lemma ending in \code{\verb~|sorry~} with a \code{\verb~|/-- **Open.** ... -/~} docstring, never a hypothesis of the top-level theorem. Run \code{\verb~|python3 scripts/check-open.py --update~} to keep \code{\verb~|OPEN.md~} in sync.}
-\li{\strong{Add examples, imports, and differential tests.} Wire \code{\verb~|LibcMath.<Function>~} into \code{\verb~|LibcMath.lean~}, add \code{\verb~|Examples.lean~}, register the kernel in \code{\verb~|Testing/Target.lean~} for \code{\verb~|checkrange~}, and add a differential test script modelled on \code{\verb~|scripts/difftest-expf.sh~}. Verify \code{\verb~|lake build~}, \code{\verb~|python3 scripts/check-open.py~}, \code{\verb~|bash extract/test/run_tests.sh~}, and \code{\verb~|journal-build~}.}
+\li{\strong{Add examples, imports, and differential tests.} Wire \code{\verb~|LibcMath.Kernels.<Function>~} into \code{\verb~|LibcMath.lean~}, add \code{\verb~|Examples.lean~}, register the kernel in \code{\verb~|Testing/Target.lean~} for \code{\verb~|checkrange~}, and add a differential test script modelled on \code{\verb~|scripts/difftest-expf.sh~}. Verify \code{\verb~|lake build~}, \code{\verb~|python3 scripts/check-open.py~}, \code{\verb~|bash extract/test/run_tests.sh~}, and \code{\verb~|journal-build~}.}
 }
 }
