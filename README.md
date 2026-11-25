@@ -2,6 +2,31 @@
 
 Lean 4 proofs that LLVM libc math functions are correctly rounded.
 
+## From libc source to a checked proof
+
+Each step below has one tool and one result. Steps 1 to 4 make a Lean model of the C++ code and
+test it. Steps 5 to 7 prove a statement about that model and check the proof.
+
+```mermaid
+flowchart TD
+    src["<b>1. LLVM libc source</b><br/>src/math/generic/&lt;fn&gt;.cpp and src/__support/math/*.h<br/>at commit e1a5f92db023"]
+    ast["<b>2. Clang AST</b><br/>ast2lean parses the source with the compiler flags of one plan.<br/>It records the LIBC_MATH_* and LIBC_TARGET_CPU_HAS_* macros that Clang sees."]
+    kernel["<b>3. Extracted kernel</b><br/>LibcMath/Kernels/&lt;Fn&gt;/Generated/&lt;Plan&gt;.lean<br/>A total Lean function over FloatLib; none marks C++ undefined behaviour."]
+    plans["<b>Plans: one kernel for each</b><br/><i>Evaluation plan</i> (LIBC_MATH_&lt;FN&gt;_IMPL):<br/>double_eval: double-precision tables and polynomial<br/>float_eval: single precision only, fast, not correctly rounded<br/>float_eval_cr_rn: float-float arithmetic with FMA, round to nearest<br/>integer_eval: integer arithmetic only, round to nearest<br/>static_rounding: integer arithmetic only, rounding mode as an argument<br/><i>Target plan</i> (compiler flags):<br/>sse2, sse42, avx2_fma, aarch64, soft float"]
+    stmt["<b>4. Statement</b><br/>One Prop for each plan, for example ExpfDoubleEvalCorrectlyRounded.<br/>Until it is proved, its theorem ends in sorry and is listed in OPEN.md."]
+    diff["<b>5. Differential test</b><br/>scripts/difftest-f32.sh compiles the C++ with the same flags<br/>and compares result bits in each rounding mode on a fixed set of inputs.<br/>It shows that the model is the code, up to the inputs it tries. It is not a proof."]
+    proof["<b>6. Proof by analysis</b><br/>Symbolic execution, error bounds and TMD certificates,<br/>in LibcMath/Kernels/&lt;Fn&gt;/Proof/&lt;Plan&gt;/"]
+    lean["<b>7. Lean kernel</b><br/>lake build checks every proof term.<br/>#guard_msgs on #print axioms keeps the axioms to<br/>propext, Classical.choice and Quot.sound."]
+    ext["<b>8. External kernel</b><br/>The proof terms are exported with lean4export and checked again<br/>by gruszka/con-leche, a formally verified kernel.<br/>This rejects a proof that passes only because of a bug in Lean."]
+
+    src --> ast --> kernel
+    kernel -.- plans
+    kernel --> stmt --> diff --> proof --> lean --> ext
+```
+
+The external check of step 8 is a rule of the project, but `con-leche` is not yet in the flake
+([`prob-YUE1`](journal/trees/problem/prob-YUE1.tree)). Each session records when it skips it.
+
 ## Setup
 
 The development environment is a Nix flake. It provides Lean 4.36.0 (the official release,
@@ -129,6 +154,41 @@ theorem that ends in an open lemma. The short paths of `double_eval_fma` (87.30 
 `integerEval_eq_staticRounding_nearest`) are proved; their main polynomial ranges are open.
 `float_eval` is not correctly rounded, so its statement is that it reaches no undefined
 operation. `OPEN.md` lists every open lemma.
+
+### How the proof of `expf` (`double_eval`) is built
+
+The proof is a case analysis on the `2³²` bit patterns, in each of the four rounding modes. Each
+class of inputs is closed by the method that suits it.
+
+```mermaid
+flowchart TD
+    all["<b>All 2³² binary32 inputs × 4 rounding modes</b><br/>expfDoubleEval_correctlyRounded"]
+
+    short["<b>Short paths: 87.30 %</b><br/>The function returns before its tables and polynomial."]
+    special["<b>Special values</b><br/>±0, ±∞, NaNs"]
+    closed["<b>Ranges with a closed form</b><br/>|x| ≤ 2⁻²⁶ returns 1 + x;<br/>overflow; underflow"]
+    symb["<b>Symbolic execution</b><br/>ShortPaths/SymbolicExecution.lean evaluates the kernel on a whole range;<br/>Analysis/ExpRanges.lean gives the correctly rounded result there.<br/>ShortPaths/Ranges.lean"]
+
+    tiny["<b>Tiny and near-underflow inputs: 0.59 %</b><br/>2⁻²⁶ &lt; x &lt; 2⁻²⁴, -2⁻²⁵ &lt; x &lt; -2⁻²⁶, and next to underflow"]
+    analytic["<b>Numerical analysis on intervals</b><br/>The error bound puts the result between two rounding boundaries<br/>for the whole interval. MainPath/ProductError.lean"]
+
+    main["<b>Main polynomial ranges: 12.11 %</b><br/>2⁻²⁴ ≤ x &lt; 88.72…, -103.97… &lt; x &lt; -2⁻²⁵"]
+    err["<b>Value error</b><br/>|v − eˣ| ≤ 2·10⁻¹⁵·eˣ from range reduction, table bounds<br/>and Horner error. MainPath/{RangeReduction,TableBounds,HornerError,ProductError}.lean"]
+    tmd["<b>TMD certificates</b><br/>278 619 Chebyshev SLZ certificates, checked in Lean's kernel, show that<br/>no other input comes nearer than the error bound to a rounding boundary.<br/>MainPath/Tmd/"]
+    pts["<b>103 exceptional inputs</b><br/>Too near a boundary for the general bound. Each one is decided<br/>in Lean's kernel (decide +kernel) against an 80-bit enclosure of eˣ.<br/>MainPath/PointwiseExceptions.lean"]
+
+    all --> short
+    all --> tiny
+    all --> main
+    short --> special --> symb
+    short --> closed --> symb
+    tiny --> analytic
+    main --> err
+    err --> tmd
+    err --> pts
+```
+
+No step runs the function on every input, and no proof uses `native_decide`.
 
 ## Testing a kernel
 

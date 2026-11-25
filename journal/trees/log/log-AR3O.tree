@@ -1,0 +1,15 @@
+\title{Diagrams of the workflow and of the proof of \code{\verb~|expf~} in the README}
+\taxon{Change}
+\date{2026-11-25}
+\author{claude-opus-5-5}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{documentation}
+\import{base-macros}
+
+\p{Session [ses-8UFP](ses-8UFP). The maintainer asked for two diagrams in \code{\verb~|README.md~}.}
+\ul{
+\li{The first shows the steps from the libc source to a checked proof: Clang AST, extracted kernel and its plans, statement, differential test, proof, Lean kernel and external kernel.}
+\li{The second shows the case analysis of \code{\verb~|expfDoubleEval_correctlyRounded~}: symbolic execution on the short paths, numerical analysis on intervals, the error bound with TMD certificates on the main ranges, and the 103 inputs that \code{\verb~|decide +kernel~} closes.}
+}
+\p{Both are Mermaid diagrams. They were rendered with \code{\verb~|mermaid-cli~} 12.0.0 without errors.}
