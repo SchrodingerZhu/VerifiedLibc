@@ -184,6 +184,10 @@ PLANS: list[tuple[str, str, str, str, str, str, str, str | None]] = [
 ]
 
 
+# Flag kinds that compile for another target with `-nostdinc` and the headers of Clang only.
+CROSS_KINDS = {"aarch64", "riscv64", "softfloat"}
+
+
 def flags_for(kind: str, cpp_file: str, rdir: str) -> list[str]:
     upper = cpp_file.upper()
     if kind == "sse2":
@@ -207,7 +211,28 @@ def flags_for(kind: str, cpp_file: str, rdir: str) -> list[str]:
     raise ValueError(f"unknown flags kind: {kind}")
 
 
-def run_one(libc: Path, rdir: str, entry: tuple[str, str, str, str, str, str, str, str | None]) -> str:
+def host_include_flags() -> list[str]:
+    """Return the system include directories of the C++ compiler as `-isystem` flags.
+
+    `ast2lean` uses the resource directory of Clang but not the C library headers that the
+    compiler wrapper adds, and some LLVM libc headers include them (`sys/syscall.h`).
+    """
+    cxx = os.environ.get("AST2LEAN_CXX", "clang++")
+    res = subprocess.run([cxx, "-x", "c++", "-E", "-v", "-"], input="", capture_output=True,
+                         text=True, check=True)
+    lines = res.stderr.splitlines()
+    start = lines.index("#include <...> search starts here:") + 1
+    end = lines.index("End of search list.")
+    dirs = [d.strip() for d in lines[start:end] if "resource-root" not in d]
+    return [f for d in dirs for f in ("-isystem", d)]
+
+
+def run_one(
+    libc: Path,
+    rdir: str,
+    host_includes: list[str],
+    entry: tuple[str, str, str, str, str, str, str, str | None],
+) -> str:
     _, kdir, cpp_file, lean_fn, plan_mod, variant, fkind, target_override = entry
     src = libc / "src" / "math" / "generic" / f"{cpp_file}.cpp"
     out_dir = ROOT / "LibcMath" / "Kernels" / kdir / "Generated"
@@ -216,6 +241,8 @@ def run_one(libc: Path, rdir: str, entry: tuple[str, str, str, str, str, str, st
     ns = f"LibcMath.Kernels.{kdir}.Generated.{plan_mod}"
     target = target_override or f"__llvm_libc::{cpp_file}"
     extra = flags_for(fkind, cpp_file, rdir)
+    if fkind not in CROSS_KINDS:
+        extra += host_includes
     cmd = [
         str(BIN),
         str(src),
@@ -251,12 +278,13 @@ def main() -> int:
     libc = Path(sys.argv[1]).resolve()
     fam = sys.argv[2] if len(sys.argv) >= 3 else "all"
     rdir = subprocess.check_output(["clang++", "-print-resource-dir"], text=True).strip()
+    host_includes = host_include_flags()
     selected = [p for p in PLANS if fam == "all" or p[0] == fam]
     if not selected:
         print(f"error: no plans for family '{fam}'", file=sys.stderr)
         return 2
     with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 8) as ex:
-        futs = [ex.submit(run_one, libc, rdir, e) for e in selected]
+        futs = [ex.submit(run_one, libc, rdir, host_includes, e) for e in selected]
         done = [f.result() for f in futs]
     print(f"Extracted {len(done)} plans for family '{fam}'.")
     return 0
