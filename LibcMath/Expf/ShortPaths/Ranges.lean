@@ -49,7 +49,7 @@ private theorem toNatBits_ofBits (b : BitVec 32) : f32(b).toNatBits = b.toNat :=
 
 /-! ## `Generated.DoubleEval.expf` short-path ranges -/
 
-theorem holdsOnBits_small_pos (hmode : mode ∈ cModes) :
+theorem holdsOnBits_doubleEval_small_pos (hmode : mode ∈ cModes) :
     HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEval.expf mode)
       0x00000000 0x32800001 :=
   holdsOnBits_of_forall_bitVec fun b _ hhi => by
@@ -62,7 +62,7 @@ theorem holdsOnBits_small_pos (hmode : mode ∈ cModes) :
       rw [one_add_of_tiny_pos_bits hmode hbits,
         ExpRanges.eval_of_tiny_pos_bits hmode ⟨hbits.1, by omega⟩]
 
-theorem holdsOnBits_small_neg (hmode : mode ∈ cModes) :
+theorem holdsOnBits_doubleEval_small_neg (hmode : mode ∈ cModes) :
     HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEval.expf mode)
       0x80000000 0xB2800001 :=
   holdsOnBits_of_forall_bitVec fun b hlo hhi => by
@@ -75,7 +75,7 @@ theorem holdsOnBits_small_neg (hmode : mode ∈ cModes) :
       rw [one_add_of_tiny_neg_bits hmode hbits,
         ExpRanges.eval_of_tiny_neg_bits hmode ⟨hbits.1, by omega⟩]
 
-theorem holdsOnBits_overflow (hmode : mode ∈ cModes) :
+theorem holdsOnBits_doubleEval_overflow (hmode : mode ∈ cModes) :
     HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEval.expf mode)
       0x42B17218 0x7F800000 :=
   holdsOnBits_of_forall_bitVec fun b hlo hhi => by
@@ -83,7 +83,7 @@ theorem holdsOnBits_overflow (hmode : mode ∈ cModes) :
     rw [ExpRanges.eval_of_overflow_bits (x := f32(b)) hmode
       ⟨by rw [toNatBits_ofBits]; omega, by rw [toNatBits_ofBits]; omega⟩]
 
-theorem holdsOnBits_posInf (hmode : mode ∈ cModes) :
+theorem holdsOnBits_doubleEval_posInf (hmode : mode ∈ cModes) :
     HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEval.expf mode)
       0x7F800000 0x7F800001 :=
   holdsOnBits_of_forall_bitVec fun b hlo hhi => by
@@ -92,7 +92,7 @@ theorem holdsOnBits_posInf (hmode : mode ∈ cModes) :
     rw [ExpRanges.eval_of_posInf_bits (x := f32(0x7F800000#32)) rfl]
     rcases hmode with rfl | rfl | rfl | rfl <;> decide +kernel
 
-theorem holdsOnBits_pos_nan :
+theorem holdsOnBits_doubleEval_pos_nan :
     HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEval.expf mode)
       0x7F800001 0x80000000 :=
   holdsOnBits_of_forall_bitVec fun b hlo hhi => by
@@ -103,7 +103,7 @@ theorem holdsOnBits_pos_nan :
     · rw [ExpRanges.eval_of_isNaN hnan]
       decide +kernel
 
-theorem holdsOnBits_underflow (hmode : mode ∈ cModes) :
+theorem holdsOnBits_doubleEval_underflow (hmode : mode ∈ cModes) :
     HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEval.expf mode)
       0xC2CFF1B5 0xFF800000 :=
   holdsOnBits_of_forall_bitVec fun b hlo hhi => by
@@ -111,7 +111,7 @@ theorem holdsOnBits_underflow (hmode : mode ∈ cModes) :
     rw [ExpRanges.eval_of_underflow_bits (x := f32(b)) hmode
       ⟨by rw [toNatBits_ofBits]; omega, by rw [toNatBits_ofBits]; omega⟩]
 
-theorem holdsOnBits_negInf :
+theorem holdsOnBits_doubleEval_negInf :
     HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEval.expf mode)
       0xFF800000 0xFF800001 :=
   holdsOnBits_of_forall_bitVec fun b hlo hhi => by
@@ -119,7 +119,7 @@ theorem holdsOnBits_negInf :
     refine .of_eq_some (y := Model.posZero .binary32) doubleEval_of_negInf (.inl ?_)
     exact (ExpRanges.eval_of_negInf_bits (x := Model.negInf .binary32) rfl).symm
 
-theorem holdsOnBits_neg_nan :
+theorem holdsOnBits_doubleEval_neg_nan :
     HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEval.expf mode)
       0xFF800001 0x100000000 :=
   holdsOnBits_of_forall_bitVec fun b hlo hhi => by
@@ -131,21 +131,23 @@ theorem holdsOnBits_neg_nan :
 
 /-- All short-path ranges of `Generated.DoubleEval.expf` joined into three intervals covering
 3 749 616 693 of 2³² bit patterns (87.30 %) in every C rounding mode. -/
-theorem holdsOnBits_short_paths (hmode : mode ∈ cModes) :
+theorem holdsOnBits_short_paths_doubleEval (hmode : mode ∈ cModes) :
     HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEval.expf mode)
       0x00000000 0x32800001 ∧
     HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEval.expf mode)
       0x42B17218 0xB2800001 ∧
     HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEval.expf mode)
       0xC2CFF1B5 0x100000000 :=
-  ⟨holdsOnBits_small_pos hmode,
-    (((holdsOnBits_overflow hmode).append (holdsOnBits_posInf hmode)).append
-      holdsOnBits_pos_nan).append (holdsOnBits_small_neg hmode),
-    ((holdsOnBits_underflow hmode).append holdsOnBits_negInf).append holdsOnBits_neg_nan⟩
+  ⟨holdsOnBits_doubleEval_small_pos hmode,
+    (((holdsOnBits_doubleEval_overflow hmode).append
+      (holdsOnBits_doubleEval_posInf hmode)).append
+      holdsOnBits_doubleEval_pos_nan).append (holdsOnBits_doubleEval_small_neg hmode),
+    ((holdsOnBits_doubleEval_underflow hmode).append holdsOnBits_doubleEval_negInf).append
+      holdsOnBits_doubleEval_neg_nan⟩
 
 /-! ## `Generated.DoubleEvalFma.expf` short-path ranges -/
 
-theorem holdsOnBits_short_paths_fma (hmode : mode ∈ cModes) :
+theorem holdsOnBits_short_paths_doubleEvalFma (hmode : mode ∈ cModes) :
     HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEvalFma.expf mode)
         0x00000000 0x32800001 ∧
     HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEvalFma.expf mode)

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Compare an AST-extracted Lean model of `expf` with compiled LLVM libc C++ machine code.
 #
-#   scripts/difftest-expf.sh [--plan=<plan>] <llvm-project>/libc quick
-#   scripts/difftest-expf.sh [--plan=<plan>] <llvm-project>/libc dense [<step>]
-#   scripts/difftest-expf.sh [--plan=<plan>] <llvm-project>/libc range <first> <last> [<step>]
+#   scripts/difftest-expf.sh --plan=<plan> <llvm-project>/libc quick
+#   scripts/difftest-expf.sh --plan=<plan> <llvm-project>/libc dense [<step>]
+#   scripts/difftest-expf.sh --plan=<plan> <llvm-project>/libc range <first> <last> [<step>]
 #
-# Plans:
-#   double_eval      (default) x86-64 non-FMA, all 4 rounding modes
+# Plans (required):
+#   double_eval      x86-64 non-FMA, all 4 rounding modes
 #   double_eval_fma  -mavx2 -mfma, all 4 rounding modes
 #   integer_eval     LIBC_MATH_EXPF_IMPL=integer_eval, LIBC_MATH=0x2C (RN only)
 #   float_eval       -mavx2 -mfma, LIBC_MATH_EXPF_IMPL=float_eval, LIBC_MATH=0x3F (RN only)
@@ -16,11 +16,12 @@
 # JOBS sets the number of parallel processes (default 8).
 set -euo pipefail
 
-plan=double_eval
-if [[ ${1:-} == --plan=* ]]; then
-  plan=${1#--plan=}
-  shift
+if [[ ${1:-} != --plan=* ]]; then
+  echo "usage: scripts/difftest-expf.sh --plan=<plan> <llvm-project>/libc <quick|dense|range> ..." >&2
+  exit 2
 fi
+plan=${1#--plan=}
+shift
 
 libc=$1 suite=$2
 shift 2

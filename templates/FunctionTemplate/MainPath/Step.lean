@@ -27,9 +27,9 @@ open FloatLib.Floats.Formats.BinaryInterchange
 open Model (IEEERoundingMode)
 
 /-- **Open.** Replace with the specific analytical step and a Sollya/Gappa-checked error bound. -/
-theorem correctAt_main {mode : IEEERoundingMode} (hmode : mode ∈ cModes)
+theorem correctAt_plan_main {mode : IEEERoundingMode} (hmode : mode ∈ cModes)
     {lo hi : ℕ} :
-    HoldsOnBits (CorrectAt (Spec.fn .binary32) Generated.Default.fn mode) lo hi := by
+    HoldsOnBits (CorrectAt (Spec.fn .binary32) Generated.Plan.fn mode) lo hi := by
   sorry
 
 end LibcMath.Fn.MainPath

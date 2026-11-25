@@ -10,8 +10,9 @@ namespace LibcMath.Fn
 open FloatLib.Floats.Formats.BinaryInterchange
 open Model (IEEERoundingMode)
 
-/-- Correct rounding of the default extracted `<fn>` plan in the four rounding directions of C. -/
-def FnCorrectlyRounded : Prop :=
-  CorrectlyRounded (Spec.fn .binary32) cModes Generated.Default.fn
+/-- Correct rounding of `math::<plan>::<fn>` in the four rounding directions of C. Always include
+the implementation plan name in every statement; do not define a "default" alias. -/
+def FnPlanCorrectlyRounded : Prop :=
+  CorrectlyRounded (Spec.fn .binary32) cModes Generated.Plan.fn
 
 end LibcMath.Fn

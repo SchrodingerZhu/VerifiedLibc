@@ -14,7 +14,7 @@
 \subtree[note-adding-a-function-layout]{
 \title{Directory shape}
 
-\p{Copy \code{\verb~|templates/FunctionTemplate/~} to \code{\verb~|LibcMath/<Function>/~} and \code{\verb~|templates/FunctionTemplate.lean~} to \code{\verb~|LibcMath/<Function>.lean~}, replacing \code{\verb~|Fn~} / \code{\verb~|fn~} with your function name (for example, \code{\verb~|Exp2f~} / \code{\verb~|exp2f~}):}
+\p{Copy \code{\verb~|templates/FunctionTemplate/~} to \code{\verb~|LibcMath/<Function>/~} and \code{\verb~|templates/FunctionTemplate.lean~} to \code{\verb~|LibcMath/<Function>.lean~}, replacing \code{\verb~|Fn~} / \code{\verb~|fn~} with your function name (for example, \code{\verb~|Exp2f~} / \code{\verb~|exp2f~}) and \code{\verb~|Plan~} / \code{\verb~|plan~} with the explicit evaluation plan name (for example, \code{\verb~|DoubleEval~} / \code{\verb~|doubleEval~}); per [dec-RLMN](dec-RLMN), never define a plan-less "default" alias:}
 
 \ul{
 \li{\code{\verb~|LibcMath/<Function>.lean~} — entry point: imports the short paths and main path, states and proves the top-level theorem, and carries \code{\verb~|#guard_msgs in #print axioms~}.}
@@ -33,7 +33,7 @@
 \ol{
 \li{\strong{Add the specification.} If the mathematical specification is not yet in \code{\verb~|LibcMath/Framework/Specs.lean~}, add \code{\verb~|Spec.<fn>~} following ISO C23 Annex F.10.}
 \li{\strong{Extract the plans with \code{\verb~|ast2lean~}.} Write an extraction script modelled on \code{\verb~|extract/extract-expf-plans.sh~} that emits each build plan into \code{\verb~|LibcMath/<Function>/Generated/~} with \code{\verb~|--namespace=LibcMath.<Function>.Generated.<Plan>~}. Add \code{\verb~|Plans.lean~} next to \code{\verb~|Generated/~} collecting \code{\verb~|allPlans~}.}
-\li{\strong{Write the statement.} In \code{\verb~|Statement.lean~}, define \code{\verb~|<Function>CorrectlyRounded~} against \code{\verb~|Spec.<fn>~} and \code{\verb~|cModes~} (or \code{\verb~|{.nearest}~} for RN-only plans).}
+\li{\strong{Write the statement.} In \code{\verb~|Statement.lean~}, define \code{\verb~|<Function><Plan>CorrectlyRounded~} against \code{\verb~|Spec.<fn>~} and \code{\verb~|cModes~} (or \code{\verb~|{.nearest}~} for RN-only plans), always naming the implementation plan explicitly ([dec-RLMN](dec-RLMN)).}
 \li{\strong{Prove the short paths for whole ranges.} Add closed-form range theorems for the real function under \code{\verb~|LibcMath/Analysis/~} (modelled on \code{\verb~|Analysis/ExpRanges.lean~}). Evaluate the extracted kernel symbolically in \code{\verb~|ShortPaths/Exec.lean~} and join the ranges with \code{\verb~|HoldsOnBits.append~} in \code{\verb~|ShortPaths/Ranges.lean~}.}
 \li{\strong{Decompose the main path into analytical steps.} Create one file per step under \code{\verb~|MainPath/~}:
   \ul{

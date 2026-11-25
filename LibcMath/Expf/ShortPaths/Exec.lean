@@ -10,7 +10,7 @@ has a result there, `some …`, and what it is: none of the operations that C++ 
 reached on these paths, so no side condition has to be proved.
 
 Covers four extracted plans:
-* `Generated.DoubleEval.expf` (default x86-64, all 4 rounding modes)
+* `Generated.DoubleEval.expf` (x86-64 non-FMA, all 4 rounding modes)
 * `Generated.DoubleEvalFma.expf` (`-mavx2 -mfma`, all 4 rounding modes)
 * `Generated.StaticRounding.kernel` (pure integer `Frac64`, all 4 rounding modes)
 * `Generated.IntegerEval.kernel` (pure integer `Frac64`, round-to-nearest-even, via

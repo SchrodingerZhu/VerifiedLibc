@@ -8,25 +8,30 @@ import LibcMath.Expf.ShortPaths.Ranges
 import LibcMath.Expf.Statement
 
 /-!
-# `expf` is correctly rounded
+# Extracted `expf` implementations: correctness theorems
 
-Entry point for the verification of LLVM libc `expf` (`LibcMath/Expf/`).
+Entry point for the verification of LLVM libc `expf` evaluation plans (`LibcMath/Expf/`). Every
+statement and theorem explicitly names its extracted implementation plan; there is no "default"
+plan alias.
 
-`expf_correctlyRounded` proves `ExpfCorrectlyRounded` for the default plan `double_eval` across all
-`2³²` binary32 inputs and all four C rounding directions (`cModes`), with no `sorry` and only the
-three standard Lean axioms (`[propext, Classical.choice, Quot.sound]`):
+`expfDoubleEval_correctlyRounded` proves `ExpfDoubleEvalCorrectlyRounded`
+(`math::double_eval::expf`, x86-64 non-FMA, `LIBC_MATH=0`) on all `2³²` binary32 inputs and all
+four C rounding directions (`cModes`), with no `sorry` and only the three standard Lean axioms
+(`[propext, Classical.choice, Quot.sound]`):
 
-* `Expf/ShortPaths/Ranges.lean` proves the short paths (`3 749 616 693` bit patterns, `87.30 %`).
-* `correctAt_main_pos` closes `[0x32800001, 0x42B17218)` (`271 675 927` bit patterns, `6.33 %`)
-  by combining `MainPath.ProductError.holdsOnBits_tiny_pos_main` (`[0x32800001, 0x33800000)`) with
-  `MainPath.Tmd.Main.holdsOnBits_tmd_pos` (`[0x33800000, 0x42B17218)`).
-* `correctAt_main_neg` closes `[0xB2800001, 0xC2CFF1B5)` (`273 674 676` bit patterns, `6.37 %`)
-  by combining `MainPath.ProductError.holdsOnBits_tiny_neg_main` (`[0xB2800001, 0xB3000000)`),
-  `MainPath.PointwiseExceptions.correctAt_0xB3000000` (`0xB3000000`),
+* `Expf/ShortPaths/Ranges.lean` proves `holdsOnBits_short_paths_doubleEval` (`3 749 616 693` bit
+  patterns, `87.30 %`).
+* `correctAt_doubleEval_main_pos` closes `[0x32800001, 0x42B17218)` (`271 675 927` bit patterns,
+  `6.33 %`) by combining `MainPath.ProductError.holdsOnBits_tiny_pos_main`
+  (`[0x32800001, 0x33800000)`) with `MainPath.Tmd.Main.holdsOnBits_tmd_pos`
+  (`[0x33800000, 0x42B17218)`).
+* `correctAt_doubleEval_main_neg` closes `[0xB2800001, 0xC2CFF1B5)` (`273 674 676` bit patterns,
+  `6.37 %`) by combining `MainPath.ProductError.holdsOnBits_tiny_neg_main`
+  (`[0xB2800001, 0xB3000000)`), `MainPath.PointwiseExceptions.correctAt_0xB3000000` (`0xB3000000`),
   `MainPath.Tmd.Main.holdsOnBits_tmd_neg` (`[0xB3000001, 0xC2CE8ED0)`), and
   `MainPath.ProductError.holdsOnBits_near_underflow_main` (`[0xC2CE8ED0, 0xC2CFF1B5)`).
 
-## Analytical decomposition of the main path (`Expf/MainPath/`)
+## Analytical decomposition of the `double_eval` main path (`Expf/MainPath/`)
 
 1. **UB-freedom & exact range reduction (`RangeReduction.lean`)**: builds on
    `LibcMath/Analysis/RangeReduction.lean` to show `k = nearestInt (128 * x)` is an exact integer,
@@ -58,9 +63,11 @@ open Model (IEEERoundingMode)
 
 variable {mode : IEEERoundingMode}
 
+/-! ### `math::double_eval::expf` (non-FMA) -/
+
 /-- `Generated.DoubleEval.expf` is correctly rounded on `[0x32800001, 0x42B17218)`
 (`2⁻²⁶ < x < 88.72…`) in every C rounding mode. -/
-theorem correctAt_main_pos (hmode : mode ∈ cModes) :
+theorem correctAt_doubleEval_main_pos (hmode : mode ∈ cModes) :
     HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEval.expf mode)
       0x32800001 0x42B17218 :=
   (MainPath.ProductError.holdsOnBits_tiny_pos_main hmode).append
@@ -68,7 +75,7 @@ theorem correctAt_main_pos (hmode : mode ∈ cModes) :
 
 /-- `Generated.DoubleEval.expf` is correctly rounded on `[0xB2800001, 0xC2CFF1B5)`
 (`-103.97… < x < -2⁻²⁶`, including the special input `0xC236BD8C`) in every C rounding mode. -/
-theorem correctAt_main_neg (hmode : mode ∈ cModes) :
+theorem correctAt_doubleEval_main_neg (hmode : mode ∈ cModes) :
     HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEval.expf mode)
       0xB2800001 0xC2CFF1B5 :=
   (((MainPath.ProductError.holdsOnBits_tiny_neg_main hmode).append
@@ -76,18 +83,28 @@ theorem correctAt_main_neg (hmode : mode ∈ cModes) :
     (MainPath.Tmd.Main.holdsOnBits_tmd_neg hmode)).append
     (MainPath.ProductError.holdsOnBits_near_underflow_main hmode)
 
-/-- `math::double_eval::expf` is correctly rounded in all four rounding directions of C and never
-reaches an undefined operation. -/
-theorem expf_correctlyRounded : ExpfCorrectlyRounded := by
+/-- `math::double_eval::expf` (non-FMA) is correctly rounded in all four rounding directions of C
+and never reaches an undefined operation. -/
+theorem expfDoubleEval_correctlyRounded : ExpfDoubleEvalCorrectlyRounded := by
   refine correctlyRounded_of_holdsOnBits fun mode hmode => ?_
-  obtain ⟨low, middle, high⟩ := ShortPaths.holdsOnBits_short_paths hmode
-  exact (((low.append (correctAt_main_pos hmode)).append middle).append
-    (correctAt_main_neg hmode)).append high
+  obtain ⟨low, middle, high⟩ := ShortPaths.holdsOnBits_short_paths_doubleEval hmode
+  exact (((low.append (correctAt_doubleEval_main_pos hmode)).append middle).append
+    (correctAt_doubleEval_main_neg hmode)).append high
+
+/-- Short-paths theorem for `Generated.DoubleEval.expf`. -/
+theorem expfDoubleEval_correct_on_short_paths {mode : IEEERoundingMode} (hmode : mode ∈ cModes) :
+    HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEval.expf mode)
+      0x00000000 0x32800001 ∧
+    HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEval.expf mode)
+      0x42B17218 0xB2800001 ∧
+    HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEval.expf mode)
+      0xC2CFF1B5 0x100000000 :=
+  ShortPaths.holdsOnBits_short_paths_doubleEval hmode
 
 /-! ### Other evaluation plans (short paths proved, main ranges conditional) -/
 
 /-- Under `mode`, `Generated.DoubleEvalFma.expf` is correct on both main polynomial ranges. -/
-def ExpfFmaMainRangesChecked (mode : IEEERoundingMode) : Prop :=
+def ExpfDoubleEvalFmaMainRangesChecked (mode : IEEERoundingMode) : Prop :=
   HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEvalFma.expf mode)
     0x32800001 0x42B17218 ∧
   HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEvalFma.expf mode)
@@ -96,10 +113,10 @@ def ExpfFmaMainRangesChecked (mode : IEEERoundingMode) : Prop :=
 /-- `Generated.DoubleEvalFma.expf` is correctly rounded in all four C rounding directions, provided
 it is on its two polynomial ranges. -/
 theorem expfDoubleEvalFmaCorrectlyRounded_of_mainRanges
-    (h : ∀ mode ∈ cModes, ExpfFmaMainRangesChecked mode) :
+    (h : ∀ mode ∈ cModes, ExpfDoubleEvalFmaMainRangesChecked mode) :
     ExpfDoubleEvalFmaCorrectlyRounded := by
   refine correctlyRounded_of_holdsOnBits fun mode hmode => ?_
-  obtain ⟨low, middle, high⟩ := ShortPaths.holdsOnBits_short_paths_fma hmode
+  obtain ⟨low, middle, high⟩ := ShortPaths.holdsOnBits_short_paths_doubleEvalFma hmode
   obtain ⟨positive, negative⟩ := h mode hmode
   exact (((low.append positive).append middle).append negative).append high
 
@@ -145,30 +162,20 @@ theorem expfIntegerEvalCorrectlyRounded_of_staticRounding
 
 /-! ### Axioms
 
-`expf_correctlyRounded` depends solely on the three standard Lean axioms (`propext`,
+`expfDoubleEval_correctlyRounded` depends solely on the three standard Lean axioms (`propext`,
 `Classical.choice`, `Quot.sound`) — no `sorryAx`, no `Lean.ofReduceBool`, no oracle axioms. -/
 
 /--
-info: 'LibcMath.Expf.expf_correctlyRounded' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: 'LibcMath.Expf.expfDoubleEval_correctlyRounded' depends on axioms: [propext, Classical.choice, Quot.sound]
 -/
 #guard_msgs in
-#print axioms expf_correctlyRounded
-
-/-- Short-paths theorem for `double_eval`. -/
-theorem expf_correct_on_short_paths {mode : IEEERoundingMode} (hmode : mode ∈ cModes) :
-    HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEval.expf mode)
-      0x00000000 0x32800001 ∧
-    HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEval.expf mode)
-      0x42B17218 0xB2800001 ∧
-    HoldsOnBits (CorrectAt (Spec.exp .binary32) Generated.DoubleEval.expf mode)
-      0xC2CFF1B5 0x100000000 :=
-  ShortPaths.holdsOnBits_short_paths hmode
+#print axioms expfDoubleEval_correctlyRounded
 
 /--
-info: 'LibcMath.Expf.expf_correct_on_short_paths' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: 'LibcMath.Expf.expfDoubleEval_correct_on_short_paths' depends on axioms: [propext, Classical.choice, Quot.sound]
 -/
 #guard_msgs in
-#print axioms expf_correct_on_short_paths
+#print axioms expfDoubleEval_correct_on_short_paths
 
 /--
 info: 'LibcMath.Expf.expfDoubleEvalFmaCorrectlyRounded_of_mainRanges' depends on axioms: [propext,

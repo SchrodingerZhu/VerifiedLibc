@@ -3,7 +3,7 @@ import LibcMath.Expf.Plans
 /-!
 # The Lean models of `expf`, run from the command line
 
-    difftest-expf-model [--plan=<name>] <mode> (<first> <step> <count>)...
+    difftest-expf-model --plan=<name> <mode> (<first> <step> <count>)...
 
 evaluates the selected AST-extracted `expf` evaluation plan under `<mode>` (`nearest`, `up`,
 `down`, or `zero`) at binary32 bit patterns `first + i * step` modulo `2 ^ 32` for `i < count`.
@@ -74,12 +74,12 @@ def main (args : List String) : IO UInt32 := do
             | some k => some (k, rest)
             | none => none
           else
-            some (DoubleEval.kernel, args)
+            none
       | [] => none
     let mode :: rest := rest | none
     pure (kernel, ← parseMode mode, ← parseRanges rest)
   let some (kernel, mode, ranges) := parsed
-    | IO.eprintln "usage: difftest-expf-model [--plan=double_eval|double_eval_fma|integer_eval|static_rounding|float_eval|float_eval_cr_rn] nearest|up|down|zero (<first> <step> <count>)..."
+    | IO.eprintln "usage: difftest-expf-model --plan=double_eval|double_eval_fma|integer_eval|static_rounding|float_eval|float_eval_cr_rn nearest|up|down|zero (<first> <step> <count>)..."
       return 2
   let stdout ← IO.getStdout
   for range in ranges do

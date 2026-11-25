@@ -2,8 +2,10 @@
 
 Copy `FunctionTemplate.lean` to `LibcMath/<Function>.lean` and `FunctionTemplate/` to
 `LibcMath/<Function>/`, then replace `Fn` / `fn` with your function's CamelCase / lowercase name
-(for example `Exp2f` / `exp2f`). See `journal/trees/note/note-adding-a-function.tree` for the full
-walkthrough and `LibcMath/Expf.lean` + `LibcMath/Expf/` for the worked example.
+(for example `Exp2f` / `exp2f`) and `Plan` / `plan` with the explicit evaluation plan name (for
+example `DoubleEval` / `doubleEval`). Always name the implementation plan in every statement and
+theorem; never add a "default" alias. See `journal/trees/note/note-adding-a-function.tree` for the
+full walkthrough and `LibcMath/Expf.lean` + `LibcMath/Expf/` for the worked example.
 
 Checklist:
 1. Ensure `Spec.<fn>` exists in `LibcMath/Framework/Specs.lean`.

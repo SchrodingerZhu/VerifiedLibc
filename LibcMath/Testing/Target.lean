@@ -17,10 +17,6 @@ open Model (IEEERoundingMode)
 /-- The oracle that is proved sound in Lean. -/
 abbrev oracle : Oracle (Spec.exp .binary32) := expOracle .binary32
 
-/-- The default plan (`math::double_eval::expf`). -/
-abbrev run : IEEERoundingMode → Model .binary32 → Option (Model .binary32) :=
-  Expf.Generated.DoubleEval.expf
-
 /-- Look up any extracted `expf` evaluation plan by variant name (for `checkrange --plan=...`). -/
 def planByName? : String → Option (Libc.UnaryKernel .binary32)
   | "double_eval" => some Expf.Generated.DoubleEval.kernel

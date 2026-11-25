@@ -31,7 +31,12 @@ example : mpfrAccepted .towardZero 1 0x3f800000 512 = true := by native_decide
 example : mpfrAccepted .up 2 0xc2ce8ed0 512 = true := by native_decide
 example : mpfrAccepted .down 3 0x42b17000 512 = true := by native_decide
 
-example : checkBlock mpfrExpOracle.check run .nearest 0x3f800000 512 = true := by native_decide
-example : checkBlock mpfrExpOracle.check run .up 0x3f800000 512 = true := by native_decide
+example :
+    checkBlock mpfrExpOracle.check Expf.Generated.DoubleEval.expf .nearest 0x3f800000 512 = true :=
+  by native_decide
+
+example :
+    checkBlock mpfrExpOracle.check Expf.Generated.DoubleEval.expf .up 0x3f800000 512 = true :=
+  by native_decide
 
 end LibcMath.Testing.MpfrExamples
