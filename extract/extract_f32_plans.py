@@ -39,6 +39,27 @@ PLANS: list[tuple[str, str, str, str, str, str, str, str | None]] = [
     ("exp", "Exp10m1f", "exp10m1f", "exp10m1f", "Sse2", "sse2", "sse2", None),
     ("exp", "Exp10m1f", "exp10m1f", "exp10m1f", "Sse42", "sse42", "sse42", None),
     ("exp", "Exp10m1f", "exp10m1f", "exp10m1f", "Avx2Fma", "avx2_fma", "avx2_fma", None),
+    # Logarithmic, root, and power family
+    ("logpow", "Logf", "logf", "logf", "DoubleEvalSse2", "double_eval_sse2", "sse2", None),
+    ("logpow", "Logf", "logf", "logf", "DoubleEvalAvx2Fma", "double_eval_avx2_fma", "avx2_fma", None),
+    ("logpow", "Log2f", "log2f", "log2f", "DoubleEvalSse2", "double_eval_sse2", "sse2", None),
+    ("logpow", "Log2f", "log2f", "log2f", "DoubleEvalAvx2Fma", "double_eval_avx2_fma", "avx2_fma", None),
+    ("logpow", "Log10f", "log10f", "log10f", "DoubleEvalSse2", "double_eval_sse2", "sse2", None),
+    ("logpow", "Log10f", "log10f", "log10f", "DoubleEvalAvx2Fma", "double_eval_avx2_fma", "avx2_fma", None),
+    ("logpow", "Log1pf", "log1pf", "log1pf", "DoubleEvalSse2", "double_eval_sse2", "sse2", None),
+    ("logpow", "Log1pf", "log1pf", "log1pf", "DoubleEvalAvx2Fma", "double_eval_avx2_fma", "avx2_fma", None),
+    ("logpow", "Cbrtf", "cbrtf", "cbrtf", "Sse2", "sse2", "sse2", None),
+    ("logpow", "Cbrtf", "cbrtf", "cbrtf", "Avx2Fma", "avx2_fma", "avx2_fma", None),
+    ("logpow", "Rsqrtf", "rsqrtf", "rsqrtf", "Sse2", "sse2", "sse2", None),
+    ("logpow", "Rsqrtf", "rsqrtf", "rsqrtf", "Avx2Fma", "avx2_fma", "avx2_fma", None),
+    ("logpow", "Hypotf", "hypotf", "hypotf", "GenericSse2", "generic_sse2", "sse2", None),
+    ("logpow", "Hypotf", "hypotf", "hypotf", "Avx2Fma", "avx2_fma", "avx2_fma", None),
+    ("logpow", "Sqrtf", "sqrtf", "sqrtf", "X86Sse2", "x86_sse2", "sse2", None),
+    ("logpow", "Sqrtf", "sqrtf", "sqrtf", "GenericSoftFloat", "generic_softfloat", "softfloat", "fputil::generic::sqrt"),
+    ("logpow", "Powf", "powf", "powf", "DoubleEvalSse2", "double_eval_sse2", "sse2", None),
+    ("logpow", "Powf", "powf", "powf", "DoubleEvalSse42", "double_eval_sse42", "sse42", None),
+    ("logpow", "Powf", "powf", "powf", "DoubleEvalAvx2Fma", "double_eval_avx2_fma", "avx2_fma", None),
+    ("logpow", "Powf", "powf", "powf", "FloatEval", "float_eval", "float_eval", None),
 ]
 
 

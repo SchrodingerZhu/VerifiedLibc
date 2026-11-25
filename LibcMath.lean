@@ -23,6 +23,15 @@ import LibcMath.Kernels.Exp10f
 import LibcMath.Kernels.Expm1f
 import LibcMath.Kernels.Exp2m1f
 import LibcMath.Kernels.Exp10m1f
+import LibcMath.Kernels.Logf
+import LibcMath.Kernels.Log2f
+import LibcMath.Kernels.Log10f
+import LibcMath.Kernels.Log1pf
+import LibcMath.Kernels.Cbrtf
+import LibcMath.Kernels.Rsqrtf
+import LibcMath.Kernels.Hypotf
+import LibcMath.Kernels.Sqrtf
+import LibcMath.Kernels.Powf
 import LibcMath.Testing.Oracle.Exp
 import LibcMath.Testing.Oracle.ExpExamples
 import LibcMath.Testing.Oracle.FloatLib

@@ -4,10 +4,12 @@ Generated from every `sorry` under `LibcMath/` by `scripts/check-open.py`.
 Do not edit by hand; run `python3 scripts/check-open.py --update` after changing
 the open lemmas.
 
-Total open obligations: **23**.
+Total open obligations: **43**.
 
 | File | Lemma | Summary |
 |---|---|---|
+| `LibcMath/Kernels/Cbrtf.lean` | `cbrtfSse2_correctlyRounded` | **Open.** Prove `cbrtf` (`sse2`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Cbrtf.lean` | `cbrtfAvx2Fma_correctlyRounded` | **Open.** Prove `cbrtf` (`avx2_fma`) is correctly rounded in all four C modes. |
 | `LibcMath/Kernels/Exp10f.lean` | `exp10fDoubleEvalSse2_correctlyRounded` | **Open.** Prove `exp10f` (`double_eval_sse2`) is correctly rounded across all four C modes. |
 | `LibcMath/Kernels/Exp10f.lean` | `exp10fDoubleEvalSse42_correctlyRounded` | **Open.** Prove `exp10f` (`double_eval_sse42`) is correctly rounded across all four modes. |
 | `LibcMath/Kernels/Exp10f.lean` | `exp10fDoubleEvalAvx2Fma_correctlyRounded` | **Open.** Prove `exp10f` (`double_eval_avx2_fma`) is correctly rounded across all modes. |
@@ -31,3 +33,21 @@ Total open obligations: **23**.
 | `LibcMath/Kernels/Expm1f.lean` | `expm1fSse2_correctlyRounded` | **Open.** Prove `expm1f` (`sse2`) is correctly rounded across all four C rounding modes. |
 | `LibcMath/Kernels/Expm1f.lean` | `expm1fSse42_correctlyRounded` | **Open.** Prove `expm1f` (`sse42`) is correctly rounded across all four C rounding modes. |
 | `LibcMath/Kernels/Expm1f.lean` | `expm1fAvx2Fma_correctlyRounded` | **Open.** Prove `expm1f` (`avx2_fma`) is correctly rounded across all four C rounding modes. |
+| `LibcMath/Kernels/Hypotf.lean` | `hypotfGenericSse2_correctlyRounded` | **Open.** Prove `hypotf` (`generic_sse2`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Hypotf.lean` | `hypotfAvx2Fma_correctlyRounded` | **Open.** Prove `hypotf` (`avx2_fma`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Log10f.lean` | `log10fDoubleEvalSse2_correctlyRounded` | **Open.** Prove `log10f` (`double_eval_sse2`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Log10f.lean` | `log10fDoubleEvalAvx2Fma_correctlyRounded` | **Open.** Prove `log10f` (`double_eval_avx2_fma`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Log1pf.lean` | `log1pfDoubleEvalSse2_correctlyRounded` | **Open.** Prove `log1pf` (`double_eval_sse2`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Log1pf.lean` | `log1pfDoubleEvalAvx2Fma_correctlyRounded` | **Open.** Prove `log1pf` (`double_eval_avx2_fma`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Log2f.lean` | `log2fDoubleEvalSse2_correctlyRounded` | **Open.** Prove `log2f` (`double_eval_sse2`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Log2f.lean` | `log2fDoubleEvalAvx2Fma_correctlyRounded` | **Open.** Prove `log2f` (`double_eval_avx2_fma`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Logf.lean` | `logfDoubleEvalSse2_correctlyRounded` | **Open.** Prove `logf` (`double_eval_sse2`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Logf.lean` | `logfDoubleEvalAvx2Fma_correctlyRounded` | **Open.** Prove `logf` (`double_eval_avx2_fma`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Powf.lean` | `powfDoubleEvalSse2_correctlyRounded` | **Open.** Prove `powf` (`double_eval_sse2`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Powf.lean` | `powfDoubleEvalSse42_correctlyRounded` | **Open.** Prove `powf` (`double_eval_sse42`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Powf.lean` | `powfDoubleEvalAvx2Fma_correctlyRounded` | **Open.** Prove `powf` (`double_eval_avx2_fma`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Powf.lean` | `powfFloatEval_defined` | **Open.** Prove `powf` (`float_eval`) executes without C++ undefined behavior. |
+| `LibcMath/Kernels/Rsqrtf.lean` | `rsqrtfSse2_correctlyRounded` | **Open.** Prove `rsqrtf` (`sse2`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Rsqrtf.lean` | `rsqrtfAvx2Fma_correctlyRounded` | **Open.** Prove `rsqrtf` (`avx2_fma`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Sqrtf.lean` | `sqrtfX86Sse2_correctlyRounded` | **Open.** Prove `sqrtf` (`x86_sse2`) is correctly rounded in all four C modes. |
+| `LibcMath/Kernels/Sqrtf.lean` | `sqrtfGenericSoftFloat_correctlyRounded` | **Open.** Prove `sqrtf` (`generic_softfloat`) is correctly rounded in all four C modes. |

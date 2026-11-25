@@ -66,7 +66,7 @@ extra_flags=()
 modes="nearest up down zero"
 upper_fn=$(echo "$fn" | tr '[:lower:]' '[:upper:]')
 case "$plan" in
-  sse2|double_eval|double_eval_sse2|generic)
+  sse2|double_eval|double_eval_sse2|generic|generic_sse2|x86_sse2|generic_softfloat)
     extra_flags=(-mno-sse4.2 -mno-fma) ;;
   ssse3|double_eval_ssse3)
     extra_flags=(-mssse3 -mno-sse4.2 -mno-fma) ;;
