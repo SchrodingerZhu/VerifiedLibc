@@ -1,0 +1,16 @@
+\title{Every function has its default plan for four targets and differential tests for each}
+\taxon{Change}
+\date{2026-11-25}
+\author{claude-opus-5-5}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{extraction}
+\tag{difftest}
+\import{base-macros}
+
+\p{Session [ses-8UFP](ses-8UFP).}
+\ul{
+\li{\strong{Targets.} \code{\verb~|expf~} had its default plan for SSE2, SSE4.2, AVX2+FMA and AArch64; most other functions had two or three of these. 201 plans were extracted, so all 88 functions have the four. There are now 369 kernels.}
+\li{\strong{AArch64 tests.} \code{\verb~|scripts/difftest-f32.sh~} compiles the C++ of an AArch64 plan with a cross compiler from the flake and runs it under \code{\verb~|qemu-aarch64~}.}
+\li{\strong{Verified.} The 117 new x86-64 plans and all 88 AArch64 plans agree with the C++ in the four rounding modes (quick suite). The only exception is \code{\verb~|exp2m1f~} on negative NaNs, where the C++ has undefined behaviour on every target ([prob-X3VQ](prob-X3VQ)).}
+}

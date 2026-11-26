@@ -10,14 +10,16 @@ about that model and check the proof.
 ```mermaid
 flowchart TD
     src["LLVM libc source"] --> ast["Clang AST"] --> kernel["Extracted Lean kernel, one per plan"]
-    plans["Plans: double_eval, float_eval, integer_eval, ...<br/>for each target: SSE2, SSE4.2, AVX2+FMA, AArch64"] -.- kernel
+    plans["Plans: double_eval, float_eval, integer_eval, ...<br/>
+      for each target: SSE2, SSE4.2, AVX2+FMA, AArch64"] -.- kernel
     kernel --> diff["Differential test against the compiled C++"]
     diff --> proof["Proof"]
     proof --> lean["Lean kernel check"]
     lean --> ext["External kernels: con-leche, gruszka"]
 ```
 
-Run the external kernels with `kernel-check <Module>` in the flake shell, after `lake build`.
+Run the external kernels with `kernel-check <Module> <Theorem>...` in the flake shell, after
+`lake build`.
 
 ## Setup
 

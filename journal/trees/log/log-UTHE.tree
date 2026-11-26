@@ -1,0 +1,15 @@
+\title{Every function has the layout of \code{\verb~|expf~}, with one open theorem for each plan}
+\taxon{Change}
+\date{2026-11-25}
+\author{claude-opus-5-5}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{kernels}
+\import{base-macros}
+
+\p{Session [ses-8UFP](ses-8UFP). Before this change, each function other than \code{\verb~|expf~} kept its statements and theorems in one file, \code{\verb~|LibcMath/Kernels/<Fn>.lean~}, and its directory held only \code{\verb~|Generated/~}.}
+\ul{
+\li{Each function now has \code{\verb~|<Fn>.lean~} as an index, \code{\verb~|<Fn>/Plans.lean~}, \code{\verb~|Statement.lean~}, \code{\verb~|Examples.lean~} and one \code{\verb~|Proof/<Plan>.lean~} for each plan. Each proof file holds the theorem of its plan, which ends in \code{\verb~|sorry~} until it is proved, and its \code{\verb~|#print axioms~} guard.}
+\li{One open theorem is one file and one row of \code{\verb~|OPEN.md~} (367 rows). An agent can take one without touching the files of another.}
+\li{The statements that existed are unchanged. A new target plan has the statement of the SSE2 plan of the same function. \code{\verb~|Examples.lean~} evaluates each plan and checks that the target plans agree with the SSE2 plan near 1.}
+}

@@ -1,0 +1,16 @@
+\title{The external kernels \code{\verb~|con-leche~} and \code{\verb~|gruszka~} are in the flake and accept the proof of \code{\verb~|expf~}}
+\taxon{Change}
+\date{2026-11-25}
+\author{claude-opus-5-5}
+\contributor{schrodingerzy}
+\tag{changelog}
+\tag{verification}
+\tag{nix}
+\import{base-macros}
+
+\p{Session [ses-8UFP](ses-8UFP). This closes [prob-YUE1](prob-YUE1).}
+\ul{
+\li{The flake builds \code{\verb~|con-leche~}, \code{\verb~|lean4export~}, \code{\verb~|susz~} and \code{\verb~|gruszka~} from sources pinned in \code{\verb~|flake.lock~}, with the Lean of the flake, and puts them in the development shell.}
+\li{\code{\verb~|kernel-check MODULE THEOREM...~} checks the theorems and all they depend on: \code{\verb~|con-leche~} reads the \code{\verb~|.olean~} files, and \code{\verb~|gruszka~} reads a \code{\verb~|lean4export~} file packed by \code{\verb~|susz~}.}
+\li{\strong{Result.} On \code{\verb~|expfDoubleEval_correctlyRounded~}, \code{\verb~|con-leche~} accepts 41 399 declarations in \code{\verb~|--verified~} mode (77 s, 7.2 GB on 32 workers), and \code{\verb~|gruszka~} accepts the same declarations.}
+}

@@ -1,0 +1,16 @@
+\title{Running the external kernels on this repository}
+\taxon{Insight}
+\date{2026-11-25}
+\author{claude-opus-5-5}
+\contributor{schrodingerzy}
+\tag{tooling}
+\tag{verification}
+\import{base-macros}
+
+\p{Source: session [ses-8UFP](ses-8UFP). Observed on x86-64 Linux with 32 hardware threads and 91 GB of memory.}
+\ul{
+\li{The Lean 4.36.0 release has a \code{\verb~|con-leche~} of its own in \code{\verb~|bin~}, first in \code{\verb~|PATH~}. It is an older version that reads only \code{\verb~|lean4export~} files and rejects \code{\verb~|--olean~}. \code{\verb~|kernel-check~} names each tool by its store path.}
+\li{With the default stack of 1 GB, \code{\verb~|con-leche~} stops with a stack overflow on the proof of \code{\verb~|expf~}. \code{\verb~|LEAN_STACK_SIZE_KB=16777216~} is sufficient.}
+\li{On the whole import closure of \code{\verb~|LibcMath.Kernels.Expf.Proof.DoubleEval~} (477 881 declarations, Mathlib included), \code{\verb~|con-leche~} ran out of memory at 74 GB. With \code{\verb~|--constant~} on the theorem it checks 41 399 declarations in 77 s and 7.2 GB. Check theorems, not modules.}
+\li{\code{\verb~|susz-olean~} packs \code{\verb~|.olean~} files for \code{\verb~|gruszka~} directly, but it needs Rust 1.100 and nixpkgs has 1.99.1. \code{\verb~|lean4export~} followed by \code{\verb~|susz pack~} works.}
+}
