@@ -1,0 +1,18 @@
+\title{No external kernel gives a verdict on \code{\verb~|bigInt_quickMulHi_128_error_bound~}}
+\taxon{Problem}
+\date{2026-11-25}
+\author{claude-opus-5-5}
+\contributor{schrodingerzy}
+\tag{verification}
+\tag{kernel}
+\meta{status}{open}
+\meta{created}{2026-11-25}
+\import{base-macros}
+
+\p{\strong{Status:} open.}
+\p{\code{\verb~|LibcMath.Libc.Microarch.bigInt_quickMulHi_128_error_bound~} is accepted by Lean's kernel in \code{\verb~|lake build~}. The proof of \code{\verb~|expf~} does not use it. Both external kernels fail to give a verdict on it (session [ses-8UFP](ses-8UFP), with \code{\verb~|kernel-check~}'s tools, 2026-11-25):}
+\ul{
+\li{\code{\verb~|con-leche --olean --constant=…~} (verified mode, 8 workers, 16 GB stack, 60 GB memory limit) checks 2 256 declarations and does not finish in 20 minutes. In the run on the whole closure of the proof of \code{\verb~|expf~}, it was the declaration in progress for the longest time before memory ran out at 74 GB.}
+\li{\code{\verb~|gruszka~} declines it after 3 minutes: \code{\verb~|a worker table is full~} (exit 2).}
+}
+\p{Neither kernel rejects the theorem. Next steps: find which part of the proof the kernels spend their time on (the theorem compares a product of 256-bit vectors with \code{\verb~|BigInt.quickMulHi~}), and try to restate the proof so that it reduces less, as in [ins-L00D](ins-L00D).}
