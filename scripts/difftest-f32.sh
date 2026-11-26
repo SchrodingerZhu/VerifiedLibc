@@ -65,7 +65,13 @@ esac
 extra_flags=()
 modes="nearest up down zero"
 upper_fn=$(echo "$fn" | tr '[:lower:]' '[:upper:]')
+# AArch64 plans are compiled with AARCH64_CXX (set by the flake) and run under qemu-aarch64.
+cxx=clang++
+run=()
 case "$plan" in
+  aarch64|double_eval_aarch64)
+    cxx=${AARCH64_CXX:?"set AARCH64_CXX to a C++ compiler for aarch64-linux-gnu"}
+    run=(qemu-aarch64) ;;
   sse2|double_eval|double_eval_sse2|generic|generic_sse2|x86_sse2|generic_softfloat)
     extra_flags=(-mno-sse4.2 -mno-fma) ;;
   ssse3|double_eval_ssse3)
@@ -118,16 +124,16 @@ namespace __llvm_libc {
 float ${fn}(float x) { return static_rounding_${fn}(x, std::fegetround()); }
 } // namespace __llvm_libc
 CPP
-  clang++ "${libc_flags[@]}" -c -o "$out/fn_impl.o" "$out/static_rounding.cpp"
-  clang++ -O2 -c -o "$out/fn_mode.o" "$out/static_rounding_mode.cpp"
-  ld -r -o "$out/fn.o" "$out/fn_impl.o" "$out/fn_mode.o"
+  "$cxx" "${libc_flags[@]}" -c -o "$out/fn_impl.o" "$out/static_rounding.cpp"
+  "$cxx" -O2 -c -o "$out/fn_mode.o" "$out/static_rounding_mode.cpp"
+  "$cxx" -r -nostdlib -o "$out/fn.o" "$out/fn_impl.o" "$out/fn_mode.o"
 else
-  clang++ "${libc_flags[@]}" -c -o "$out/fn.o" "$libc/src/math/generic/${fn}.cpp"
+  "$cxx" "${libc_flags[@]}" -c -o "$out/fn.o" "$libc/src/math/generic/${fn}.cpp"
 fi
-clang++ "${libc_flags[@]}" -c -o "$out/libc_errno.o" "$libc/src/errno/libc_errno.cpp"
-clang++ -O2 -frounding-math "-DFN_NAME=${fn}" "-DFN_SIG=${sig}" \
+"$cxx" "${libc_flags[@]}" -c -o "$out/libc_errno.o" "$libc/src/errno/libc_errno.cpp"
+"$cxx" -O2 -frounding-math "-DFN_NAME=${fn}" "-DFN_SIG=${sig}" \
   -c -o "$out/native.o" "$root/test/difftest/f32_native.cpp"
-clang++ -o "$out/f32-native" "$out/native.o" "$out/fn.o" "$out/libc_errno.o"
+"$cxx" -o "$out/f32-native" "$out/native.o" "$out/fn.o" "$out/libc_errno.o"
 
 model="$root/.lake/build/bin/difftest-f32-model"
 if [[ ! -x "$model" ]]; then
@@ -159,7 +165,7 @@ run_unary_mode() {
     ranges+=(00000000 131071 32768)
   fi
   paste -d' ' <("$model" "--fn=$fn" "--plan=$plan" "$mode" "${ranges[@]}") \
-              <("$out/f32-native" "$mode" "${ranges[@]}") |
+              <("${run[@]}" "$out/f32-native" "$mode" "${ranges[@]}") |
     awk -v fn="$fn" -v plan="$plan" -v mode="$mode" -v ck="$cmp_kind" '
       function nan(b) { return b ~ /^[7f]f[89a-f]/ && b !~ /^[7f]f800000$/ }
       function fagree(a, b) { return a == b || (nan(a) && nan(b)) }
@@ -229,7 +235,7 @@ run_stdin_mode() {
   trap 'rm -f "$inp"' RETURN
   gen_stdin_inputs >"$inp"
   paste -d' ' <("$model" "--fn=$fn" "--plan=$plan" "$mode" --stdin <"$inp") \
-              <("$out/f32-native" "$mode" --stdin <"$inp") |
+              <("${run[@]}" "$out/f32-native" "$mode" --stdin <"$inp") |
     awk -v fn="$fn" -v plan="$plan" -v mode="$mode" -v ck="$cmp_kind" '
       function nan(b) { return b ~ /^[7f]f[89a-f]/ && b !~ /^[7f]f800000$/ }
       function fagree(a, b) { return a == b || (nan(a) && nan(b)) }

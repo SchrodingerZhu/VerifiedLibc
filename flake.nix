@@ -235,6 +235,9 @@
           (journalTools pkgs).serve
           (journalTools pkgs).new
 
+          # Differential tests of the AArch64 plans: a cross compiler and user-mode emulation.
+          qemu-user
+
           # External kernels and `kernel-check` (see AGENTS.md).
           (kernelToolsFor pkgs).con-leche-bin
           (kernelToolsFor pkgs).lean4export-bin
@@ -250,6 +253,10 @@
         # The unwrapped `clang-scan-deps` of `clang` comes first in PATH and does not find the C++
         # standard headers; the one of `clang-tools` is wrapped.
         AST2LEAN_CLANG_SCAN_DEPS = "${pkgs.llvmPackages_23.clang-tools}/bin/clang-scan-deps";
+        # A C++ compiler for aarch64-linux-gnu, for the differential tests of the AArch64 plans.
+        AARCH64_CXX = let
+          cross = pkgs.pkgsCross.aarch64-multiplatform.buildPackages.llvmPackages_23.clang;
+        in "${cross}/bin/aarch64-unknown-linux-gnu-clang++";
         LLVM_DIR = "${pkgs.llvmPackages_23.llvm.dev}/lib/cmake/llvm";
         Clang_DIR = "${pkgs.llvmPackages_23.libclang.dev}/lib/cmake/clang";
       };
