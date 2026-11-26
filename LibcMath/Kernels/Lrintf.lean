@@ -1,32 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Kernels.Lrintf.Generated.GenericSse2
+import LibcMath.Kernels.Lrintf.Plans
+import LibcMath.Kernels.Lrintf.Statement
+import LibcMath.Kernels.Lrintf.Proof.GenericSse2
+import LibcMath.Kernels.Lrintf.Proof.Sse42
+import LibcMath.Kernels.Lrintf.Proof.Avx2Fma
+import LibcMath.Kernels.Lrintf.Proof.AArch64
+import LibcMath.Kernels.Lrintf.Examples
 
 /-!
-# Extracted `lrintf` generic SSE2 plan
+# `lrintf`: where everything is
 
-Collects the extracted LLVM libc `lrintf` (`generic_sse2`) plan and states its obligation.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.lrintfGenericSse2_defined`.
+* `sse42` (open): `Proof.Sse42.lrintfSse42_defined`.
+* `avx2_fma` (open): `Proof.Avx2Fma.lrintfAvx2Fma_defined`.
+* `aarch64` (open): `Proof.AArch64.lrintfAArch64_defined`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Lrintf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open Model (IEEERoundingMode)
-open LibcMath.Libc
-open LibcMath.Kernels.Lrintf.Generated
-
-/-- Definedness (no C++ undefined behavior) of `lrintf` (`generic_sse2`). -/
-def LrintfGenericSse2Defined : Prop :=
-  ∀ m ∈ cModes, ∀ x : Model .binary32, (GenericSse2.lrintf m x).isSome
-
-/-- **Open.** Prove `lrintf` (`generic_sse2`) executes without C++ undefined behavior. -/
-theorem lrintfGenericSse2_defined : LrintfGenericSse2Defined := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Lrintf.lrintfGenericSse2_defined' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]
--/
-#guard_msgs in
-#print axioms lrintfGenericSse2_defined
-
-end LibcMath.Kernels.Lrintf

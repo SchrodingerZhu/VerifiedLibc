@@ -1,32 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Kernels.Frexpf.Generated.GenericSse2
+import LibcMath.Kernels.Frexpf.Plans
+import LibcMath.Kernels.Frexpf.Statement
+import LibcMath.Kernels.Frexpf.Proof.GenericSse2
+import LibcMath.Kernels.Frexpf.Proof.Sse42
+import LibcMath.Kernels.Frexpf.Proof.Avx2Fma
+import LibcMath.Kernels.Frexpf.Proof.AArch64
+import LibcMath.Kernels.Frexpf.Examples
 
 /-!
-# Extracted `frexpf` generic SSE2 plan
+# `frexpf`: where everything is
 
-Collects the extracted LLVM libc `frexpf` (`generic_sse2`) plan and states its obligation.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.frexpfGenericSse2_defined`.
+* `sse42` (open): `Proof.Sse42.frexpfSse42_defined`.
+* `avx2_fma` (open): `Proof.Avx2Fma.frexpfAvx2Fma_defined`.
+* `aarch64` (open): `Proof.AArch64.frexpfAArch64_defined`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Frexpf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open Model (IEEERoundingMode)
-open LibcMath.Libc
-open LibcMath.Kernels.Frexpf.Generated
-
-/-- Definedness (no C++ undefined behavior) of `frexpf` (`generic_sse2`). -/
-def FrexpfGenericSse2Defined : Prop :=
-  ∀ x : Model .binary32, (GenericSse2.frexpf x).isSome
-
-/-- **Open.** Prove `frexpf` (`generic_sse2`) executes without C++ undefined behavior. -/
-theorem frexpfGenericSse2_defined : FrexpfGenericSse2Defined := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Frexpf.frexpfGenericSse2_defined' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]
--/
-#guard_msgs in
-#print axioms frexpfGenericSse2_defined
-
-end LibcMath.Kernels.Frexpf

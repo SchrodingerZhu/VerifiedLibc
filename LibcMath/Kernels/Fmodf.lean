@@ -1,32 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Kernels.Fmodf.Generated.GenericSse2
+import LibcMath.Kernels.Fmodf.Plans
+import LibcMath.Kernels.Fmodf.Statement
+import LibcMath.Kernels.Fmodf.Proof.GenericSse2
+import LibcMath.Kernels.Fmodf.Proof.Sse42
+import LibcMath.Kernels.Fmodf.Proof.Avx2Fma
+import LibcMath.Kernels.Fmodf.Proof.AArch64
+import LibcMath.Kernels.Fmodf.Examples
 
 /-!
-# Extracted `fmodf` generic SSE2 plan
+# `fmodf`: where everything is
 
-Collects the extracted LLVM libc `fmodf` (`generic_sse2`) plan and states its obligation.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.fmodfGenericSse2_defined`.
+* `sse42` (open): `Proof.Sse42.fmodfSse42_defined`.
+* `avx2_fma` (open): `Proof.Avx2Fma.fmodfAvx2Fma_defined`.
+* `aarch64` (open): `Proof.AArch64.fmodfAArch64_defined`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Fmodf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open Model (IEEERoundingMode)
-open LibcMath.Libc
-open LibcMath.Kernels.Fmodf.Generated
-
-/-- Definedness (no C++ undefined behavior) of `fmodf` (`generic_sse2`). -/
-def FmodfGenericSse2Defined : Prop :=
-  ∀ x y : Model .binary32, (GenericSse2.fmodf x y).isSome
-
-/-- **Open.** Prove `fmodf` (`generic_sse2`) executes without C++ undefined behavior. -/
-theorem fmodfGenericSse2_defined : FmodfGenericSse2Defined := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Fmodf.fmodfGenericSse2_defined' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]
--/
-#guard_msgs in
-#print axioms fmodfGenericSse2_defined
-
-end LibcMath.Kernels.Fmodf

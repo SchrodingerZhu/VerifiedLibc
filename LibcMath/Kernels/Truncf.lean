@@ -1,58 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Testing.Oracle.FloatLib
-import LibcMath.Kernels.Truncf.Generated.GenericSse2
-import LibcMath.Kernels.Truncf.Generated.BuiltinSse42
+import LibcMath.Kernels.Truncf.Plans
+import LibcMath.Kernels.Truncf.Statement
+import LibcMath.Kernels.Truncf.Proof.GenericSse2
+import LibcMath.Kernels.Truncf.Proof.BuiltinSse42
+import LibcMath.Kernels.Truncf.Proof.Avx2Fma
+import LibcMath.Kernels.Truncf.Proof.AArch64
+import LibcMath.Kernels.Truncf.Examples
 
 /-!
-# Extracted `truncf` microarch plans
+# `truncf`: where everything is
 
-Collects 2 extracted LLVM libc `truncf` plans and states plan-qualified obligations.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.truncfGenericSse2_correctlyRounded`.
+* `builtin_sse42` (open): `Proof.BuiltinSse42.truncfBuiltinSse42_correctlyRounded`.
+* `avx2_fma` (open): `Proof.Avx2Fma.truncfAvx2Fma_correctlyRounded`.
+* `aarch64` (open): `Proof.AArch64.truncfAArch64_correctlyRounded`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Truncf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open LibcMath.Libc
-open LibcMath.Kernels.Truncf.Generated
-
-/-- Lists all 2 extracted `truncf` plans. -/
-def allPlans : List (UnaryKernel .binary32) :=
-  [ GenericSse2.kernel
-  , BuiltinSse42.kernel ]
-
-/-- Correct rounding of `truncf` (`generic_sse2`) in all four C modes. -/
-def TruncfGenericSse2CorrectlyRounded : Prop :=
-  UnaryFnCorrectlyRounded FloatLibSpec.trunc cModes GenericSse2.kernel.eval
-
-/-- **Open.** Prove `truncf` (`generic_sse2`) is correctly rounded in all four C modes. -/
-theorem truncfGenericSse2_correctlyRounded : TruncfGenericSse2CorrectlyRounded := by
-  sorry
-
-/-- Correct rounding of `truncf` (`builtin_sse42`) in all four C modes. -/
-def TruncfBuiltinSse42CorrectlyRounded : Prop :=
-  UnaryFnCorrectlyRounded FloatLibSpec.trunc cModes BuiltinSse42.kernel.eval
-
-/-- **Open.** Prove `truncf` (`builtin_sse42`) is correctly rounded in all four C modes. -/
-theorem truncfBuiltinSse42_correctlyRounded : TruncfBuiltinSse42CorrectlyRounded := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Truncf.truncfGenericSse2_correctlyRounded' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms truncfGenericSse2_correctlyRounded
-
-/--
-info: 'LibcMath.Kernels.Truncf.truncfBuiltinSse42_correctlyRounded' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms truncfBuiltinSse42_correctlyRounded
-
-end LibcMath.Kernels.Truncf

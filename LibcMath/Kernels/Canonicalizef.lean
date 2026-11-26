@@ -1,35 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Kernels.Canonicalizef.Generated.GenericSse2
+import LibcMath.Kernels.Canonicalizef.Plans
+import LibcMath.Kernels.Canonicalizef.Statement
+import LibcMath.Kernels.Canonicalizef.Proof.GenericSse2
+import LibcMath.Kernels.Canonicalizef.Proof.Sse42
+import LibcMath.Kernels.Canonicalizef.Proof.Avx2Fma
+import LibcMath.Kernels.Canonicalizef.Proof.AArch64
+import LibcMath.Kernels.Canonicalizef.Examples
 
 /-!
-# Extracted `canonicalizef` generic SSE2 plan
+# `canonicalizef`: where everything is
 
-Collects the extracted LLVM libc `canonicalizef` (`generic_sse2`) plan and states its obligation.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.canonicalizefGenericSse2_defined`.
+* `sse42` (open): `Proof.Sse42.canonicalizefSse42_defined`.
+* `avx2_fma` (open): `Proof.Avx2Fma.canonicalizefAvx2Fma_defined`.
+* `aarch64` (open): `Proof.AArch64.canonicalizefAArch64_defined`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Canonicalizef
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open Model (IEEERoundingMode)
-open LibcMath.Libc
-open LibcMath.Kernels.Canonicalizef.Generated
-
-/-- Definedness (no C++ undefined behavior) of `canonicalizef` (`generic_sse2`). -/
-def CanonicalizefGenericSse2Defined : Prop :=
-  ∀ x : Model .binary32, (GenericSse2.canonicalizef x).isSome
-
-/-- **Open.** Prove `canonicalizef` (`generic_sse2`) executes without C++ undefined behavior. -/
-theorem canonicalizefGenericSse2_defined : CanonicalizefGenericSse2Defined := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Canonicalizef.canonicalizefGenericSse2_defined' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms canonicalizefGenericSse2_defined
-
-end LibcMath.Kernels.Canonicalizef

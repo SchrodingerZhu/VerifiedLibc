@@ -1,33 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Kernels.Iscanonicalf.Generated.GenericSse2
+import LibcMath.Kernels.Iscanonicalf.Plans
+import LibcMath.Kernels.Iscanonicalf.Statement
+import LibcMath.Kernels.Iscanonicalf.Proof.GenericSse2
+import LibcMath.Kernels.Iscanonicalf.Proof.Sse42
+import LibcMath.Kernels.Iscanonicalf.Proof.Avx2Fma
+import LibcMath.Kernels.Iscanonicalf.Proof.AArch64
+import LibcMath.Kernels.Iscanonicalf.Examples
 
 /-!
-# Extracted `iscanonicalf` generic SSE2 plan
+# `iscanonicalf`: where everything is
 
-Collects the extracted LLVM libc `iscanonicalf` (`generic_sse2`) plan and states its obligation.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.iscanonicalfGenericSse2_correct`.
+* `sse42` (open): `Proof.Sse42.iscanonicalfSse42_correct`.
+* `avx2_fma` (open): `Proof.Avx2Fma.iscanonicalfAvx2Fma_correct`.
+* `aarch64` (open): `Proof.AArch64.iscanonicalfAArch64_correct`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Iscanonicalf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open Model (IEEERoundingMode)
-open LibcMath.Libc
-open LibcMath.Kernels.Iscanonicalf.Generated
-
-/-- Exact agreement of `iscanonicalf` (`generic_sse2`) with IEEE canonical encoding predicate. -/
-def IscanonicalfGenericSse2Correct : Prop :=
-  FnCorrectlyRounded Eq (fun _ (_ : Model .binary32) => 1#32) cModes
-    (fun _ x => GenericSse2.iscanonicalf x)
-
-/-- **Open.** Prove `iscanonicalf` (`generic_sse2`) matches IEEE canonical encoding predicate. -/
-theorem iscanonicalfGenericSse2_correct : IscanonicalfGenericSse2Correct := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Iscanonicalf.iscanonicalfGenericSse2_correct' depends on axioms: [sorryAx]
--/
-#guard_msgs in
-#print axioms iscanonicalfGenericSse2_correct
-
-end LibcMath.Kernels.Iscanonicalf

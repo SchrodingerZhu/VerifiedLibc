@@ -1,58 +1,25 @@
-import LibcMath.Framework.Spec
-import LibcMath.Testing.Oracle.FloatLib
-import LibcMath.Kernels.Sqrtf.Generated.X86Sse2
-import LibcMath.Kernels.Sqrtf.Generated.GenericSoftFloat
+import LibcMath.Kernels.Sqrtf.Plans
+import LibcMath.Kernels.Sqrtf.Statement
+import LibcMath.Kernels.Sqrtf.Proof.X86Sse2
+import LibcMath.Kernels.Sqrtf.Proof.Sse42
+import LibcMath.Kernels.Sqrtf.Proof.Avx2Fma
+import LibcMath.Kernels.Sqrtf.Proof.AArch64
+import LibcMath.Kernels.Sqrtf.Proof.GenericSoftFloat
+import LibcMath.Kernels.Sqrtf.Examples
 
 /-!
-# Extracted `sqrtf` evaluation and microarch plans
+# `sqrtf`: where everything is
 
-Collects 2 extracted LLVM libc `sqrtf` plans and states plan-qualified obligations.
-Every statement names its evaluation and microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `x86_sse2` (open): `Proof.X86Sse2.sqrtfX86Sse2_correctlyRounded`.
+* `sse42` (open): `Proof.Sse42.sqrtfSse42_correctlyRounded`.
+* `avx2_fma` (open): `Proof.Avx2Fma.sqrtfAvx2Fma_correctlyRounded`.
+* `aarch64` (open): `Proof.AArch64.sqrtfAArch64_correctlyRounded`.
+* `generic_softfloat` (open): `Proof.GenericSoftFloat.sqrtfGenericSoftFloat_correctlyRounded`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Sqrtf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open LibcMath.Libc
-open LibcMath.Kernels.Sqrtf.Generated
-
-/-- Lists all 2 extracted `sqrtf` plans. -/
-def allPlans : List (UnaryKernel .binary32) :=
-  [ X86Sse2.kernel
-  , GenericSoftFloat.kernel ]
-
-/-- Correct rounding of `sqrtf` (`x86_sse2`) in all four C modes. -/
-def SqrtfX86Sse2CorrectlyRounded : Prop :=
-  UnaryFnCorrectlyRounded FloatLibSpec.sqrt cModes X86Sse2.kernel.eval
-
-/-- **Open.** Prove `sqrtf` (`x86_sse2`) is correctly rounded in all four C modes. -/
-theorem sqrtfX86Sse2_correctlyRounded : SqrtfX86Sse2CorrectlyRounded := by
-  sorry
-
-/-- Correct rounding of `sqrtf` (`generic_softfloat`) in all four C modes. -/
-def SqrtfGenericSoftFloatCorrectlyRounded : Prop :=
-  UnaryFnCorrectlyRounded FloatLibSpec.sqrt cModes GenericSoftFloat.kernel.eval
-
-/-- **Open.** Prove `sqrtf` (`generic_softfloat`) is correctly rounded in all four C modes. -/
-theorem sqrtfGenericSoftFloat_correctlyRounded : SqrtfGenericSoftFloatCorrectlyRounded := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Sqrtf.sqrtfX86Sse2_correctlyRounded' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms sqrtfX86Sse2_correctlyRounded
-
-/--
-info: 'LibcMath.Kernels.Sqrtf.sqrtfGenericSoftFloat_correctlyRounded' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms sqrtfGenericSoftFloat_correctlyRounded
-
-end LibcMath.Kernels.Sqrtf

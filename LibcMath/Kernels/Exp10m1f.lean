@@ -1,75 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Testing.Oracle.FloatLib
-import LibcMath.Kernels.Exp10m1f.Generated.Sse2
-import LibcMath.Kernels.Exp10m1f.Generated.Sse42
-import LibcMath.Kernels.Exp10m1f.Generated.Avx2Fma
+import LibcMath.Kernels.Exp10m1f.Plans
+import LibcMath.Kernels.Exp10m1f.Statement
+import LibcMath.Kernels.Exp10m1f.Proof.Sse2
+import LibcMath.Kernels.Exp10m1f.Proof.Sse42
+import LibcMath.Kernels.Exp10m1f.Proof.Avx2Fma
+import LibcMath.Kernels.Exp10m1f.Proof.AArch64
+import LibcMath.Kernels.Exp10m1f.Examples
 
 /-!
-# Extracted `exp10m1f` microarch plans
+# `exp10m1f`: where everything is
 
-Collects three extracted LLVM libc `exp10m1f` microarch plans (SSE2, SSE4.2, AVX2+FMA).
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `sse2` (open): `Proof.Sse2.exp10m1fSse2_correctlyRounded`.
+* `sse42` (open): `Proof.Sse42.exp10m1fSse42_correctlyRounded`.
+* `avx2_fma` (open): `Proof.Avx2Fma.exp10m1fAvx2Fma_correctlyRounded`.
+* `aarch64` (open): `Proof.AArch64.exp10m1fAArch64_correctlyRounded`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Exp10m1f
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open LibcMath.Libc
-open LibcMath.Kernels.Exp10m1f.Generated
-
-/-- Lists all three extracted `exp10m1f` microarch plans. -/
-def allPlans : List (UnaryKernel .binary32) :=
-  [ Sse2.kernel, Sse42.kernel, Avx2Fma.kernel ]
-
-/-- Correct rounding of `exp10m1f` (`sse2`) across all four C rounding modes. -/
-def Exp10m1fSse2CorrectlyRounded : Prop :=
-  UnaryFnCorrectlyRounded FloatLibSpec.exp10m1 cModes Sse2.kernel.eval
-
-/-- Correct rounding of `exp10m1f` (`sse42`) across all four C rounding modes. -/
-def Exp10m1fSse42CorrectlyRounded : Prop :=
-  UnaryFnCorrectlyRounded FloatLibSpec.exp10m1 cModes Sse42.kernel.eval
-
-/-- Correct rounding of `exp10m1f` (`avx2_fma`) across all four C rounding modes. -/
-def Exp10m1fAvx2FmaCorrectlyRounded : Prop :=
-  UnaryFnCorrectlyRounded FloatLibSpec.exp10m1 cModes Avx2Fma.kernel.eval
-
-/-- **Open.** Prove `exp10m1f` (`sse2`) is correctly rounded across all four C rounding modes. -/
-theorem exp10m1fSse2_correctlyRounded : Exp10m1fSse2CorrectlyRounded := by
-  sorry
-
-/-- **Open.** Prove `exp10m1f` (`sse42`) is correctly rounded across all four C rounding modes. -/
-theorem exp10m1fSse42_correctlyRounded : Exp10m1fSse42CorrectlyRounded := by
-  sorry
-
-/-- **Open.** Prove `exp10m1f` (`avx2_fma`) is correctly rounded across all four C modes. -/
-theorem exp10m1fAvx2Fma_correctlyRounded : Exp10m1fAvx2FmaCorrectlyRounded := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Exp10m1f.exp10m1fSse2_correctlyRounded' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms exp10m1fSse2_correctlyRounded
-
-/--
-info: 'LibcMath.Kernels.Exp10m1f.exp10m1fSse42_correctlyRounded' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms exp10m1fSse42_correctlyRounded
-
-/--
-info: 'LibcMath.Kernels.Exp10m1f.exp10m1fAvx2Fma_correctlyRounded' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms exp10m1fAvx2Fma_correctlyRounded
-
-end LibcMath.Kernels.Exp10m1f

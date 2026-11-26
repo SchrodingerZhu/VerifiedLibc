@@ -1,36 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Testing.Oracle.FloatLib
-import LibcMath.Kernels.Nextupf.Generated.GenericSse2
+import LibcMath.Kernels.Nextupf.Plans
+import LibcMath.Kernels.Nextupf.Statement
+import LibcMath.Kernels.Nextupf.Proof.GenericSse2
+import LibcMath.Kernels.Nextupf.Proof.Sse42
+import LibcMath.Kernels.Nextupf.Proof.Avx2Fma
+import LibcMath.Kernels.Nextupf.Proof.AArch64
+import LibcMath.Kernels.Nextupf.Examples
 
 /-!
-# Extracted `nextupf` generic SSE2 plan
+# `nextupf`: where everything is
 
-Collects the extracted LLVM libc `nextupf` (`generic_sse2`) plan and states its obligation.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.nextupfGenericSse2_correctlyRounded`.
+* `sse42` (open): `Proof.Sse42.nextupfSse42_correctlyRounded`.
+* `avx2_fma` (open): `Proof.Avx2Fma.nextupfAvx2Fma_correctlyRounded`.
+* `aarch64` (open): `Proof.AArch64.nextupfAArch64_correctlyRounded`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Nextupf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open Model (IEEERoundingMode)
-open LibcMath.Libc
-open LibcMath.Kernels.Nextupf.Generated
-
-/-- Correct rounding of `nextupf` (`generic_sse2`) in all four C modes. -/
-def NextupfGenericSse2CorrectlyRounded : Prop :=
-  UnaryFnCorrectlyRounded FloatLibSpec.nextup cModes GenericSse2.kernel.eval
-
-/-- **Open.** Prove `nextupf` (`generic_sse2`) matches `FloatLibSpec.nextup` in all four C modes. -/
-theorem nextupfGenericSse2_correctlyRounded : NextupfGenericSse2CorrectlyRounded := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Nextupf.nextupfGenericSse2_correctlyRounded' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms nextupfGenericSse2_correctlyRounded
-
-end LibcMath.Kernels.Nextupf

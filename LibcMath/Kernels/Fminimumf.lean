@@ -1,39 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Testing.Oracle.FloatLib
-import LibcMath.Kernels.Fminimumf.Generated.GenericSse2
+import LibcMath.Kernels.Fminimumf.Plans
+import LibcMath.Kernels.Fminimumf.Statement
+import LibcMath.Kernels.Fminimumf.Proof.GenericSse2
+import LibcMath.Kernels.Fminimumf.Proof.Sse42
+import LibcMath.Kernels.Fminimumf.Proof.Avx2Fma
+import LibcMath.Kernels.Fminimumf.Proof.AArch64
+import LibcMath.Kernels.Fminimumf.Examples
 
 /-!
-# Extracted `fminimumf` microarch plans
+# `fminimumf`: where everything is
 
-Collects 1 extracted LLVM libc `fminimumf` plans and states plan-qualified obligations.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.fminimumfGenericSse2_correctlyRounded`.
+* `sse42` (open): `Proof.Sse42.fminimumfSse42_correctlyRounded`.
+* `avx2_fma` (open): `Proof.Avx2Fma.fminimumfAvx2Fma_correctlyRounded`.
+* `aarch64` (open): `Proof.AArch64.fminimumfAArch64_correctlyRounded`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Fminimumf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open LibcMath.Libc
-open LibcMath.Kernels.Fminimumf.Generated
-
-/-- Lists all 1 extracted `fminimumf` plans. -/
-def allPlans : List (BinaryKernel .binary32) :=
-  [ GenericSse2.kernel ]
-
-/-- Correct rounding of `fminimumf` (`generic_sse2`) in all four C modes. -/
-def FminimumfGenericSse2CorrectlyRounded : Prop :=
-  BinaryFnCorrectlyRounded FloatLibSpec.fminimum cModes GenericSse2.kernel.eval
-
-/-- **Open.** Prove `fminimumf` (`generic_sse2`) is correctly rounded in all four C modes. -/
-theorem fminimumfGenericSse2_correctlyRounded : FminimumfGenericSse2CorrectlyRounded := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Fminimumf.fminimumfGenericSse2_correctlyRounded' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms fminimumfGenericSse2_correctlyRounded
-
-end LibcMath.Kernels.Fminimumf

@@ -1,58 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Testing.Oracle.FloatLib
-import LibcMath.Kernels.Acoshf.Generated.Sse2
-import LibcMath.Kernels.Acoshf.Generated.Avx2Fma
+import LibcMath.Kernels.Acoshf.Plans
+import LibcMath.Kernels.Acoshf.Statement
+import LibcMath.Kernels.Acoshf.Proof.Sse2
+import LibcMath.Kernels.Acoshf.Proof.Sse42
+import LibcMath.Kernels.Acoshf.Proof.Avx2Fma
+import LibcMath.Kernels.Acoshf.Proof.AArch64
+import LibcMath.Kernels.Acoshf.Examples
 
 /-!
-# Extracted `acoshf` microarch plans
+# `acoshf`: where everything is
 
-Collects 2 extracted LLVM libc `acoshf` plans and states plan-qualified obligations.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `sse2` (open): `Proof.Sse2.acoshfSse2_correctlyRounded`.
+* `sse42` (open): `Proof.Sse42.acoshfSse42_correctlyRounded`.
+* `avx2_fma` (open): `Proof.Avx2Fma.acoshfAvx2Fma_correctlyRounded`.
+* `aarch64` (open): `Proof.AArch64.acoshfAArch64_correctlyRounded`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Acoshf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open LibcMath.Libc
-open LibcMath.Kernels.Acoshf.Generated
-
-/-- Lists all 2 extracted `acoshf` plans. -/
-def allPlans : List (UnaryKernel .binary32) :=
-  [ Sse2.kernel
-  , Avx2Fma.kernel ]
-
-/-- Correct rounding of `acoshf` (`sse2`) in all four C modes. -/
-def AcoshfSse2CorrectlyRounded : Prop :=
-  UnaryFnCorrectlyRounded FloatLibSpec.acosh cModes Sse2.kernel.eval
-
-/-- **Open.** Prove `acoshf` (`sse2`) is correctly rounded in all four C modes. -/
-theorem acoshfSse2_correctlyRounded : AcoshfSse2CorrectlyRounded := by
-  sorry
-
-/-- Correct rounding of `acoshf` (`avx2_fma`) in all four C modes. -/
-def AcoshfAvx2FmaCorrectlyRounded : Prop :=
-  UnaryFnCorrectlyRounded FloatLibSpec.acosh cModes Avx2Fma.kernel.eval
-
-/-- **Open.** Prove `acoshf` (`avx2_fma`) is correctly rounded in all four C modes. -/
-theorem acoshfAvx2Fma_correctlyRounded : AcoshfAvx2FmaCorrectlyRounded := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Acoshf.acoshfSse2_correctlyRounded' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms acoshfSse2_correctlyRounded
-
-/--
-info: 'LibcMath.Kernels.Acoshf.acoshfAvx2Fma_correctlyRounded' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms acoshfAvx2Fma_correctlyRounded
-
-end LibcMath.Kernels.Acoshf

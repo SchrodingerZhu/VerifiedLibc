@@ -1,58 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Testing.Oracle.FloatLib
-import LibcMath.Kernels.Roundf.Generated.GenericSse2
-import LibcMath.Kernels.Roundf.Generated.AArch64
+import LibcMath.Kernels.Roundf.Plans
+import LibcMath.Kernels.Roundf.Statement
+import LibcMath.Kernels.Roundf.Proof.GenericSse2
+import LibcMath.Kernels.Roundf.Proof.Sse42
+import LibcMath.Kernels.Roundf.Proof.Avx2Fma
+import LibcMath.Kernels.Roundf.Proof.AArch64
+import LibcMath.Kernels.Roundf.Examples
 
 /-!
-# Extracted `roundf` microarch plans
+# `roundf`: where everything is
 
-Collects 2 extracted LLVM libc `roundf` plans and states plan-qualified obligations.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.roundfGenericSse2_correctlyRounded`.
+* `sse42` (open): `Proof.Sse42.roundfSse42_correctlyRounded`.
+* `avx2_fma` (open): `Proof.Avx2Fma.roundfAvx2Fma_correctlyRounded`.
+* `aarch64` (open): `Proof.AArch64.roundfAArch64_correctlyRounded`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Roundf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open LibcMath.Libc
-open LibcMath.Kernels.Roundf.Generated
-
-/-- Lists all 2 extracted `roundf` plans. -/
-def allPlans : List (UnaryKernel .binary32) :=
-  [ GenericSse2.kernel
-  , AArch64.kernel ]
-
-/-- Correct rounding of `roundf` (`generic_sse2`) in all four C modes. -/
-def RoundfGenericSse2CorrectlyRounded : Prop :=
-  UnaryFnCorrectlyRounded FloatLibSpec.round cModes GenericSse2.kernel.eval
-
-/-- **Open.** Prove `roundf` (`generic_sse2`) is correctly rounded in all four C modes. -/
-theorem roundfGenericSse2_correctlyRounded : RoundfGenericSse2CorrectlyRounded := by
-  sorry
-
-/-- Correct rounding of `roundf` (`aarch64`) in all four C modes. -/
-def RoundfAArch64CorrectlyRounded : Prop :=
-  UnaryFnCorrectlyRounded FloatLibSpec.round cModes AArch64.kernel.eval
-
-/-- **Open.** Prove `roundf` (`aarch64`) is correctly rounded in all four C modes. -/
-theorem roundfAArch64_correctlyRounded : RoundfAArch64CorrectlyRounded := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Roundf.roundfGenericSse2_correctlyRounded' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms roundfGenericSse2_correctlyRounded
-
-/--
-info: 'LibcMath.Kernels.Roundf.roundfAArch64_correctlyRounded' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms roundfAArch64_correctlyRounded
-
-end LibcMath.Kernels.Roundf

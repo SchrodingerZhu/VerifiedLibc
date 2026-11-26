@@ -1,37 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Testing.Oracle.FloatLib
-import LibcMath.Kernels.Getpayloadf.Generated.GenericSse2
+import LibcMath.Kernels.Getpayloadf.Plans
+import LibcMath.Kernels.Getpayloadf.Statement
+import LibcMath.Kernels.Getpayloadf.Proof.GenericSse2
+import LibcMath.Kernels.Getpayloadf.Proof.Sse42
+import LibcMath.Kernels.Getpayloadf.Proof.Avx2Fma
+import LibcMath.Kernels.Getpayloadf.Proof.AArch64
+import LibcMath.Kernels.Getpayloadf.Examples
 
 /-!
-# Extracted `getpayloadf` generic SSE2 plan
+# `getpayloadf`: where everything is
 
-Collects the extracted LLVM libc `getpayloadf` (`generic_sse2`) plan and states its obligation.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.getpayloadfGenericSse2_correctlyRounded`.
+* `sse42` (open): `Proof.Sse42.getpayloadfSse42_correctlyRounded`.
+* `avx2_fma` (open): `Proof.Avx2Fma.getpayloadfAvx2Fma_correctlyRounded`.
+* `aarch64` (open): `Proof.AArch64.getpayloadfAArch64_correctlyRounded`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Getpayloadf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open Model (IEEERoundingMode)
-open LibcMath.Libc
-open LibcMath.Kernels.Getpayloadf.Generated
-
-/-- Correct rounding of `getpayloadf` (`generic_sse2`) in all four C modes. -/
-def GetpayloadfGenericSse2CorrectlyRounded : Prop :=
-  UnaryFnCorrectlyRounded FloatLibSpec.getpayload cModes GenericSse2.kernel.eval
-
-/-- **Open.** Prove `getpayloadf` (`generic_sse2`) matches `FloatLibSpec.getpayload` in C modes.
--/
-theorem getpayloadfGenericSse2_correctlyRounded : GetpayloadfGenericSse2CorrectlyRounded := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Getpayloadf.getpayloadfGenericSse2_correctlyRounded' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms getpayloadfGenericSse2_correctlyRounded
-
-end LibcMath.Kernels.Getpayloadf

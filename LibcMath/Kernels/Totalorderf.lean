@@ -1,38 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Testing.Oracle.FloatLib
-import LibcMath.Kernels.Totalorderf.Generated.GenericSse2
+import LibcMath.Kernels.Totalorderf.Plans
+import LibcMath.Kernels.Totalorderf.Statement
+import LibcMath.Kernels.Totalorderf.Proof.GenericSse2
+import LibcMath.Kernels.Totalorderf.Proof.Sse42
+import LibcMath.Kernels.Totalorderf.Proof.Avx2Fma
+import LibcMath.Kernels.Totalorderf.Proof.AArch64
+import LibcMath.Kernels.Totalorderf.Examples
 
 /-!
-# Extracted `totalorderf` generic SSE2 plan
+# `totalorderf`: where everything is
 
-Collects the extracted LLVM libc `totalorderf` (`generic_sse2`) plan and states its obligation.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.totalorderfGenericSse2_correct`.
+* `sse42` (open): `Proof.Sse42.totalorderfSse42_correct`.
+* `avx2_fma` (open): `Proof.Avx2Fma.totalorderfAvx2Fma_correct`.
+* `aarch64` (open): `Proof.AArch64.totalorderfAArch64_correct`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Totalorderf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open Model (IEEERoundingMode)
-open LibcMath.Libc
-open LibcMath.Kernels.Totalorderf.Generated
-
-/-- Exact IEEE 754 agreement of `totalorderf` (`generic_sse2`) in all four C modes. -/
-def TotalorderfGenericSse2Correct : Prop :=
-  FnCorrectlyRounded Eq (fun m (p : Model .binary32 × Model .binary32) =>
-    if FloatLibSpec.totalorder m p.1 p.2 then 1#32 else 0#32) cModes
-    (fun _ p => GenericSse2.totalorderf p.1 p.2)
-
-/-- **Open.** Prove `totalorderf` (`generic_sse2`) matches `FloatLibSpec.totalorder`. -/
-theorem totalorderfGenericSse2_correct : TotalorderfGenericSse2Correct := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Totalorderf.totalorderfGenericSse2_correct' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms totalorderfGenericSse2_correct
-
-end LibcMath.Kernels.Totalorderf

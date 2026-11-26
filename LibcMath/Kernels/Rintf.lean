@@ -1,58 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Testing.Oracle.FloatLib
-import LibcMath.Kernels.Rintf.Generated.GenericSse2
-import LibcMath.Kernels.Rintf.Generated.BuiltinSse42
+import LibcMath.Kernels.Rintf.Plans
+import LibcMath.Kernels.Rintf.Statement
+import LibcMath.Kernels.Rintf.Proof.GenericSse2
+import LibcMath.Kernels.Rintf.Proof.BuiltinSse42
+import LibcMath.Kernels.Rintf.Proof.Avx2Fma
+import LibcMath.Kernels.Rintf.Proof.AArch64
+import LibcMath.Kernels.Rintf.Examples
 
 /-!
-# Extracted `rintf` microarch plans
+# `rintf`: where everything is
 
-Collects 2 extracted LLVM libc `rintf` plans and states plan-qualified obligations.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.rintfGenericSse2_correctlyRounded`.
+* `builtin_sse42` (open): `Proof.BuiltinSse42.rintfBuiltinSse42_correctlyRounded`.
+* `avx2_fma` (open): `Proof.Avx2Fma.rintfAvx2Fma_correctlyRounded`.
+* `aarch64` (open): `Proof.AArch64.rintfAArch64_correctlyRounded`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Rintf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open LibcMath.Libc
-open LibcMath.Kernels.Rintf.Generated
-
-/-- Lists all 2 extracted `rintf` plans. -/
-def allPlans : List (UnaryKernel .binary32) :=
-  [ GenericSse2.kernel
-  , BuiltinSse42.kernel ]
-
-/-- Correct rounding of `rintf` (`generic_sse2`) in all four C modes. -/
-def RintfGenericSse2CorrectlyRounded : Prop :=
-  UnaryFnCorrectlyRounded FloatLibSpec.rint cModes GenericSse2.kernel.eval
-
-/-- **Open.** Prove `rintf` (`generic_sse2`) is correctly rounded in all four C modes. -/
-theorem rintfGenericSse2_correctlyRounded : RintfGenericSse2CorrectlyRounded := by
-  sorry
-
-/-- Correct rounding of `rintf` (`builtin_sse42`) in all four C modes. -/
-def RintfBuiltinSse42CorrectlyRounded : Prop :=
-  UnaryFnCorrectlyRounded FloatLibSpec.rint cModes BuiltinSse42.kernel.eval
-
-/-- **Open.** Prove `rintf` (`builtin_sse42`) is correctly rounded in all four C modes. -/
-theorem rintfBuiltinSse42_correctlyRounded : RintfBuiltinSse42CorrectlyRounded := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Rintf.rintfGenericSse2_correctlyRounded' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms rintfGenericSse2_correctlyRounded
-
-/--
-info: 'LibcMath.Kernels.Rintf.rintfBuiltinSse42_correctlyRounded' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms rintfBuiltinSse42_correctlyRounded
-
-end LibcMath.Kernels.Rintf

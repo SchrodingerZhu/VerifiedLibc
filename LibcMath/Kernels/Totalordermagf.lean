@@ -1,38 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Testing.Oracle.FloatLib
-import LibcMath.Kernels.Totalordermagf.Generated.GenericSse2
+import LibcMath.Kernels.Totalordermagf.Plans
+import LibcMath.Kernels.Totalordermagf.Statement
+import LibcMath.Kernels.Totalordermagf.Proof.GenericSse2
+import LibcMath.Kernels.Totalordermagf.Proof.Sse42
+import LibcMath.Kernels.Totalordermagf.Proof.Avx2Fma
+import LibcMath.Kernels.Totalordermagf.Proof.AArch64
+import LibcMath.Kernels.Totalordermagf.Examples
 
 /-!
-# Extracted `totalordermagf` generic SSE2 plan
+# `totalordermagf`: where everything is
 
-Collects the extracted LLVM libc `totalordermagf` (`generic_sse2`) plan and states its obligation.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.totalordermagfGenericSse2_correct`.
+* `sse42` (open): `Proof.Sse42.totalordermagfSse42_correct`.
+* `avx2_fma` (open): `Proof.Avx2Fma.totalordermagfAvx2Fma_correct`.
+* `aarch64` (open): `Proof.AArch64.totalordermagfAArch64_correct`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Totalordermagf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open Model (IEEERoundingMode)
-open LibcMath.Libc
-open LibcMath.Kernels.Totalordermagf.Generated
-
-/-- Exact IEEE 754 agreement of `totalordermagf` (`generic_sse2`) in all four C modes. -/
-def TotalordermagfGenericSse2Correct : Prop :=
-  FnCorrectlyRounded Eq (fun m (p : Model .binary32 × Model .binary32) =>
-    if FloatLibSpec.totalordermag m p.1 p.2 then 1#32 else 0#32) cModes
-    (fun _ p => GenericSse2.totalordermagf p.1 p.2)
-
-/-- **Open.** Prove `totalordermagf` (`generic_sse2`) matches `FloatLibSpec.totalordermag`. -/
-theorem totalordermagfGenericSse2_correct : TotalordermagfGenericSse2Correct := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Totalordermagf.totalordermagfGenericSse2_correct' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms totalordermagfGenericSse2_correct
-
-end LibcMath.Kernels.Totalordermagf

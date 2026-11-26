@@ -1,36 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Testing.Oracle.FloatLib
-import LibcMath.Kernels.Remainderf.Generated.GenericSse2
+import LibcMath.Kernels.Remainderf.Plans
+import LibcMath.Kernels.Remainderf.Statement
+import LibcMath.Kernels.Remainderf.Proof.GenericSse2
+import LibcMath.Kernels.Remainderf.Proof.Sse42
+import LibcMath.Kernels.Remainderf.Proof.Avx2Fma
+import LibcMath.Kernels.Remainderf.Proof.AArch64
+import LibcMath.Kernels.Remainderf.Examples
 
 /-!
-# Extracted `remainderf` generic SSE2 plan
+# `remainderf`: where everything is
 
-Collects the extracted LLVM libc `remainderf` (`generic_sse2`) plan and states its obligation.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.remainderfGenericSse2_correctlyRounded`.
+* `sse42` (open): `Proof.Sse42.remainderfSse42_correctlyRounded`.
+* `avx2_fma` (open): `Proof.Avx2Fma.remainderfAvx2Fma_correctlyRounded`.
+* `aarch64` (open): `Proof.AArch64.remainderfAArch64_correctlyRounded`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Remainderf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open Model (IEEERoundingMode)
-open LibcMath.Libc
-open LibcMath.Kernels.Remainderf.Generated
-
-/-- Correct rounding of `remainderf` (`generic_sse2`) in all four C modes. -/
-def RemainderfGenericSse2CorrectlyRounded : Prop :=
-  BinaryFnCorrectlyRounded FloatLibSpec.remainder cModes GenericSse2.kernel.eval
-
-/-- **Open.** Prove `remainderf` (`generic_sse2`) matches IEEE remainder in all C modes. -/
-theorem remainderfGenericSse2_correctlyRounded : RemainderfGenericSse2CorrectlyRounded := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Remainderf.remainderfGenericSse2_correctlyRounded' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms remainderfGenericSse2_correctlyRounded
-
-end LibcMath.Kernels.Remainderf

@@ -1,37 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Testing.Oracle.FloatLib
-import LibcMath.Kernels.Nextdownf.Generated.GenericSse2
+import LibcMath.Kernels.Nextdownf.Plans
+import LibcMath.Kernels.Nextdownf.Statement
+import LibcMath.Kernels.Nextdownf.Proof.GenericSse2
+import LibcMath.Kernels.Nextdownf.Proof.Sse42
+import LibcMath.Kernels.Nextdownf.Proof.Avx2Fma
+import LibcMath.Kernels.Nextdownf.Proof.AArch64
+import LibcMath.Kernels.Nextdownf.Examples
 
 /-!
-# Extracted `nextdownf` generic SSE2 plan
+# `nextdownf`: where everything is
 
-Collects the extracted LLVM libc `nextdownf` (`generic_sse2`) plan and states its obligation.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.nextdownfGenericSse2_correctlyRounded`.
+* `sse42` (open): `Proof.Sse42.nextdownfSse42_correctlyRounded`.
+* `avx2_fma` (open): `Proof.Avx2Fma.nextdownfAvx2Fma_correctlyRounded`.
+* `aarch64` (open): `Proof.AArch64.nextdownfAArch64_correctlyRounded`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Nextdownf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open Model (IEEERoundingMode)
-open LibcMath.Libc
-open LibcMath.Kernels.Nextdownf.Generated
-
-/-- Correct rounding of `nextdownf` (`generic_sse2`) in all four C modes. -/
-def NextdownfGenericSse2CorrectlyRounded : Prop :=
-  UnaryFnCorrectlyRounded FloatLibSpec.nextdown cModes GenericSse2.kernel.eval
-
-/-- **Open.** Prove `nextdownf` (`generic_sse2`) matches `FloatLibSpec.nextdown` in all C modes.
--/
-theorem nextdownfGenericSse2_correctlyRounded : NextdownfGenericSse2CorrectlyRounded := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Nextdownf.nextdownfGenericSse2_correctlyRounded' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms nextdownfGenericSse2_correctlyRounded
-
-end LibcMath.Kernels.Nextdownf

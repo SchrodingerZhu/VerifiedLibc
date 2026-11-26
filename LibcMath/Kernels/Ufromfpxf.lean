@@ -1,35 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Kernels.Ufromfpxf.Generated.GenericSse2
+import LibcMath.Kernels.Ufromfpxf.Plans
+import LibcMath.Kernels.Ufromfpxf.Statement
+import LibcMath.Kernels.Ufromfpxf.Proof.GenericSse2
+import LibcMath.Kernels.Ufromfpxf.Proof.Sse42
+import LibcMath.Kernels.Ufromfpxf.Proof.Avx2Fma
+import LibcMath.Kernels.Ufromfpxf.Proof.AArch64
+import LibcMath.Kernels.Ufromfpxf.Examples
 
 /-!
-# Extracted `ufromfpxf` generic SSE2 plan
+# `ufromfpxf`: where everything is
 
-Collects the extracted LLVM libc `ufromfpxf` (`generic_sse2`) plan and states its obligation.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.ufromfpxfGenericSse2_defined`.
+* `sse42` (open): `Proof.Sse42.ufromfpxfSse42_defined`.
+* `avx2_fma` (open): `Proof.Avx2Fma.ufromfpxfAvx2Fma_defined`.
+* `aarch64` (open): `Proof.AArch64.ufromfpxfAArch64_defined`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Ufromfpxf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open Model (IEEERoundingMode)
-open LibcMath.Libc
-open LibcMath.Kernels.Ufromfpxf.Generated
-
-/-- Definedness (no C++ undefined behavior) of `ufromfpxf` (`generic_sse2`). -/
-def UfromfpxfGenericSse2Defined : Prop :=
-  ∀ m ∈ cModes, ∀ (x : Model .binary32) (r w : BitVec 32), (GenericSse2.ufromfpxf m x r w).isSome
-
-/-- **Open.** Prove `ufromfpxf` (`generic_sse2`) executes without C++ undefined behavior. -/
-theorem ufromfpxfGenericSse2_defined : UfromfpxfGenericSse2Defined := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Ufromfpxf.ufromfpxfGenericSse2_defined' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms ufromfpxfGenericSse2_defined
-
-end LibcMath.Kernels.Ufromfpxf

@@ -1,39 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Testing.Oracle.FloatLib
-import LibcMath.Kernels.Fminf.Generated.GenericSse2
+import LibcMath.Kernels.Fminf.Plans
+import LibcMath.Kernels.Fminf.Statement
+import LibcMath.Kernels.Fminf.Proof.GenericSse2
+import LibcMath.Kernels.Fminf.Proof.Sse42
+import LibcMath.Kernels.Fminf.Proof.Avx2Fma
+import LibcMath.Kernels.Fminf.Proof.AArch64
+import LibcMath.Kernels.Fminf.Examples
 
 /-!
-# Extracted `fminf` microarch plans
+# `fminf`: where everything is
 
-Collects 1 extracted LLVM libc `fminf` plans and states plan-qualified obligations.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.fminfGenericSse2_correctlyRounded`.
+* `sse42` (open): `Proof.Sse42.fminfSse42_correctlyRounded`.
+* `avx2_fma` (open): `Proof.Avx2Fma.fminfAvx2Fma_correctlyRounded`.
+* `aarch64` (open): `Proof.AArch64.fminfAArch64_correctlyRounded`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Fminf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open LibcMath.Libc
-open LibcMath.Kernels.Fminf.Generated
-
-/-- Lists all 1 extracted `fminf` plans. -/
-def allPlans : List (BinaryKernel .binary32) :=
-  [ GenericSse2.kernel ]
-
-/-- Correct rounding of `fminf` (`generic_sse2`) in all four C modes. -/
-def FminfGenericSse2CorrectlyRounded : Prop :=
-  BinaryFnCorrectlyRounded FloatLibSpec.fmin cModes GenericSse2.kernel.eval
-
-/-- **Open.** Prove `fminf` (`generic_sse2`) is correctly rounded in all four C modes. -/
-theorem fminfGenericSse2_correctlyRounded : FminfGenericSse2CorrectlyRounded := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Fminf.fminfGenericSse2_correctlyRounded' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms fminfGenericSse2_correctlyRounded
-
-end LibcMath.Kernels.Fminf

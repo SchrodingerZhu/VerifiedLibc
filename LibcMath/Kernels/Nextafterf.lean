@@ -1,35 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Kernels.Nextafterf.Generated.GenericSse2
+import LibcMath.Kernels.Nextafterf.Plans
+import LibcMath.Kernels.Nextafterf.Statement
+import LibcMath.Kernels.Nextafterf.Proof.GenericSse2
+import LibcMath.Kernels.Nextafterf.Proof.Sse42
+import LibcMath.Kernels.Nextafterf.Proof.Avx2Fma
+import LibcMath.Kernels.Nextafterf.Proof.AArch64
+import LibcMath.Kernels.Nextafterf.Examples
 
 /-!
-# Extracted `nextafterf` generic SSE2 plan
+# `nextafterf`: where everything is
 
-Collects the extracted LLVM libc `nextafterf` (`generic_sse2`) plan and states its obligation.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.nextafterfGenericSse2_defined`.
+* `sse42` (open): `Proof.Sse42.nextafterfSse42_defined`.
+* `avx2_fma` (open): `Proof.Avx2Fma.nextafterfAvx2Fma_defined`.
+* `aarch64` (open): `Proof.AArch64.nextafterfAArch64_defined`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Nextafterf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open Model (IEEERoundingMode)
-open LibcMath.Libc
-open LibcMath.Kernels.Nextafterf.Generated
-
-/-- Definedness (no C++ undefined behavior) of `nextafterf` (`generic_sse2`). -/
-def NextafterfGenericSse2Defined : Prop :=
-  ∀ x y : Model .binary32, (GenericSse2.nextafterf x y).isSome
-
-/-- **Open.** Prove `nextafterf` (`generic_sse2`) executes without C++ undefined behavior. -/
-theorem nextafterfGenericSse2_defined : NextafterfGenericSse2Defined := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Nextafterf.nextafterfGenericSse2_defined' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms nextafterfGenericSse2_defined
-
-end LibcMath.Kernels.Nextafterf

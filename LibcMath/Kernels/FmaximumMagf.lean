@@ -1,39 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Testing.Oracle.FloatLib
-import LibcMath.Kernels.FmaximumMagf.Generated.GenericSse2
+import LibcMath.Kernels.FmaximumMagf.Plans
+import LibcMath.Kernels.FmaximumMagf.Statement
+import LibcMath.Kernels.FmaximumMagf.Proof.GenericSse2
+import LibcMath.Kernels.FmaximumMagf.Proof.Sse42
+import LibcMath.Kernels.FmaximumMagf.Proof.Avx2Fma
+import LibcMath.Kernels.FmaximumMagf.Proof.AArch64
+import LibcMath.Kernels.FmaximumMagf.Examples
 
 /-!
-# Extracted `fmaximum_magf` microarch plans
+# `fmaximum_magf`: where everything is
 
-Collects 1 extracted LLVM libc `fmaximum_magf` plans and states plan-qualified obligations.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.fmaximum_magfGenericSse2_correctlyRounded`.
+* `sse42` (open): `Proof.Sse42.fmaximum_magfSse42_correctlyRounded`.
+* `avx2_fma` (open): `Proof.Avx2Fma.fmaximum_magfAvx2Fma_correctlyRounded`.
+* `aarch64` (open): `Proof.AArch64.fmaximum_magfAArch64_correctlyRounded`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.FmaximumMagf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open LibcMath.Libc
-open LibcMath.Kernels.FmaximumMagf.Generated
-
-/-- Lists all 1 extracted `fmaximum_magf` plans. -/
-def allPlans : List (BinaryKernel .binary32) :=
-  [ GenericSse2.kernel ]
-
-/-- Correct rounding of `fmaximum_magf` (`generic_sse2`) in all four C modes. -/
-def FmaximumMagfGenericSse2CorrectlyRounded : Prop :=
-  BinaryFnCorrectlyRounded FloatLibSpec.fmaximumMag cModes GenericSse2.kernel.eval
-
-/-- **Open.** Prove `fmaximum_magf` (`generic_sse2`) is correctly rounded in all four C modes. -/
-theorem fmaximum_magfGenericSse2_correctlyRounded : FmaximumMagfGenericSse2CorrectlyRounded := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.FmaximumMagf.fmaximum_magfGenericSse2_correctlyRounded' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms fmaximum_magfGenericSse2_correctlyRounded
-
-end LibcMath.Kernels.FmaximumMagf

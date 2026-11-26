@@ -1,33 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Kernels.Isnanf.Generated.GenericSse2
+import LibcMath.Kernels.Isnanf.Plans
+import LibcMath.Kernels.Isnanf.Statement
+import LibcMath.Kernels.Isnanf.Proof.GenericSse2
+import LibcMath.Kernels.Isnanf.Proof.Sse42
+import LibcMath.Kernels.Isnanf.Proof.Avx2Fma
+import LibcMath.Kernels.Isnanf.Proof.AArch64
+import LibcMath.Kernels.Isnanf.Examples
 
 /-!
-# Extracted `isnanf` generic SSE2 plan
+# `isnanf`: where everything is
 
-Collects the extracted LLVM libc `isnanf` (`generic_sse2`) plan and states its obligation.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.isnanfGenericSse2_correct`.
+* `sse42` (open): `Proof.Sse42.isnanfSse42_correct`.
+* `avx2_fma` (open): `Proof.Avx2Fma.isnanfAvx2Fma_correct`.
+* `aarch64` (open): `Proof.AArch64.isnanfAArch64_correct`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Isnanf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open Model (IEEERoundingMode)
-open LibcMath.Libc
-open LibcMath.Kernels.Isnanf.Generated
-
-/-- Exact agreement of `isnanf` (`generic_sse2`) with IEEE NaN classification. -/
-def IsnanfGenericSse2Correct : Prop :=
-  FnCorrectlyRounded Eq (fun _ (x : Model .binary32) => if x.isNaN then 1#32 else 0#32) cModes
-    (fun _ x => GenericSse2.isnanf x)
-
-/-- **Open.** Prove `isnanf` (`generic_sse2`) matches IEEE NaN classification. -/
-theorem isnanfGenericSse2_correct : IsnanfGenericSse2Correct := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Isnanf.isnanfGenericSse2_correct' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]
--/
-#guard_msgs in
-#print axioms isnanfGenericSse2_correct
-
-end LibcMath.Kernels.Isnanf

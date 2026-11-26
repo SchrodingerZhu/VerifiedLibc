@@ -1,35 +1,23 @@
-import LibcMath.Framework.Spec
-import LibcMath.Kernels.Scalbnf.Generated.GenericSse2
+import LibcMath.Kernels.Scalbnf.Plans
+import LibcMath.Kernels.Scalbnf.Statement
+import LibcMath.Kernels.Scalbnf.Proof.GenericSse2
+import LibcMath.Kernels.Scalbnf.Proof.Sse42
+import LibcMath.Kernels.Scalbnf.Proof.Avx2Fma
+import LibcMath.Kernels.Scalbnf.Proof.AArch64
+import LibcMath.Kernels.Scalbnf.Examples
 
 /-!
-# Extracted `scalbnf` generic SSE2 plan
+# `scalbnf`: where everything is
 
-Collects the extracted LLVM libc `scalbnf` (`generic_sse2`) plan and states its obligation.
-Every statement names its microarch plan explicitly.
+Every statement and theorem names its plan; there is no default plan.
+
+* `generic_sse2` (open): `Proof.GenericSse2.scalbnfGenericSse2_defined`.
+* `sse42` (open): `Proof.Sse42.scalbnfSse42_defined`.
+* `avx2_fma` (open): `Proof.Avx2Fma.scalbnfAvx2Fma_defined`.
+* `aarch64` (open): `Proof.AArch64.scalbnfAArch64_defined`.
+
+* `Generated/`: the plans as `ast2lean` writes them. `Plans.lean` lists them.
+* `Statement.lean`: what is to be proved about each plan.
+* `Proof/<Plan>.lean`: the theorem for one plan.
+* `Examples.lean`: worked evaluations.
 -/
-
-namespace LibcMath.Kernels.Scalbnf
-
-open FloatLib.Floats.Formats.BinaryInterchange
-open Model (IEEERoundingMode)
-open LibcMath.Libc
-open LibcMath.Kernels.Scalbnf.Generated
-
-/-- Definedness (no C++ undefined behavior) of `scalbnf` (`generic_sse2`). -/
-def ScalbnfGenericSse2Defined : Prop :=
-  ∀ m ∈ cModes, ∀ (x : Model .binary32) (n : BitVec 32), (GenericSse2.scalbnf m x n).isSome
-
-/-- **Open.** Prove `scalbnf` (`generic_sse2`) executes without C++ undefined behavior. -/
-theorem scalbnfGenericSse2_defined : ScalbnfGenericSse2Defined := by
-  sorry
-
-/--
-info: 'LibcMath.Kernels.Scalbnf.scalbnfGenericSse2_defined' depends on axioms: [propext,
- sorryAx,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms scalbnfGenericSse2_defined
-
-end LibcMath.Kernels.Scalbnf
